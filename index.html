@@ -497,8 +497,8 @@
           </select>
         </div>
         <div class="field">
-          <label>Durée de l'intervention</label>
-          <input type="text" id="f-duree" placeholder="ex : 1h30">
+          <label>Durée de l'intervention (minutes)</label>
+          <input type="number" id="f-duree" placeholder="ex : 90" step="1" min="0">
         </div>
       </div>
     </div>
@@ -519,8 +519,8 @@
           <input type="number" id="f-piece-cout" placeholder="0.00" step="0.01" min="0">
         </div>
         <div class="field">
-          <label>Délai estimé de réception</label>
-          <input type="text" id="f-piece-delai" placeholder="ex : 5 à 7 jours">
+          <label>Délai estimé de réception (jours)</label>
+          <input type="number" id="f-piece-delai" placeholder="ex : 5" step="1" min="0">
         </div>
         <div class="checkbox-row full">
           <input type="checkbox" id="f-piece-recue">
@@ -1434,14 +1434,14 @@ function showDetail(r){
   html += dRow('Diagnostic', escapeHtml(r.diagnostic), true);
   html += dRow('Travaux effectués', escapeHtml(r.travaux), true);
   html += dRow('Statut', escapeHtml(STATUT_LABELS[r.statut] || r.statut || ''));
-  html += dRow('Durée', escapeHtml(r.duree));
+  html += dRow('Durée', formatDuree(r.duree));
   html += '</div>';
 
   if(r['commande-piece']){
     html += '<div class="detail-section"><h3>Pièces détachées</h3>';
     html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
     html += dRow('Coût estimé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
-    html += dRow('Délai estimé', escapeHtml(r['piece-delai']));
+    html += dRow('Délai estimé', formatDelai(r['piece-delai']));
     html += dRow('Pièce reçue', r['piece-recue'] ? 'Oui' : 'Non');
     html += dRow('Pièce posée', r['piece-posee'] ? 'Oui' : 'Non');
     html += '</div>';
@@ -1549,6 +1549,22 @@ document.getElementById('detail-edit').addEventListener('click', () => {
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
 });
+
+function formatDuree(minutes){
+  const m = parseInt(minutes, 10);
+  if(!m || m <= 0) return '—';
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  if(h === 0) return `${m} min`;
+  if(rest === 0) return `${h} h`;
+  return `${h} h ${rest} min`;
+}
+
+function formatDelai(jours){
+  const j = parseInt(jours, 10);
+  if(!j || j <= 0) return '—';
+  return j === 1 ? '1 jour' : `${j} jours`;
+}
 
 function escapeHtml(str){
   const div = document.createElement('div');
@@ -1682,7 +1698,7 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
   line('Diagnostic', data.diagnostic);
   line('Travaux effectués', data.travaux);
   line('Statut', STATUT_LABELS[data.statut] || data.statut);
-  line('Durée', data.duree);
+  line('Durée', formatDuree(data.duree));
   y += 2;
 
   // Pièces
@@ -1690,7 +1706,7 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
     section('Commande de pièces');
     line('Désignation', data['piece-desc']);
     line('Coût estimé', data['piece-cout'] ? data['piece-cout'] + ' €' : '—');
-    line('Délai estimé', data['piece-delai']);
+    line('Délai estimé', formatDelai(data['piece-delai']));
     line('Pièce reçue', data['piece-recue'] ? 'Oui' : 'Non');
     line('Pièce posée', data['piece-posee'] ? 'Oui' : 'Non');
     y += 2;
