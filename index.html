@@ -265,6 +265,10 @@
           <input type="date" id="f-date">
         </div>
         <div class="field">
+          <label>Heure d'intervention</label>
+          <input type="time" id="f-heure">
+        </div>
+        <div class="field">
           <label>Technicien</label>
           <input type="text" id="f-technicien" value="Jonathan" placeholder="Nom du technicien">
         </div>
@@ -344,8 +348,8 @@
         <div class="field full">
           <label>Plaque signalétique (photo)</label>
           <div id="plaque-thumb-wrap" style="display:none; margin-bottom:0.6rem;">
-            <div class="photo-thumb" style="max-width:160px;">
-              <img id="plaque-thumb-img" src="" alt="Plaque signalétique">
+            <div class="photo-thumb" style="max-width:240px; aspect-ratio:auto; border-radius:8px; position:relative; border:1px solid var(--border); overflow:hidden;">
+              <img id="plaque-thumb-img" src="" alt="Plaque signalétique" style="width:100%; height:auto; display:block; object-fit:contain;">
               <button type="button" class="remove-photo" id="remove-plaque" aria-label="Supprimer">×</button>
             </div>
           </div>
@@ -877,7 +881,7 @@ document.getElementById('remove-plaque').addEventListener('click', () => {
 
 
 const fieldIds = [
-  'f-date','f-technicien','f-nom','f-prenom','f-adresse','f-cp','f-ville','f-tel','f-email',
+  'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-cp','f-ville','f-tel','f-email',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
   'f-piece-desc','f-piece-cout','f-piece-delai',
@@ -891,6 +895,7 @@ function resetForm(){
   fieldIds.forEach(id => document.getElementById(id).value = '');
   checkboxIds.forEach(id => document.getElementById(id).checked = false);
   document.getElementById('f-date').value = todayISO();
+  document.getElementById('f-heure').value = new Date().toTimeString().slice(0,5);
   document.getElementById('f-technicien').value = 'Jonathan';
   document.getElementById('f-statut').value = 'Terminée';
   document.getElementById('f-paiement-statut').value = 'Paye_total';
@@ -1107,6 +1112,15 @@ function showToast(msg, isError){
   setTimeout(() => toast.classList.remove('show'), 2200);
 }
 
+function getImageDimensions(dataUrl){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({width: img.naturalWidth, height: img.naturalHeight});
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 // ---------- Export PDF ----------
 document.getElementById('pdf-btn').addEventListener('click', async () => {
   const data = collectFormData();
@@ -1171,6 +1185,7 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
   // Référence / date
   section('Informations générales');
   line('Date d\'intervention', dateFr(data.date));
+  line('Heure d\'intervention', data.heure || '—');
   line('Technicien', data.technicien);
   y += 2;
 
@@ -1189,11 +1204,21 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
   line('Numéro de série', data.serie);
   line('Âge approximatif', data.age);
   if(data.plaquePhoto){
-    if(y + 45 > 280){ doc.addPage(); y = 18; }
+    if(y + 50 > 280){ doc.addPage(); y = 18; }
     doc.setFont('helvetica','bold');
     doc.text('Plaque signalétique :', 16, y);
     y += 4;
-    try{ doc.addImage(data.plaquePhoto, 'JPEG', 16, y, 60, 40); y += 44; }catch(e){}
+    try{
+      const dims = await getImageDimensions(data.plaquePhoto);
+      const maxW = 70, maxH = 50;
+      let w = dims.width, h = dims.height;
+      const ratio = Math.min(maxW / w, maxH / h);
+      w = w * ratio;
+      h = h * ratio;
+      if(y + h > 280){ doc.addPage(); y = 18; }
+      doc.addImage(data.plaquePhoto, 'JPEG', 16, y, w, h);
+      y += h + 4;
+    }catch(e){}
     doc.setFont('helvetica','normal');
   }
   y += 2;
