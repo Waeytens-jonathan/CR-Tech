@@ -452,8 +452,8 @@
           <input type="text" id="f-serie" placeholder="N° de série">
         </div>
         <div class="field">
-          <label>Âge approximatif de l'appareil</label>
-          <input type="text" id="f-age" placeholder="ex : 5 ans">
+          <label>Âge approximatif de l'appareil (années)</label>
+          <input type="number" id="f-age" placeholder="ex : 5" step="1" min="0" inputmode="numeric" pattern="[0-9]*">
         </div>
         <div class="field full">
           <label>Plaque signalétique (photo)</label>
@@ -1420,7 +1420,7 @@ function showDetail(r){
   html += dRow('Type', escapeHtml(r.appareil));
   html += dRow('Marque / Modèle', escapeHtml(`${r.marque||''} ${r.modele||''}`.trim()));
   html += dRow('Numéro de série', escapeHtml(r.serie));
-  html += dRow('Âge approximatif', escapeHtml(r.age));
+  html += dRow('Âge approximatif', formatAge(r.age));
   html += '</div>';
 
   if(r.plaquePhoto){
@@ -1550,6 +1550,13 @@ document.getElementById('detail-edit').addEventListener('click', () => {
   goToStep(1);
 });
 
+function formatAge(annees){
+  const a = parseInt(annees, 10);
+  if(!a && a !== 0) return '—';
+  if(a === 0) return 'moins d\'1 an';
+  return a === 1 ? '1 an' : `${a} ans`;
+}
+
 function formatDuree(minutes){
   const m = parseInt(minutes, 10);
   if(!m || m <= 0) return '—';
@@ -1671,7 +1678,7 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
   line('Type', data.appareil);
   line('Marque / Modèle', `${data.marque||''} ${data.modele||''}`);
   line('Numéro de série', data.serie);
-  line('Âge approximatif', data.age);
+  line('Âge approximatif', formatAge(data.age));
   if(data.plaquePhoto){
     if(y + 50 > 280){ doc.addPage(); y = 18; }
     doc.setFont('helvetica','bold');
