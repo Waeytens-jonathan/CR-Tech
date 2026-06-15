@@ -232,16 +232,56 @@
     display:flex;
     justify-content:space-between;
     align-items:center;
-    gap:0.8rem;
+    gap:0.5rem;
     margin-top:0.5rem;
     padding:1rem 0 2rem;
   }
-  .step-nav .btn{flex:1; text-align:center;}
+  .step-nav .btn{
+    flex:1;
+    text-align:center;
+    padding:0.7rem 0.6rem;
+    font-size:0.85rem;
+    white-space:nowrap;
+    min-width:0;
+  }
   .step-nav #step-prev:disabled,
   .step-nav .btn:disabled{
     opacity:0.35;
     cursor:not-allowed;
   }
+  .detail-section{margin-bottom:1.4rem;}
+  .detail-section h3{
+    font-family:'Bebas Neue', sans-serif;
+    font-size:1.1rem;
+    color:var(--orange);
+    letter-spacing:0.5px;
+    margin-bottom:0.6rem;
+    border-bottom:1px solid var(--border);
+    padding-bottom:0.4rem;
+  }
+  .detail-row{
+    display:flex;
+    justify-content:space-between;
+    gap:1rem;
+    padding:0.35rem 0;
+    font-size:0.92rem;
+    border-bottom:1px solid rgba(255,255,255,0.04);
+  }
+  .detail-row:last-child{border-bottom:none;}
+  .detail-row .dlabel{color:var(--text-muted); flex:0 0 45%;}
+  .detail-row .dvalue{flex:1; text-align:right; word-break:break-word;}
+  .detail-row .dvalue.left{text-align:left;}
+  .detail-title{
+    font-family:'Bebas Neue', sans-serif;
+    font-size:1.6rem;
+    color:var(--orange);
+    letter-spacing:0.5px;
+    margin-bottom:0.3rem;
+  }
+  .detail-sub{color:var(--text-muted); font-size:0.85rem; margin-bottom:1.2rem;}
+  .detail-photos{display:grid; grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:0.6rem;}
+  .detail-photos img{width:100%; border-radius:8px; border:1px solid var(--border); object-fit:cover; aspect-ratio:1;}
+  .detail-sig img{max-width:240px; border-radius:8px; background:#fff;}
   .photo-thumb{
     position:relative;
     aspect-ratio:1;
@@ -282,9 +322,12 @@
 
 <div class="container">
 
-  <div class="tabs">
-    <button class="tab-btn active" data-view="list">Historique</button>
-    <button class="tab-btn" data-view="form">Nouveau / Édition</button>
+  <div class="tabs" style="justify-content:space-between;">
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <button class="tab-btn active" data-view="list">Historique</button>
+      <button class="tab-btn" data-view="form" id="tab-new">Nouveau</button>
+    </div>
+    <button class="tab-btn" id="delete-all-btn" style="border-color:var(--red); color:var(--red);">Supprimer tout</button>
   </div>
 
   <!-- ===================== VUE LISTE ===================== -->
@@ -296,6 +339,17 @@
       </div>
       <div id="report-list"></div>
       <div class="empty" id="empty-msg">Aucun compte-rendu enregistré pour le moment.</div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE DÉTAIL (RAPPORT COMPLET) ===================== -->
+  <div class="view" id="view-detail">
+    <div class="card">
+      <div id="detail-content"></div>
+      <div class="actions" style="margin-top:1.2rem;">
+        <button class="btn btn-outline" id="detail-back">Retour à l'historique</button>
+        <button class="btn btn-primary" id="detail-edit">Modifier ce compte-rendu</button>
+      </div>
     </div>
   </div>
 
@@ -470,7 +524,11 @@
         </div>
         <div class="checkbox-row full">
           <input type="checkbox" id="f-piece-recue">
-          <label for="f-piece-recue">Pièce reçue / RDV de pose à reprogrammer</label>
+          <label for="f-piece-recue">Pièce reçue (en stock, RDV de pose à programmer)</label>
+        </div>
+        <div class="checkbox-row full">
+          <input type="checkbox" id="f-piece-posee">
+          <label for="f-piece-posee">Pièce posée (intervention terminée)</label>
         </div>
       </div>
     </div>
@@ -536,10 +594,6 @@
         <div class="checkbox-row full">
           <input type="checkbox" id="f-garantie">
           <label for="f-garantie">Intervention sous garantie</label>
-        </div>
-        <div class="checkbox-row full">
-          <input type="checkbox" id="f-relance">
-          <label for="f-relance">Nécessite une relance / suivi client</label>
         </div>
         <div class="checkbox-row full">
           <input type="checkbox" id="f-conseils-entretien">
@@ -620,6 +674,7 @@ const CONSEILS_ENTRETIEN_B64 = "JVBERi0xLjQKJfbk/N8KMSAwIG9iago8PAovVHlwZSAvQ2F0
 
 // ---------- Données ----------
 const STORAGE_KEY = 'technikhome_reports';
+const DRAFT_KEY = 'technikhome_draft';
 let reports = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let currentId = null;
 
@@ -632,20 +687,55 @@ document.getElementById('header-date').textContent = new Date().toLocaleDateStri
 document.getElementById('f-date').value = todayISO();
 
 // ---------- Navigation onglets ----------
-document.querySelectorAll('.tab-btn').forEach(btn => {
+document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if(btn.dataset.view === 'list') renderList();
-    if(btn.dataset.view === 'form') goToStep(1);
+    if(btn.dataset.view === 'form'){
+      if(btn.id === 'tab-new'){
+        resetForm();
+        clearDraft();
+      }
+      goToStep(1);
+    }
   });
 });
 
 // ---------- Mode étapes ----------
 const TOTAL_STEPS = 10;
 let currentStep = 1;
+
+// ---------- Brouillon (sauvegarde automatique) ----------
+function saveDraft(){
+  try{
+    const data = collectFormData();
+    data.id = currentId;
+    data._draftStep = currentStep;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+  }catch(e){}
+}
+
+function clearDraft(){
+  localStorage.removeItem(DRAFT_KEY);
+}
+
+function hasDraftContent(data){
+  // Considère qu'il y a un brouillon utile si au moins un champ texte/coché est rempli
+  const skip = ['date','heure','technicien','statut','paiement-statut','reste-encaisser','ref','id','_draftStep','photos','plaquePhoto','signature'];
+  for(const key in data){
+    if(skip.includes(key)) continue;
+    const val = data[key];
+    if(val === true) return true;
+    if(typeof val === 'string' && val.trim() !== '') return true;
+  }
+  if(Array.isArray(data.photos) && data.photos.length) return true;
+  if(data.signature) return true;
+  if(data.plaquePhoto) return true;
+  return false;
+}
 
 function goToStep(n){
   if(n < 1) n = 1;
@@ -668,11 +758,13 @@ function goToStep(n){
   }
   // Remonter en haut de l'écran à chaque changement d'étape
   window.scrollTo({top:0, behavior:'smooth'});
+  saveDraft();
 }
 
 document.getElementById('step-prev').addEventListener('click', () => goToStep(currentStep - 1));
 document.getElementById('step-next').addEventListener('click', () => goToStep(currentStep + 1));
 document.getElementById('step-home').addEventListener('click', () => {
+  saveDraft();
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelector('.tab-btn[data-view="list"]').classList.add('active');
@@ -680,6 +772,21 @@ document.getElementById('step-home').addEventListener('click', () => {
   renderList();
   window.scrollTo({top:0, behavior:'smooth'});
 });
+
+// ---------- Libellés partagés ----------
+const STATUT_LABELS = {
+  'Terminée':'Terminée — appareil fonctionnel',
+  'A_suivre':'À suivre — diagnostic posé',
+  'Attente_piece':'En attente de pièce',
+  'Non_reparable':'Non réparable / irréparable',
+  'Devis':'Devis remis, en attente accord'
+};
+const PAIEMENT_LABELS = {
+  'Paye_total':'Payé en totalité',
+  'Acompte':'Acompte versé',
+  'Non_paye':'Non payé / facture à envoyer',
+  'Gratuit':'Gratuit (devis / garantie)'
+};
 
 // ---------- Génération de référence ----------
 function generateRef(){
@@ -731,6 +838,21 @@ function updateResteAEncaisser(){
 
 document.getElementById('f-acompte-montant').addEventListener('input', updateResteAEncaisser);
 document.getElementById('f-cout-total').addEventListener('input', updateResteAEncaisser);
+
+// ---------- Pré-remplissage du coût pièce dans la facturation ----------
+function recalcTotal(){
+  const mo = parseFloat(document.getElementById('f-cout-mo').value) || 0;
+  const pieces = parseFloat(document.getElementById('f-cout-pieces').value) || 0;
+  const depl = parseFloat(document.getElementById('f-cout-deplacement').value) || 0;
+  document.getElementById('f-cout-total').value = (mo + pieces + depl).toFixed(2);
+  updateResteAEncaisser();
+}
+
+document.getElementById('f-piece-cout').addEventListener('input', () => {
+  const pieceCout = document.getElementById('f-piece-cout').value;
+  document.getElementById('f-cout-pieces').value = pieceCout;
+  recalcTotal();
+});
 
 
 // ---------- Signature ----------
@@ -997,7 +1119,7 @@ const fieldIds = [
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen',
   'f-notes'
 ];
-const checkboxIds = ['f-commande-piece','f-piece-recue','f-garantie','f-relance','f-conseils-entretien','f-facture-creee'];
+const checkboxIds = ['f-commande-piece','f-piece-recue','f-piece-posee','f-garantie','f-conseils-entretien','f-facture-creee'];
 
 function resetForm(){
   fieldIds.forEach(id => document.getElementById(id).value = '');
@@ -1034,7 +1156,7 @@ function loadIntoForm(report){
   });
   document.getElementById('piece-fields').style.display = report['commande-piece'] ? 'grid' : 'none';
   document.getElementById('acompte-field').style.display = (report['paiement-statut'] === 'Acompte') ? 'block' : 'none';
-  document.getElementById('delete-btn').style.display = 'inline-block';
+  document.getElementById('delete-btn').style.display = currentId ? 'inline-block' : 'none';
   signatureData = report.signature || null;
   updateSigPreview();
   photos = Array.isArray(report.photos) ? report.photos.slice(0, MAX_PHOTOS) : [];
@@ -1078,6 +1200,7 @@ document.getElementById('save-btn').addEventListener('click', () => {
     document.getElementById('delete-btn').style.display = 'inline-block';
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  clearDraft();
   showToast('Compte-rendu enregistré');
 });
 
@@ -1119,6 +1242,7 @@ document.getElementById('email-btn').addEventListener('click', () => {
 // ---------- Nouveau ----------
 document.getElementById('new-btn').addEventListener('click', () => {
   resetForm();
+  clearDraft();
   goToStep(1);
   showToast('Nouveau compte-rendu prêt');
 });
@@ -1129,6 +1253,7 @@ document.getElementById('delete-btn').addEventListener('click', () => {
   if(!confirm('Supprimer définitivement ce compte-rendu ?')) return;
   reports = reports.filter(r => r.id !== currentId);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  clearDraft();
   resetForm();
   showToast('Compte-rendu supprimé');
   document.querySelector('.tab-btn[data-view="list"]').click();
@@ -1173,7 +1298,16 @@ function renderList(){
       case 'Gratuit': payBadge = '<span class="badge green">Gratuit</span>'; break;
     }
 
-    let pieceBadge = r['commande-piece'] ? '<span class="badge orange">Commande pièce</span>' : '';
+    let pieceBadge = '';
+    if(r['commande-piece']){
+      if(r['piece-posee']){
+        pieceBadge = '<span class="badge green">Pièce posée</span>';
+      } else if(r['piece-recue']){
+        pieceBadge = '<span class="badge orange">Pièce reçue — pose à programmer</span>';
+      } else {
+        pieceBadge = '<span class="badge orange">Commande pièce</span>';
+      }
+    }
 
     const reste = parseFloat(r['reste-encaisser']) || 0;
     let resteBadge = '';
@@ -1199,18 +1333,222 @@ function renderList(){
       </div>
     `;
     item.addEventListener('click', () => {
-      loadIntoForm(r);
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.querySelector('.tab-btn[data-view="form"]').classList.add('active');
-      document.getElementById('view-form').classList.add('active');
-      goToStep(1);
+      showDetail(r);
     });
     container.appendChild(item);
   });
 }
 
 document.getElementById('search-input').addEventListener('input', renderList);
+
+// ---------- Suppression de tous les comptes-rendus ----------
+document.getElementById('delete-all-btn').addEventListener('click', () => {
+  if(reports.length === 0){
+    showToast('Aucun compte-rendu à supprimer', true);
+    return;
+  }
+  if(!confirm(`Supprimer définitivement les ${reports.length} compte(s)-rendu(s) enregistré(s) ? Cette action est irréversible.`)) return;
+  if(!confirm('Confirmer une seconde fois : voulez-vous vraiment tout supprimer ?')) return;
+  reports = [];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  localStorage.removeItem(DRAFT_KEY);
+  renderList();
+  showToast('Tous les comptes-rendus ont été supprimés');
+});
+
+// ---------- Vue détail (rapport complet) ----------
+let currentDetailReport = null;
+
+function dRow(label, value, leftAlign){
+  if(value === undefined || value === null || value === '') value = '—';
+  return `<div class="detail-row"><span class="dlabel">${escapeHtml(label)}</span><span class="dvalue${leftAlign ? ' left' : ''}">${value}</span></div>`;
+}
+
+function showDetail(r){
+  currentDetailReport = r;
+  const c = document.getElementById('detail-content');
+  const dateFmt = r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '—';
+
+  let html = '';
+  html += `<div class="detail-title">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')}</div>`;
+  html += `<div class="detail-sub">${escapeHtml(r.ref||'')} · ${dateFmt}${r.heure ? ' à ' + escapeHtml(r.heure) : ''}</div>`;
+
+  // ---------- Suivi rapide (éditable) ----------
+  html += '<div class="detail-section"><h3>Suivi du dossier</h3>';
+  html += '<div class="grid">';
+
+  html += '<div class="field"><label>Statut de l\'intervention</label><select id="quick-statut">';
+  Object.keys(STATUT_LABELS).forEach(key => {
+    html += `<option value="${key}" ${r.statut === key ? 'selected' : ''}>${escapeHtml(STATUT_LABELS[key])}</option>`;
+  });
+  html += '</select></div>';
+
+  html += '<div class="field"><label>Statut de paiement</label><select id="quick-paiement">';
+  Object.keys(PAIEMENT_LABELS).forEach(key => {
+    html += `<option value="${key}" ${r['paiement-statut'] === key ? 'selected' : ''}>${escapeHtml(PAIEMENT_LABELS[key])}</option>`;
+  });
+  html += '</select></div>';
+
+  html += '</div>';
+
+  html += '<div class="checkbox-row" style="margin-top:0.4rem;">';
+  html += `<input type="checkbox" id="quick-facture" ${r['facture-creee'] ? 'checked' : ''}>`;
+  html += '<label for="quick-facture">Facture créée / envoyée</label></div>';
+
+  if(r['commande-piece']){
+    html += '<div class="checkbox-row">';
+    html += `<input type="checkbox" id="quick-piece-recue" ${r['piece-recue'] ? 'checked' : ''}>`;
+    html += '<label for="quick-piece-recue">Pièce reçue (en stock)</label></div>';
+    html += '<div class="checkbox-row">';
+    html += `<input type="checkbox" id="quick-piece-posee" ${r['piece-posee'] ? 'checked' : ''}>`;
+    html += '<label for="quick-piece-posee">Pièce posée (terminé)</label></div>';
+  }
+
+  html += '<div class="actions" style="margin-top:0.8rem;">';
+  html += '<button class="btn btn-primary" id="quick-update-btn">Mettre à jour le dossier</button>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="detail-section"><h3>Client</h3>';
+  html += dRow('Adresse', escapeHtml(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`));
+  html += dRow('Téléphone', escapeHtml(r.tel));
+  html += dRow('Email', escapeHtml(r.email));
+  html += dRow('Technicien', escapeHtml(r.technicien));
+  html += '</div>';
+
+  html += '<div class="detail-section"><h3>Appareil</h3>';
+  html += dRow('Type', escapeHtml(r.appareil));
+  html += dRow('Marque / Modèle', escapeHtml(`${r.marque||''} ${r.modele||''}`.trim()));
+  html += dRow('Numéro de série', escapeHtml(r.serie));
+  html += dRow('Âge approximatif', escapeHtml(r.age));
+  html += '</div>';
+
+  if(r.plaquePhoto){
+    html += '<div class="detail-section"><h3>Plaque signalétique</h3>';
+    html += `<img src="${r.plaquePhoto}" alt="Plaque signalétique" style="max-width:240px; border-radius:8px; border:1px solid var(--border);">`;
+    html += '</div>';
+  }
+
+  html += '<div class="detail-section"><h3>Diagnostic & intervention</h3>';
+  html += dRow('Panne signalée', escapeHtml(r.panne), true);
+  html += dRow('Diagnostic', escapeHtml(r.diagnostic), true);
+  html += dRow('Travaux effectués', escapeHtml(r.travaux), true);
+  html += dRow('Statut', escapeHtml(STATUT_LABELS[r.statut] || r.statut || ''));
+  html += dRow('Durée', escapeHtml(r.duree));
+  html += '</div>';
+
+  if(r['commande-piece']){
+    html += '<div class="detail-section"><h3>Pièces détachées</h3>';
+    html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
+    html += dRow('Coût estimé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
+    html += dRow('Délai estimé', escapeHtml(r['piece-delai']));
+    html += dRow('Pièce reçue', r['piece-recue'] ? 'Oui' : 'Non');
+    html += dRow('Pièce posée', r['piece-posee'] ? 'Oui' : 'Non');
+    html += '</div>';
+  }
+
+  html += '<div class="detail-section"><h3>Facturation</h3>';
+  html += dRow('Main d\'œuvre', r['cout-mo'] ? parseFloat(r['cout-mo']).toFixed(2) + ' €' : '—');
+  html += dRow('Pièces facturées', r['cout-pieces'] ? parseFloat(r['cout-pieces']).toFixed(2) + ' €' : '—');
+  html += dRow('Déplacement', r['cout-deplacement'] ? parseFloat(r['cout-deplacement']).toFixed(2) + ' €' : '—');
+  html += dRow('Total', `<strong>${r['cout-total'] ? parseFloat(r['cout-total']).toFixed(2) + ' €' : '—'}</strong>`, false);
+  html += dRow('Statut paiement', escapeHtml(PAIEMENT_LABELS[r['paiement-statut']] || r['paiement-statut'] || ''));
+  if(r['paiement-statut'] === 'Acompte'){
+    html += dRow('Montant acompte', r['acompte-montant'] ? parseFloat(r['acompte-montant']).toFixed(2) + ' €' : '—');
+  }
+  html += dRow('Moyen de paiement', escapeHtml(r['paiement-moyen']));
+  const reste = parseFloat(r['reste-encaisser']) || 0;
+  html += dRow('Reste à encaisser', `<strong style="color:${reste > 0 ? 'var(--orange)' : 'inherit'}">${reste.toFixed(2)} €</strong>`);
+  html += dRow('Facture créée', r['facture-creee'] ? 'Oui' : 'Non');
+  html += '</div>';
+
+  html += '<div class="detail-section"><h3>Notes</h3>';
+  html += dRow('Remarques', escapeHtml(r.notes), true);
+  html += dRow('Sous garantie', r.garantie ? 'Oui' : 'Non');
+  html += dRow('Conseils d\'entretien souhaités', r['conseils-entretien'] ? 'Oui' : 'Non');
+  html += '</div>';
+
+  if(Array.isArray(r.photos) && r.photos.length){
+    html += '<div class="detail-section"><h3>Photos de l\'intervention</h3>';
+    html += '<div class="detail-photos">';
+    r.photos.forEach(src => {
+      html += `<img src="${src}" alt="Photo intervention">`;
+    });
+    html += '</div></div>';
+  }
+
+  if(r.signature){
+    html += '<div class="detail-section detail-sig"><h3>Signature client</h3>';
+    html += `<img src="${r.signature}" alt="Signature client">`;
+    html += '</div>';
+  }
+
+  c.innerHTML = html;
+
+  const quickBtn = document.getElementById('quick-update-btn');
+  if(quickBtn){
+    quickBtn.addEventListener('click', () => {
+      const idx = reports.findIndex(rep => rep.id === r.id);
+      if(idx === -1){
+        showToast('Compte-rendu introuvable', true);
+        return;
+      }
+      const statutEl = document.getElementById('quick-statut');
+      const paiementEl = document.getElementById('quick-paiement');
+      const factureEl = document.getElementById('quick-facture');
+      const pieceRecueEl = document.getElementById('quick-piece-recue');
+      const piecePoseeEl = document.getElementById('quick-piece-posee');
+
+      reports[idx].statut = statutEl.value;
+      reports[idx]['paiement-statut'] = paiementEl.value;
+      reports[idx]['facture-creee'] = factureEl.checked;
+      if(pieceRecueEl){
+        reports[idx]['piece-recue'] = pieceRecueEl.checked;
+      }
+      if(piecePoseeEl){
+        reports[idx]['piece-posee'] = piecePoseeEl.checked;
+      }
+
+      // Recalcul du reste à encaisser selon le nouveau statut de paiement
+      const total = parseFloat(reports[idx]['cout-total']) || 0;
+      let reste = 0;
+      if(paiementEl.value === 'Acompte'){
+        const acompte = parseFloat(reports[idx]['acompte-montant']) || 0;
+        reste = total - acompte;
+      } else if(paiementEl.value === 'Non_paye'){
+        reste = total;
+      }
+      if(reste < 0) reste = 0;
+      reports[idx]['reste-encaisser'] = reste.toFixed(2);
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+      showToast('Dossier mis à jour');
+      showDetail(reports[idx]);
+    });
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-detail').classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+document.getElementById('detail-back').addEventListener('click', () => {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector('.tab-btn[data-view="list"]').classList.add('active');
+  document.getElementById('view-list').classList.add('active');
+  renderList();
+});
+
+document.getElementById('detail-edit').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  loadIntoForm(currentDetailReport);
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector('.tab-btn[data-view="form"]').classList.add('active');
+  document.getElementById('view-form').classList.add('active');
+  goToStep(1);
+});
 
 function escapeHtml(str){
   const div = document.createElement('div');
@@ -1343,14 +1681,7 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
   line('Panne signalée', data.panne);
   line('Diagnostic', data.diagnostic);
   line('Travaux effectués', data.travaux);
-  const statutLabels = {
-    'Terminée':'Terminée — appareil fonctionnel',
-    'A_suivre':'À suivre — diagnostic posé',
-    'Attente_piece':'En attente de pièce',
-    'Non_reparable':'Non réparable / irréparable',
-    'Devis':'Devis remis, en attente accord'
-  };
-  line('Statut', statutLabels[data.statut] || data.statut);
+  line('Statut', STATUT_LABELS[data.statut] || data.statut);
   line('Durée', data.duree);
   y += 2;
 
@@ -1361,6 +1692,7 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
     line('Coût estimé', data['piece-cout'] ? data['piece-cout'] + ' €' : '—');
     line('Délai estimé', data['piece-delai']);
     line('Pièce reçue', data['piece-recue'] ? 'Oui' : 'Non');
+    line('Pièce posée', data['piece-posee'] ? 'Oui' : 'Non');
     y += 2;
   }
 
@@ -1388,7 +1720,6 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
   section('Notes complémentaires');
   line('Remarques', data.notes);
   line('Sous garantie', data.garantie ? 'Oui' : 'Non');
-  line('Relance nécessaire', data.relance ? 'Oui' : 'Non');
   line('Conseils d\'entretien joints', data['conseils-entretien'] ? 'Oui' : 'Non');
   y += 4;
 
@@ -1487,6 +1818,52 @@ renderPhotos();
 resetForm();
 renderList();
 goToStep(1);
+
+// Sauvegarde automatique du brouillon à chaque modification (debounce)
+let draftTimeout = null;
+document.getElementById('view-form').addEventListener('input', () => {
+  clearTimeout(draftTimeout);
+  draftTimeout = setTimeout(saveDraft, 600);
+});
+document.getElementById('view-form').addEventListener('change', () => {
+  clearTimeout(draftTimeout);
+  draftTimeout = setTimeout(saveDraft, 600);
+});
+
+// Reprise d'un brouillon existant au chargement de la page
+(function checkDraft(){
+  try{
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if(!raw) return;
+    const draft = JSON.parse(raw);
+    if(!hasDraftContent(draft)){
+      clearDraft();
+      return;
+    }
+    const nom = (draft.prenom || draft.nom) ? `${draft.prenom||''} ${draft.nom||''}`.trim() : 'sans nom';
+    if(confirm(`Un brouillon de compte-rendu non terminé a été trouvé (${nom}, réf. ${draft.ref||''}). Voulez-vous le reprendre ?`)){
+      // Si le brouillon correspond à un compte-rendu déjà enregistré, on l'édite ; sinon on charge le brouillon tel quel
+      if(draft.id){
+        const existing = reports.find(r => r.id === draft.id);
+        if(existing){
+          loadIntoForm(draft);
+        } else {
+          loadIntoForm(draft);
+        }
+      } else {
+        loadIntoForm(draft);
+      }
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelector('.tab-btn[data-view="form"]').classList.add('active');
+      document.getElementById('view-form').classList.add('active');
+      goToStep(draft._draftStep || 1);
+    } else {
+      clearDraft();
+    }
+  }catch(e){}
+})();
+
 </script>
 
 </body>
