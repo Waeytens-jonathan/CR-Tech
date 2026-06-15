@@ -104,6 +104,16 @@
     background:var(--card-bg);
     color:var(--text-light);
   }
+  input[type="date"], input[type="time"]{
+    color-scheme:dark;
+    padding-right:0.5rem;
+    min-width:0;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator{
+    filter:invert(0.8);
+    margin-left:4px;
+  }
   textarea{resize:vertical; min-height:80px;}
   .checkbox-row{display:flex; align-items:center; gap:0.6rem; padding:0.4rem 0;}
   .checkbox-row input{width:18px; height:18px; flex:none;}
@@ -463,6 +473,10 @@
           <label><strong>Reste à encaisser (€)</strong></label>
           <input type="number" id="f-reste-encaisser" placeholder="0.00" step="0.01" readonly style="font-weight:500; color:var(--orange);">
         </div>
+      </div>
+      <div class="checkbox-row" style="margin-top:0.6rem;">
+        <input type="checkbox" id="f-facture-creee">
+        <label for="f-facture-creee">Facture créée</label>
       </div>
     </div>
 
@@ -889,7 +903,7 @@ const fieldIds = [
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen',
   'f-notes'
 ];
-const checkboxIds = ['f-commande-piece','f-piece-recue','f-garantie','f-relance','f-conseils-entretien'];
+const checkboxIds = ['f-commande-piece','f-piece-recue','f-garantie','f-relance','f-conseils-entretien','f-facture-creee'];
 
 function resetForm(){
   fieldIds.forEach(id => document.getElementById(id).value = '');
@@ -1072,6 +1086,10 @@ function renderList(){
       resteBadge = `<span class="badge red">Reste ${reste.toFixed(2)} €</span>`;
     }
 
+    let factureBadge = r['facture-creee']
+      ? '<span class="badge green">Facture créée</span>'
+      : '<span class="badge orange">Facture à créer</span>';
+
     item.innerHTML = `
       <div class="info">
         <div class="name">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')} — ${escapeHtml(r.appareil||'Appareil non précisé')}</div>
@@ -1080,6 +1098,7 @@ function renderList(){
       <div class="right">
         ${payBadge}
         ${resteBadge}
+        ${factureBadge}
         ${pieceBadge}
         <span class="badge" style="background:rgba(26,115,200,0.15); color:#1a73c8;">${total}</span>
       </div>
@@ -1265,6 +1284,8 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
   };
   line('Statut paiement', paiementLabels[data['paiement-statut']] || data['paiement-statut']);
   line('Moyen de paiement', data['paiement-moyen']);
+  line('Reste à encaisser', data['reste-encaisser'] ? data['reste-encaisser'] + ' €' : '0.00 €');
+  line('Facture créée', data['facture-creee'] ? 'Oui' : 'Non');
   y += 2;
 
   // Notes
