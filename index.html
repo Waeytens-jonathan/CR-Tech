@@ -280,7 +280,9 @@
   }
   .detail-sub{color:var(--text-muted); font-size:0.85rem; margin-bottom:1.2rem;}
   .detail-photos{display:grid; grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:0.6rem;}
-  .detail-photos img{width:100%; border-radius:8px; border:1px solid var(--border); object-fit:cover; aspect-ratio:1;}
+  .detail-photos img{width:100%; border-radius:8px; border:1px solid var(--border); object-fit:cover; aspect-ratio:1; cursor:pointer;}
+  .detail-photo-wrap{position:relative; display:inline-block; width:100%;}
+  .detail-photo-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:14px;line-height:24px;text-align:center;cursor:pointer;padding:0;z-index:2;}
   .detail-sig img{max-width:240px; border-radius:8px; background:#fff;}
   .photo-thumb{
     position:relative;
@@ -648,7 +650,6 @@
       <h2>Validation & envoi</h2>
       <div class="actions">
         <button class="btn btn-primary" id="save-btn">Enregistrer le compte-rendu</button>
-        <button class="btn btn-secondary" id="draft-save-btn">💾 Sauver comme brouillon</button>
         <button class="btn btn-secondary" id="pdf-btn">Exporter en PDF</button>
         <button class="btn btn-outline" id="sms-btn">Envoyer par SMS</button>
         <button class="btn btn-outline" id="email-btn">Envoyer par email</button>
@@ -660,6 +661,7 @@
     <div class="step-nav">
       <button class="btn btn-outline" id="step-prev" type="button">Précédent</button>
       <button class="btn btn-outline" id="step-home" type="button">Accueil</button>
+      <button class="btn btn-secondary" id="draft-save-btn" type="button" style="font-size:0.78rem;">💾 Brouillon</button>
       <button class="btn btn-primary" id="step-next" type="button">Suivant</button>
     </div>
 
@@ -1264,6 +1266,65 @@ document.getElementById('delete-btn').addEventListener('click', () => {
 });
 
 // ---------- Liste ----------
+function buildListItem(r){
+  const item = document.createElement('div');
+  item.className = 'list-item';
+  const dateFmt = r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '';
+  const total = r['cout-total'] ? parseFloat(r['cout-total']).toFixed(2) + ' €' : '—';
+
+  let payBadge = '';
+  switch(r['paiement-statut']){
+    case 'Paye_total': payBadge = '<span class="badge green">Payé</span>'; break;
+    case 'Acompte': payBadge = '<span class="badge orange">Acompte</span>'; break;
+    case 'Non_paye': payBadge = '<span class="badge red">Non payé</span>'; break;
+    case 'Gratuit': payBadge = '<span class="badge green">Gratuit</span>'; break;
+  }
+
+  let pieceBadge = '';
+  if(r['commande-piece']){
+    if(r['piece-posee']){
+      pieceBadge = '<span class="badge green">Pièce posée</span>';
+    } else if(r['piece-recue']){
+      pieceBadge = '<span class="badge orange">Pièce reçue — pose à programmer</span>';
+    } else {
+      pieceBadge = '<span class="badge orange">Commande pièce</span>';
+    }
+  }
+
+  const reste = parseFloat(r['reste-encaisser']) || 0;
+  let resteBadge = '';
+  if(reste > 0){
+    resteBadge = `<span class="badge red">Reste ${reste.toFixed(2)} €</span>`;
+  }
+
+  let factureBadge = r['facture-creee']
+    ? '<span class="badge green">Facture créée</span>'
+    : '<span class="badge orange">Facture à créer</span>';
+
+  item.innerHTML = `
+    <div class="info">
+      <div class="name">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')} — ${escapeHtml(r.appareil||'Appareil non précisé')}</div>
+      <div class="meta">${escapeHtml(r.ref||'')} · ${dateFmt} · ${escapeHtml(r.ville||'')}</div>
+    </div>
+    <div class="right">
+      ${payBadge}
+      ${resteBadge}
+      ${factureBadge}
+      ${pieceBadge}
+      <span class="badge" style="background:rgba(26,115,200,0.15); color:#1a73c8;">${total}</span>
+    </div>
+  `;
+  item.addEventListener('click', () => { showDetail(r); });
+  return item;
+}
+
+function renderSectionTitle(text, color){
+  const div = document.createElement('div');
+  div.style.cssText = `font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${color};padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;`;
+  div.textContent = text;
+  return div;
+}
+
 function renderList(){
   const container = document.getElementById('report-list');
   const emptyMsg = document.getElementById('empty-msg');
@@ -1287,64 +1348,18 @@ function renderList(){
   }
   emptyMsg.style.display = 'none';
 
-  filtered.forEach(r => {
-    const item = document.createElement('div');
-    item.className = 'list-item';
+  const drafts = filtered.filter(r => r._isDraft === true);
+  const done   = filtered.filter(r => r._isDraft !== true);
 
-    const dateFmt = r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '';
-    const total = r['cout-total'] ? parseFloat(r['cout-total']).toFixed(2) + ' €' : '—';
+  if(drafts.length > 0){
+    container.appendChild(renderSectionTitle('✏️ Brouillons en cours (' + drafts.length + ')', '#f5a623'));
+    drafts.forEach(r => container.appendChild(buildListItem(r)));
+  }
 
-    let payBadge = '';
-    switch(r['paiement-statut']){
-      case 'Paye_total': payBadge = '<span class="badge green">Payé</span>'; break;
-      case 'Acompte': payBadge = '<span class="badge orange">Acompte</span>'; break;
-      case 'Non_paye': payBadge = '<span class="badge red">Non payé</span>'; break;
-      case 'Gratuit': payBadge = '<span class="badge green">Gratuit</span>'; break;
-    }
-
-    let pieceBadge = '';
-    if(r['commande-piece']){
-      if(r['piece-posee']){
-        pieceBadge = '<span class="badge green">Pièce posée</span>';
-      } else if(r['piece-recue']){
-        pieceBadge = '<span class="badge orange">Pièce reçue — pose à programmer</span>';
-      } else {
-        pieceBadge = '<span class="badge orange">Commande pièce</span>';
-      }
-    }
-
-    const reste = parseFloat(r['reste-encaisser']) || 0;
-    let resteBadge = '';
-    if(reste > 0){
-      resteBadge = `<span class="badge red">Reste ${reste.toFixed(2)} €</span>`;
-    }
-
-    let factureBadge = r['facture-creee']
-      ? '<span class="badge green">Facture créée</span>'
-      : '<span class="badge orange">Facture à créer</span>';
-
-    const isDraft = (r._isDraft === true);
-    const draftBadge = isDraft ? '<span class="badge" style="background:rgba(245,166,35,0.2); color:#f5a623; border:1px solid #f5a623;">✏️ Brouillon</span>' : '';
-
-    item.innerHTML = `
-      <div class="info">
-        <div class="name">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')} — ${escapeHtml(r.appareil||'Appareil non précisé')}</div>
-        <div class="meta">${escapeHtml(r.ref||'')} · ${dateFmt} · ${escapeHtml(r.ville||'')}</div>
-      </div>
-      <div class="right">
-        ${draftBadge}
-        ${payBadge}
-        ${resteBadge}
-        ${factureBadge}
-        ${pieceBadge}
-        <span class="badge" style="background:rgba(26,115,200,0.15); color:#1a73c8;">${total}</span>
-      </div>
-    `;
-    item.addEventListener('click', () => {
-      showDetail(r);
-    });
-    container.appendChild(item);
-  });
+  if(done.length > 0){
+    container.appendChild(renderSectionTitle('✅ Comptes-rendus terminés (' + done.length + ')', 'var(--text-muted)'));
+    done.forEach(r => container.appendChild(buildListItem(r)));
+  }
 }
 
 document.getElementById('search-input').addEventListener('input', renderList);
@@ -1488,10 +1503,12 @@ function showDetail(r){
   if(Array.isArray(r.photos) && r.photos.length){
     html += '<div class="detail-section"><h3>Photos de l\'intervention</h3>';
     html += '<div class="detail-photos">';
-    r.photos.forEach(src => {
-      html += `<img src="${src}" alt="Photo intervention">`;
+    r.photos.forEach((src, idx) => {
+      html += `<div class="detail-photo-wrap"><img src="${src}" alt="Photo intervention" onclick="deleteDetailPhoto(${idx})" title="Appuyer pour supprimer"><button class="detail-photo-del" onclick="deleteDetailPhoto(${idx})">×</button></div>`;
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += '<p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;">Appuyez sur une photo pour la supprimer</p>';
+    html += '</div>';
   }
 
   if(r.signature){
@@ -1647,6 +1664,20 @@ function sendSmsArrival(){
   if(!tel){ showToast('Numéro de téléphone manquant', true); return; }
   const msg = `Bonjour, c'est Jonathan Technik-home. Vous êtes mon prochain client(e) j'arrive chez vous dans ${minutes} minutes. Merci à tout de suite.`;
   window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(msg);
+}
+
+function deleteDetailPhoto(idx){
+  if(!currentDetailReport) return;
+  if(!confirm('Supprimer cette photo ?')) return;
+  currentDetailReport.photos.splice(idx, 1);
+  // Sauvegarder dans reports
+  const rIdx = reports.findIndex(r => r.id === currentDetailReport.id);
+  if(rIdx !== -1){
+    reports[rIdx] = currentDetailReport;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  }
+  showToast('Photo supprimée');
+  showDetail(currentDetailReport);
 }
 
 function formatAge(annees){
