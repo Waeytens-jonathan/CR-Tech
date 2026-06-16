@@ -1581,7 +1581,7 @@ document.getElementById('detail-sms-avis').addEventListener('click', () => {
 
 // ---------- Bouton Sauver comme brouillon ----------
 document.getElementById('draft-save-btn').addEventListener('click', () => {
-  const data = collectForm();
+  const data = collectFormData();
   if(!data.nom && !data.prenom && !data.tel){
     showToast('Remplissez au moins un champ avant de sauver un brouillon', true);
     return;
