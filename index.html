@@ -648,6 +648,7 @@
       <h2>Validation & envoi</h2>
       <div class="actions">
         <button class="btn btn-primary" id="save-btn">Enregistrer le compte-rendu</button>
+        <button class="btn btn-secondary" id="draft-save-btn">💾 Sauver comme brouillon</button>
         <button class="btn btn-secondary" id="pdf-btn">Exporter en PDF</button>
         <button class="btn btn-outline" id="sms-btn">Envoyer par SMS</button>
         <button class="btn btn-outline" id="email-btn">Envoyer par email</button>
@@ -1193,10 +1194,12 @@ document.getElementById('save-btn').addEventListener('click', () => {
   if(currentId){
     const idx = reports.findIndex(r => r.id === currentId);
     data.id = currentId;
+    delete data._isDraft;
     reports[idx] = data;
   } else {
     data.id = 'r_' + Date.now();
     currentId = data.id;
+    delete data._isDraft;
     reports.unshift(data);
     document.getElementById('delete-btn').style.display = 'inline-block';
   }
@@ -1320,12 +1323,16 @@ function renderList(){
       ? '<span class="badge green">Facture créée</span>'
       : '<span class="badge orange">Facture à créer</span>';
 
+    const isDraft = (r._isDraft === true);
+    const draftBadge = isDraft ? '<span class="badge" style="background:rgba(245,166,35,0.2); color:#f5a623; border:1px solid #f5a623;">✏️ Brouillon</span>' : '';
+
     item.innerHTML = `
       <div class="info">
         <div class="name">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')} — ${escapeHtml(r.appareil||'Appareil non précisé')}</div>
         <div class="meta">${escapeHtml(r.ref||'')} · ${dateFmt} · ${escapeHtml(r.ville||'')}</div>
       </div>
       <div class="right">
+        ${draftBadge}
         ${payBadge}
         ${resteBadge}
         ${factureBadge}
@@ -1412,6 +1419,15 @@ function showDetail(r){
 
   html += '<div class="detail-section"><h3>Client</h3>';
   html += dRow('Adresse', escapeHtml(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`));
+  // Boutons adresse
+  const addrFull = `${r.adresse||''} ${r.cp||''} ${r.ville||''}`.trim();
+  if(addrFull){
+    html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">';
+    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull)}'))">🗺️ Waze</button>`;
+    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrFull)}'))">📋 Copier adresse</button>`;
+    if(r.tel){ html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;background:rgba(13,27,42,0.7);" onclick="showSmsArrival(decodeURIComponent('${encodeURIComponent(r.tel||'')}'))">💬 SMS j'arrive</button>`; }
+    html += '</div>';
+  }
   html += dRow('Téléphone', escapeHtml(r.tel));
   html += dRow('Email', escapeHtml(r.email));
   html += dRow('Technicien', escapeHtml(r.technicien));
@@ -1562,6 +1578,76 @@ document.getElementById('detail-sms-avis').addEventListener('click', () => {
   const smsUrl = `sms:${tel}?body=${encodeURIComponent(message)}`;
   window.location.href = smsUrl;
 });
+
+// ---------- Bouton Sauver comme brouillon ----------
+document.getElementById('draft-save-btn').addEventListener('click', () => {
+  const data = collectForm();
+  if(!data.nom && !data.prenom && !data.tel){
+    showToast('Remplissez au moins un champ avant de sauver un brouillon', true);
+    return;
+  }
+  data._isDraft = true;
+  data._draftStep = currentStep;
+  // Si c'est une modification d'un CR existant on garde l'id
+  if(!data.id){
+    data.id = 'draft_' + Date.now();
+    data.ref = data.ref || ('BR-' + Date.now().toString().slice(-6));
+  }
+  // Mettre à jour ou ajouter dans reports
+  const idx = reports.findIndex(r => r.id === data.id);
+  if(idx !== -1){
+    reports[idx] = data;
+  } else {
+    reports.unshift(data);
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  saveDraft();
+  showToast('Brouillon sauvegardé ✓');
+  // Retour à la liste
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector('.tab-btn[data-view="list"]').classList.add('active');
+  document.getElementById('view-list').classList.add('active');
+  renderList();
+});
+
+// ---------- Waze / Copier adresse / SMS arrivée ----------
+function openWaze(addr){
+  const encoded = encodeURIComponent(addr);
+  window.open('https://waze.com/ul?q=' + encoded + '&navigate=yes', '_blank');
+}
+
+function copyAddr(addr){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(addr).then(() => showToast('Adresse copiée ✓'));
+  } else {
+    // fallback
+    const el = document.createElement('textarea');
+    el.value = addr;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast('Adresse copiée ✓');
+  }
+}
+
+let _smsArrivalTel = '';
+function showSmsArrival(tel){
+  _smsArrivalTel = tel;
+  document.getElementById('sms-arrival-modal').style.display = 'flex';
+  document.getElementById('sms-arrival-minutes').value = '10';
+  document.getElementById('sms-arrival-minutes').focus();
+}
+
+function sendSmsArrival(){
+  const minutes = parseInt(document.getElementById('sms-arrival-minutes').value, 10) || 10;
+  document.getElementById('sms-arrival-modal').style.display = 'none';
+  const tel = _smsArrivalTel.replace(/[^\d+]/g, '');
+  if(!tel){ showToast('Numéro de téléphone manquant', true); return; }
+  const msg = `Bonjour, c'est Jonathan Technik-home. Vous êtes mon prochain client(e) j'arrive chez vous dans ${minutes} minutes. Merci à tout de suite.`;
+  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(msg);
+}
 
 function formatAge(annees){
   const a = parseInt(annees, 10);
@@ -1900,7 +1986,23 @@ document.getElementById('view-form').addEventListener('change', () => {
   }catch(e){}
 })();
 
+
 </script>
+
+<!-- ===================== MODALE SMS ARRIVÉE ===================== -->
+<div id="sms-arrival-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <h3 style="margin:0 0 0.8rem;color:var(--orange);">💬 SMS — J'arrive</h3>
+    <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1rem;">Le message sera pré-rempli dans votre app SMS. Modifiez le délai si besoin :</p>
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Temps d'arrivée (minutes) :</label>
+    <input id="sms-arrival-minutes" type="number" value="10" min="1" max="120"
+      style="width:100%;padding:0.5rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1rem;box-sizing:border-box;margin-bottom:1rem;">
+    <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="document.getElementById('sms-arrival-modal').style.display='none'">Annuler</button>
+      <button class="btn btn-primary" onclick="sendSmsArrival()">Envoyer 💬</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
