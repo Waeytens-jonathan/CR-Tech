@@ -354,6 +354,7 @@
         <button class="btn btn-primary" id="detail-edit" style="flex:1;min-width:120px;">✏️ Modifier le dossier</button>
         <button class="btn btn-secondary" id="detail-sms-arrival-btn">💬 J'arrive</button>
         <button class="btn btn-secondary" id="detail-sms-avis">⭐ Avis</button>
+        <button class="btn btn-outline" id="detail-email-btn">📧 Email</button>
       </div>
       <div id="detail-content"></div>
     </div>
@@ -432,16 +433,40 @@
           <label>Type d'appareil</label>
           <select id="f-appareil">
             <option value="">-- Sélectionner --</option>
-            <option>Lave-linge</option>
-            <option>Lave-vaisselle</option>
-            <option>Réfrigérateur</option>
-            <option>Congélateur</option>
-            <option>Four</option>
-            <option>Plaque de cuisson</option>
-            <option>Sèche-linge</option>
-            <option>Hotte aspirante</option>
-            <option>Micro-ondes</option>
-            <option>Cave à vin</option>
+            <optgroup label="Gros électroménager">
+              <option>Lave-linge</option>
+              <option>Lave-vaisselle</option>
+              <option>Réfrigérateur</option>
+              <option>Congélateur</option>
+              <option>Four</option>
+              <option>Plaque de cuisson</option>
+              <option>Sèche-linge</option>
+              <option>Hotte aspirante</option>
+              <option>Micro-ondes</option>
+              <option>Cave à vin</option>
+            </optgroup>
+            <optgroup label="Audiovisuel">
+              <option>Téléviseur</option>
+              <option>Barre de son</option>
+              <option>Chaîne Hi-Fi</option>
+              <option>Ampli / Récepteur</option>
+              <option>Lecteur Blu-ray / DVD</option>
+              <option>Vidéoprojecteur</option>
+              <option>Enceinte</option>
+            </optgroup>
+            <optgroup label="Informatique & Gaming">
+              <option>Ordinateur portable</option>
+              <option>Ordinateur fixe</option>
+              <option>Console de jeux</option>
+              <option>Écran PC</option>
+              <option>Imprimante</option>
+            </optgroup>
+            <optgroup label="Petit électroménager">
+              <option>Aspirateur</option>
+              <option>Robot cuiseur</option>
+              <option>Cafetière</option>
+              <option>Autre petit électroménager</option>
+            </optgroup>
             <option>Autre</option>
           </select>
         </div>
@@ -660,7 +685,6 @@
 
     <div class="step-nav">
       <button class="btn btn-outline" id="step-prev" type="button">Précédent</button>
-      <button class="btn btn-outline" id="step-home" type="button">Accueil</button>
       <button class="btn btn-primary" id="step-next" type="button">Suivant</button>
     </div>
 
@@ -798,10 +822,7 @@ function goToList(){
   renderList();
   window.scrollTo({top:0, behavior:'smooth'});
 }
-document.getElementById('step-home').addEventListener('click', () => {
-  autoSaveDraftToReports();
-  goToList();
-});
+// step-home bouton supprimé
 document.addEventListener('visibilitychange', () => {
   if(document.hidden && document.getElementById('view-form').classList.contains('active')){
     autoSaveDraftToReports();
@@ -1260,7 +1281,7 @@ document.getElementById('email-btn').addEventListener('click', () => {
     return;
   }
   const subject = `Compte-rendu d'intervention ${data.ref||''} — Technik-Home`;
-  const message = buildMessage(data) + '\n\nN\'oubliez pas de joindre le PDF du compte-rendu (téléchargé via "Exporter en PDF").';
+  const message = buildMessage(data);
   const url = `mailto:${encodeURIComponent(data.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
   window.location.href = url;
 });
@@ -1621,6 +1642,24 @@ document.getElementById('detail-sms-avis').addEventListener('click', () => {
   if(!tel){ showToast('Numéro manquant', true); return; }
   const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
   window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
+});
+
+document.getElementById('detail-email-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  if(!r.email){ showToast('Email du client manquant', true); return; }
+
+  // 1. Générer et télécharger le PDF
+  try {
+    document.getElementById('pdf-btn').click();
+    await new Promise(res => setTimeout(res, 800));
+  } catch(e) { console.error('PDF error', e); }
+
+  // 2. Ouvrir le client mail avec le message
+  const subject = `Compte-rendu d'intervention ${r.ref||''} — Technik-Home`;
+  const body = buildMessage(r);
+  const url = `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = url;
 });
 
 // Brouillon auto-save géré par autoSaveDraftToReports() au départ du formulaire
