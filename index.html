@@ -654,9 +654,7 @@
       <div class="actions">
         <button class="btn btn-primary" id="save-btn" style="display:none;">Enregistrer</button>
         <button class="btn btn-secondary" id="pdf-btn">📄 Exporter en PDF</button>
-        <button class="btn btn-outline" id="sms-btn">💬 Envoyer par SMS</button>
         <button class="btn btn-outline" id="email-btn">📧 Envoyer par email</button>
-        <button class="btn btn-outline" id="new-btn">+ Nouveau compte-rendu</button>
       </div>
     </div>
 
@@ -1247,17 +1245,6 @@ function buildMessage(data){
     `Cordialement,\nTechnik-Home\n07 59 70 54 97`;
 }
 
-document.getElementById('sms-btn').addEventListener('click', () => {
-  const data = collectFormData();
-  if(!data.tel){
-    showToast('Numéro de téléphone du client manquant', true);
-    return;
-  }
-  const tel = data.tel.replace(/[\s.\-]/g, '');
-  const message = buildMessage(data);
-  const url = `sms:${tel}?body=${encodeURIComponent(message)}`;
-  window.location.href = url;
-});
 
 document.getElementById('email-btn').addEventListener('click', () => {
   const data = collectFormData();
@@ -1271,13 +1258,6 @@ document.getElementById('email-btn').addEventListener('click', () => {
   window.location.href = url;
 });
 
-// ---------- Nouveau ----------
-document.getElementById('new-btn').addEventListener('click', () => {
-  resetForm();
-  clearDraft();
-  goToStep(1);
-  showToast('Nouveau compte-rendu prêt');
-});
 
 // delete-btn handler supprimé
 
@@ -1380,8 +1360,8 @@ function renderList(){
   emptyMsg.style.display = 'none';
 
   const drafts   = filtered.filter(r => r._isDraft === true);
-  const encours  = filtered.filter(r => !r._isDraft && r.statut !== 'Terminée');
-  const termines = filtered.filter(r => !r._isDraft && r.statut === 'Terminée');
+  const encours  = filtered.filter(r => !r._isDraft && r.statut !== 'Terminée' && r.statut !== 'Non_reparable');
+  const termines = filtered.filter(r => !r._isDraft && (r.statut === 'Terminée' || r.statut === 'Non_reparable'));
   if(drafts.length > 0){
     container.appendChild(renderSectionTitle('✏️ Brouillons (' + drafts.length + ')', '#f5a623'));
     drafts.forEach(r => container.appendChild(buildListItem(r)));
