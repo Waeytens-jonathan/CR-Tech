@@ -754,7 +754,8 @@ function goToStep(n){
   const nextBtn = document.getElementById('step-next');
   prevBtn.disabled = (currentStep === 1);
   if(currentStep === TOTAL_STEPS){
-    nextBtn.style.display = 'none';
+    nextBtn.style.display = '';
+    nextBtn.textContent = '✓ Enregistrer';
   } else {
     nextBtn.style.display = '';
     nextBtn.textContent = 'Suivant';
@@ -765,7 +766,13 @@ function goToStep(n){
 }
 
 document.getElementById('step-prev').addEventListener('click', () => goToStep(currentStep - 1));
-document.getElementById('step-next').addEventListener('click', () => goToStep(currentStep + 1));
+document.getElementById('step-next').addEventListener('click', () => {
+  if(currentStep === TOTAL_STEPS){
+    document.getElementById('save-btn').click();
+  } else {
+    goToStep(currentStep + 1);
+  }
+});
 function autoSaveDraftToReports(){
   const data = collectFormData();
   if(!hasDraftContent(data)) return;
