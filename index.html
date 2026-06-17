@@ -329,7 +329,6 @@
       <button class="tab-btn active" data-view="list">Historique</button>
       <button class="tab-btn" data-view="form" id="tab-new">Nouveau</button>
     </div>
-    <button class="tab-btn" id="delete-all-btn" style="border-color:var(--red); color:var(--red);">Supprimer tout</button>
   </div>
 
   <!-- ===================== VUE LISTE ===================== -->
@@ -347,12 +346,16 @@
   <!-- ===================== VUE DÉTAIL (RAPPORT COMPLET) ===================== -->
   <div class="view" id="view-detail">
     <div class="card">
-      <div id="detail-content"></div>
-      <div class="actions" style="margin-top:1.2rem;">
-        <button class="btn btn-outline" id="detail-back">Retour à l'historique</button>
-        <button class="btn btn-secondary" id="detail-sms-avis">Envoyer SMS avis Google</button>
-        <button class="btn btn-primary" id="detail-edit">Modifier ce compte-rendu</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+        <button class="btn btn-outline" id="detail-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <button class="btn btn-danger" id="detail-delete-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">🗑️ Supprimer</button>
       </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <button class="btn btn-primary" id="detail-edit" style="flex:1;min-width:120px;">✏️ Modifier le dossier</button>
+        <button class="btn btn-secondary" id="detail-sms-arrival-btn">💬 J'arrive</button>
+        <button class="btn btn-secondary" id="detail-sms-avis">⭐ Avis</button>
+      </div>
+      <div id="detail-content"></div>
     </div>
   </div>
 
@@ -405,7 +408,7 @@
         </div>
         <div class="field">
           <label>Code postal</label>
-          <input type="text" id="f-cp" placeholder="62300">
+          <input type="text" id="f-cp" placeholder="62300" inputmode="numeric" pattern="[0-9]*">
         </div>
         <div class="field">
           <label>Ville</label>
@@ -649,19 +652,17 @@
     <div class="card step" data-step="10">
       <h2>Validation & envoi</h2>
       <div class="actions">
-        <button class="btn btn-primary" id="save-btn">Enregistrer le compte-rendu</button>
-        <button class="btn btn-secondary" id="pdf-btn">Exporter en PDF</button>
-        <button class="btn btn-outline" id="sms-btn">Envoyer par SMS</button>
-        <button class="btn btn-outline" id="email-btn">Envoyer par email</button>
-        <button class="btn btn-outline" id="new-btn">Nouveau compte-rendu</button>
-        <button class="btn btn-danger" id="delete-btn" style="display:none;">Supprimer</button>
+        <button class="btn btn-primary" id="save-btn" style="display:none;">Enregistrer</button>
+        <button class="btn btn-secondary" id="pdf-btn">📄 Exporter en PDF</button>
+        <button class="btn btn-outline" id="sms-btn">💬 Envoyer par SMS</button>
+        <button class="btn btn-outline" id="email-btn">📧 Envoyer par email</button>
+        <button class="btn btn-outline" id="new-btn">+ Nouveau compte-rendu</button>
       </div>
     </div>
 
     <div class="step-nav">
       <button class="btn btn-outline" id="step-prev" type="button">Précédent</button>
       <button class="btn btn-outline" id="step-home" type="button">Accueil</button>
-      <button class="btn btn-secondary" id="draft-save-btn" type="button" style="font-size:0.78rem;">💾 Brouillon</button>
       <button class="btn btn-primary" id="step-next" type="button">Suivant</button>
     </div>
 
@@ -767,14 +768,39 @@ function goToStep(n){
 
 document.getElementById('step-prev').addEventListener('click', () => goToStep(currentStep - 1));
 document.getElementById('step-next').addEventListener('click', () => goToStep(currentStep + 1));
-document.getElementById('step-home').addEventListener('click', () => {
+function autoSaveDraftToReports(){
+  const data = collectFormData();
+  if(!hasDraftContent(data)) return;
+  data._isDraft = true;
+  if(!currentId){
+    data.id = 'draft_' + Date.now();
+    data.ref = data.ref || ('BR-' + Date.now().toString().slice(-6));
+    currentId = data.id;
+    reports.unshift(data);
+  } else {
+    const idx = reports.findIndex(r => r.id === currentId);
+    if(idx !== -1 && reports[idx]._isDraft !== false){ reports[idx] = data; }
+    else if(idx === -1){ reports.unshift(data); }
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
   saveDraft();
+}
+function goToList(){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelector('.tab-btn[data-view="list"]').classList.add('active');
   document.getElementById('view-list').classList.add('active');
   renderList();
   window.scrollTo({top:0, behavior:'smooth'});
+}
+document.getElementById('step-home').addEventListener('click', () => {
+  autoSaveDraftToReports();
+  goToList();
+});
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden && document.getElementById('view-form').classList.contains('active')){
+    autoSaveDraftToReports();
+  }
 });
 
 // ---------- Libellés partagés ----------
@@ -1136,7 +1162,7 @@ function resetForm(){
   document.getElementById('f-reste-encaisser').value = '0.00';
   document.getElementById('piece-fields').style.display = 'none';
   document.getElementById('acompte-field').style.display = 'none';
-  document.getElementById('delete-btn').style.display = 'none';
+  // delete-btn supprimé
   signatureData = null;
   updateSigPreview();
   photos = [];
@@ -1160,7 +1186,7 @@ function loadIntoForm(report){
   });
   document.getElementById('piece-fields').style.display = report['commande-piece'] ? 'grid' : 'none';
   document.getElementById('acompte-field').style.display = (report['paiement-statut'] === 'Acompte') ? 'block' : 'none';
-  document.getElementById('delete-btn').style.display = currentId ? 'inline-block' : 'none';
+  // delete-btn supprimé
   signatureData = report.signature || null;
   updateSigPreview();
   photos = Array.isArray(report.photos) ? report.photos.slice(0, MAX_PHOTOS) : [];
@@ -1203,7 +1229,7 @@ document.getElementById('save-btn').addEventListener('click', () => {
     currentId = data.id;
     delete data._isDraft;
     reports.unshift(data);
-    document.getElementById('delete-btn').style.display = 'inline-block';
+    // delete-btn supprimé
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
   clearDraft();
@@ -1253,17 +1279,7 @@ document.getElementById('new-btn').addEventListener('click', () => {
   showToast('Nouveau compte-rendu prêt');
 });
 
-// ---------- Suppression ----------
-document.getElementById('delete-btn').addEventListener('click', () => {
-  if(!currentId) return;
-  if(!confirm('Supprimer définitivement ce compte-rendu ?')) return;
-  reports = reports.filter(r => r.id !== currentId);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
-  clearDraft();
-  resetForm();
-  showToast('Compte-rendu supprimé');
-  document.querySelector('.tab-btn[data-view="list"]').click();
-});
+// delete-btn handler supprimé
 
 // ---------- Liste ----------
 function buildListItem(r){
@@ -1301,17 +1317,32 @@ function buildListItem(r){
     ? '<span class="badge green">Facture créée</span>'
     : '<span class="badge orange">Facture à créer</span>';
 
+  let statutBadge = '';
+  if(r._isDraft){
+    statutBadge = '<span class="badge" style="background:rgba(245,166,35,0.18);color:#f5a623;border:1px solid #f5a623;">✏️ Brouillon</span>';
+  } else {
+    switch(r.statut){
+      case 'Terminée': statutBadge = '<span class="badge green">✅ Terminé</span>'; break;
+      case 'Non_reparable': statutBadge = '<span class="badge red">❌ Irréparable</span>'; break;
+      case 'Attente_piece': statutBadge = '<span class="badge orange">⏳ Attente pièce</span>'; break;
+      case 'Devis': statutBadge = '<span class="badge" style="background:rgba(26,115,200,0.15);color:#1a73c8;">📋 Devis</span>'; break;
+      default: statutBadge = '<span class="badge orange">🔄 En cours</span>';
+    }
+  }
   item.innerHTML = `
-    <div class="info">
-      <div class="name">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')} — ${escapeHtml(r.appareil||'Appareil non précisé')}</div>
-      <div class="meta">${escapeHtml(r.ref||'')} · ${dateFmt} · ${escapeHtml(r.ville||'')}</div>
-    </div>
-    <div class="right">
-      ${payBadge}
-      ${resteBadge}
-      ${factureBadge}
-      ${pieceBadge}
-      <span class="badge" style="background:rgba(26,115,200,0.15); color:#1a73c8;">${total}</span>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;width:100%;">
+      <div style="flex:1;min-width:0;">
+        <div class="name">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')} — ${escapeHtml(r.appareil||'Appareil non précisé')}</div>
+        <div class="meta">${dateFmt}${r.ville ? ' · '+escapeHtml(r.ville) : ''}</div>
+        <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">
+          ${statutBadge}${pieceBadge ? ' '+pieceBadge : ''}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-weight:700;color:var(--orange);font-size:1rem;">${total}</div>
+        <div style="margin-top:0.15rem;">${payBadge}</div>
+        ${resteBadge ? '<div style="margin-top:0.1rem;">'+resteBadge+'</div>' : ''}
+      </div>
     </div>
   `;
   item.addEventListener('click', () => { showDetail(r); });
@@ -1348,36 +1379,27 @@ function renderList(){
   }
   emptyMsg.style.display = 'none';
 
-  const drafts = filtered.filter(r => r._isDraft === true);
-  const done   = filtered.filter(r => r._isDraft !== true);
-
+  const drafts   = filtered.filter(r => r._isDraft === true);
+  const encours  = filtered.filter(r => !r._isDraft && r.statut !== 'Terminée');
+  const termines = filtered.filter(r => !r._isDraft && r.statut === 'Terminée');
   if(drafts.length > 0){
-    container.appendChild(renderSectionTitle('✏️ Brouillons en cours (' + drafts.length + ')', '#f5a623'));
+    container.appendChild(renderSectionTitle('✏️ Brouillons (' + drafts.length + ')', '#f5a623'));
     drafts.forEach(r => container.appendChild(buildListItem(r)));
   }
-
-  if(done.length > 0){
-    container.appendChild(renderSectionTitle('✅ Comptes-rendus terminés (' + done.length + ')', 'var(--text-muted)'));
-    done.forEach(r => container.appendChild(buildListItem(r)));
+  if(encours.length > 0){
+    container.appendChild(renderSectionTitle('🔄 En cours (' + encours.length + ')', '#1a73c8'));
+    encours.forEach(r => container.appendChild(buildListItem(r)));
+  }
+  if(termines.length > 0){
+    container.appendChild(renderSectionTitle('✅ Terminés (' + termines.length + ')', '#3fbf6f'));
+    termines.forEach(r => container.appendChild(buildListItem(r)));
   }
 }
 
 document.getElementById('search-input').addEventListener('input', renderList);
 
 // ---------- Suppression de tous les comptes-rendus ----------
-document.getElementById('delete-all-btn').addEventListener('click', () => {
-  if(reports.length === 0){
-    showToast('Aucun compte-rendu à supprimer', true);
-    return;
-  }
-  if(!confirm(`Supprimer définitivement les ${reports.length} compte(s)-rendu(s) enregistré(s) ? Cette action est irréversible.`)) return;
-  if(!confirm('Confirmer une seconde fois : voulez-vous vraiment tout supprimer ?')) return;
-  reports = [];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
-  localStorage.removeItem(DRAFT_KEY);
-  renderList();
-  showToast('Tous les comptes-rendus ont été supprimés');
-});
+// delete-all handler supprimé
 
 // ---------- Vue détail (rapport complet) ----------
 let currentDetailReport = null;
@@ -1583,50 +1605,34 @@ document.getElementById('detail-edit').addEventListener('click', () => {
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
 });
-
+document.getElementById('detail-delete-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const label = currentDetailReport._isDraft ? 'brouillon' : 'compte-rendu';
+  const name = `${currentDetailReport.prenom||''} ${currentDetailReport.nom||''}`.trim() || 'ce dossier';
+  if(!confirm(`Supprimer ce ${label} (${name}) ?`)) return;
+  if(!confirm('Confirmer ? Action irréversible.')) return;
+  reports = reports.filter(r => r.id !== currentDetailReport.id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  if(currentId === currentDetailReport.id){ clearDraft(); currentId = null; }
+  currentDetailReport = null;
+  showToast('Supprimé ✓');
+  goToList();
+});
+document.getElementById('detail-sms-arrival-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
+  if(!tel){ showToast('Numéro manquant', true); return; }
+  showSmsArrival(tel);
+});
 document.getElementById('detail-sms-avis').addEventListener('click', () => {
   if(!currentDetailReport) return;
   const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
-  if(!tel){
-    showToast('Numéro de téléphone du client manquant', true);
-    return;
-  }
-  const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention Si vous êtes satisfait, un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitative. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
-  const smsUrl = `sms:${tel}?body=${encodeURIComponent(message)}`;
-  window.location.href = smsUrl;
+  if(!tel){ showToast('Numéro manquant', true); return; }
+  const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
 });
 
-// ---------- Bouton Sauver comme brouillon ----------
-document.getElementById('draft-save-btn').addEventListener('click', () => {
-  const data = collectFormData();
-  if(!data.nom && !data.prenom && !data.tel){
-    showToast('Remplissez au moins un champ avant de sauver un brouillon', true);
-    return;
-  }
-  data._isDraft = true;
-  data._draftStep = currentStep;
-  // Si c'est une modification d'un CR existant on garde l'id
-  if(!data.id){
-    data.id = 'draft_' + Date.now();
-    data.ref = data.ref || ('BR-' + Date.now().toString().slice(-6));
-  }
-  // Mettre à jour ou ajouter dans reports
-  const idx = reports.findIndex(r => r.id === data.id);
-  if(idx !== -1){
-    reports[idx] = data;
-  } else {
-    reports.unshift(data);
-  }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
-  saveDraft();
-  showToast('Brouillon sauvegardé ✓');
-  // Retour à la liste
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelector('.tab-btn[data-view="list"]').classList.add('active');
-  document.getElementById('view-list').classList.add('active');
-  renderList();
-});
+// Brouillon auto-save géré par autoSaveDraftToReports() au départ du formulaire
 
 // ---------- Waze / Copier adresse / SMS arrivée ----------
 function openWaze(addr){
