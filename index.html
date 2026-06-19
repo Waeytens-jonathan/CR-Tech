@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --navy:#0d1b2a;
@@ -702,7 +703,186 @@ const CONSEILS_ENTRETIEN_B64 = "JVBERi0xLjQKJfbk/N8KMSAwIG9iago8PAovVHlwZSAvQ2F0
 // ---------- Données ----------
 const STORAGE_KEY = 'technikhome_reports';
 const DRAFT_KEY = 'technikhome_draft';
-let reports = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+// ---------- Supabase ----------
+const SUPABASE_URL = 'https://gzrqkapwjwlwkvwtykfi.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_EKs2eR3Du9MYSnUgeTFtBQ_vnOOFqHt';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const TABLE = 'rapports';
+
+// Mapping entre les clés internes (camelCase/kebab JS) et les colonnes Supabase (snake_case)
+const FIELD_TO_COLUMN = {
+  'id':'id','ref':'ref','date':'date','heure':'heure','technicien':'technicien',
+  'nom':'nom','prenom':'prenom','adresse':'adresse','cp':'cp','ville':'ville','tel':'tel','email':'email',
+  'appareil':'appareil','marque':'marque','modele':'modele','serie':'serie','age':'age',
+  'panne':'panne','diagnostic':'notes','travaux':'travaux','statut':'statut','duree':'duree',
+  'piece-desc':'piece_desc','piece-cout':'piece_prix','piece-delai':'notes',
+  'cout-mo':'cout_main_oeuvre','cout-pieces':'cout_pieces','cout-deplacement':'cout_deplacement',
+  'cout-total':'cout_total','reste-encaisser':'reste_encaisser',
+  'paiement-statut':'paiement_statut','acompte-montant':'notes','paiement-moyen':'mode_paiement',
+  'notes':'notes',
+  'commande-piece':'commande_piece','piece-recue':'piece_recue','piece-posee':'piece_posee',
+  'garantie':'garantie','conseils-entretien':'conseils_entretien','facture-creee':'facture_creee',
+  'photos':'photos','plaquePhoto':'photos_plaque','signature':'signature','_isDraft':'_is_draft'
+};
+
+// Convertit un objet "report" (format interne JS) -> ligne Supabase
+function reportToRow(r){
+  const row = {
+    id: r.id,
+    ref: r.ref || '',
+    date: r.date || '',
+    heure: r.heure || '',
+    technicien: r.technicien || '',
+    nom: r.nom || '',
+    prenom: r.prenom || '',
+    adresse: r.adresse || '',
+    cp: r.cp || '',
+    ville: r.ville || '',
+    tel: r.tel || '',
+    email: r.email || '',
+    appareil: r.appareil || '',
+    marque: r.marque || '',
+    modele: r.modele || '',
+    serie: r.serie || '',
+    age: r.age || '',
+    panne: r.panne || '',
+    travaux: r.travaux || '',
+    statut: r.statut || '',
+    duree: r.duree || '',
+    notes: r.notes || '',
+    commande_piece: !!r['commande-piece'],
+    piece_recue: !!r['piece-recue'],
+    piece_posee: !!r['piece-posee'],
+    piece_desc: r['piece-desc'] || '',
+    piece_prix: r['piece-cout'] || '',
+    cout_pieces: r['cout-pieces'] || '',
+    cout_main_oeuvre: r['cout-mo'] || '',
+    cout_deplacement: r['cout-deplacement'] || '',
+    cout_total: r['cout-total'] || '',
+    paiement_statut: r['paiement-statut'] || '',
+    reste_encaisser: r['reste-encaisser'] || '',
+    mode_paiement: r['paiement-moyen'] || '',
+    garantie: !!r.garantie,
+    facture_creee: !!r['facture-creee'],
+    conseils_entretien: !!r['conseils-entretien'],
+    photos: JSON.stringify(r.photos || []),
+    photos_plaque: JSON.stringify(r.plaquePhoto ? [r.plaquePhoto] : []),
+    photos_pieces: JSON.stringify([]),
+    signature: r.signature || '',
+    _is_draft: !!r._isDraft
+  };
+  // Champs sans colonne dédiée -> regroupés dans "notes" pour ne rien perdre
+  const extra = {};
+  if(r['piece-delai']) extra.piece_delai = r['piece-delai'];
+  if(r['acompte-montant']) extra.acompte_montant = r['acompte-montant'];
+  if(r._draftStep !== undefined) extra._draftStep = r._draftStep;
+  if(Object.keys(extra).length){
+    row.notes = (row.notes ? row.notes + '\n' : '') + '[meta]' + JSON.stringify(extra);
+  }
+  return row;
+}
+
+// Convertit une ligne Supabase -> objet "report" (format interne JS)
+function rowToReport(row){
+  let notes = row.notes || '';
+  let extra = {};
+  const metaIdx = notes.indexOf('[meta]');
+  if(metaIdx !== -1){
+    try{ extra = JSON.parse(notes.slice(metaIdx + 6)); }catch(e){}
+    notes = notes.slice(0, metaIdx);
+  }
+  let photos = [], plaquePhotoArr = [];
+  try{ photos = row.photos ? JSON.parse(row.photos) : []; }catch(e){ photos = []; }
+  try{ plaquePhotoArr = row.photos_plaque ? JSON.parse(row.photos_plaque) : []; }catch(e){ plaquePhotoArr = []; }
+  return {
+    id: row.id,
+    ref: row.ref,
+    date: row.date,
+    heure: row.heure,
+    technicien: row.technicien,
+    nom: row.nom,
+    prenom: row.prenom,
+    adresse: row.adresse,
+    cp: row.cp,
+    ville: row.ville,
+    tel: row.tel,
+    email: row.email,
+    appareil: row.appareil,
+    marque: row.marque,
+    modele: row.modele,
+    serie: row.serie,
+    age: row.age,
+    panne: row.panne,
+    travaux: row.travaux,
+    statut: row.statut,
+    duree: row.duree,
+    notes: notes,
+    'commande-piece': !!row.commande_piece,
+    'piece-recue': !!row.piece_recue,
+    'piece-posee': !!row.piece_posee,
+    'piece-desc': row.piece_desc,
+    'piece-cout': row.piece_prix,
+    'piece-delai': extra.piece_delai || '',
+    'cout-pieces': row.cout_pieces,
+    'cout-mo': row.cout_main_oeuvre,
+    'cout-deplacement': row.cout_deplacement,
+    'cout-total': row.cout_total,
+    'paiement-statut': row.paiement_statut,
+    'reste-encaisser': row.reste_encaisser,
+    'acompte-montant': extra.acompte_montant || '',
+    'paiement-moyen': row.mode_paiement,
+    garantie: !!row.garantie,
+    'facture-creee': !!row.facture_creee,
+    'conseils-entretien': !!row.conseils_entretien,
+    photos: photos,
+    plaquePhoto: plaquePhotoArr[0] || null,
+    signature: row.signature || null,
+    _isDraft: !!row._is_draft,
+    _draftStep: extra._draftStep
+  };
+}
+
+let reports = [];
+let reportsLoaded = false;
+
+async function loadReportsFromSupabase(){
+  try{
+    const { data, error } = await sb
+      .from(TABLE)
+      .select('*')
+      .order('created_at', { ascending: false });
+    if(error) throw error;
+    reports = (data || []).map(rowToReport);
+  }catch(e){
+    console.error('Erreur chargement Supabase :', e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
+    showToast('Connexion au cloud impossible : ' + (e.message || e.code || 'voir console'), true);
+    reports = [];
+  }
+  reportsLoaded = true;
+  if(typeof afterReportsLoaded === 'function') afterReportsLoaded();
+}
+
+async function saveReportToSupabase(report){
+  const row = reportToRow(report);
+  try{
+    const { error } = await sb.from(TABLE).upsert(row, { onConflict: 'id' });
+    if(error) throw error;
+  }catch(e){
+    console.error('Erreur sauvegarde Supabase :', e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
+    showToast('Échec sync cloud : ' + (e.message || e.code || 'voir console'), true);
+  }
+}
+
+async function deleteReportFromSupabase(id){
+  try{
+    const { error } = await sb.from(TABLE).delete().eq('id', id);
+    if(error) throw error;
+  }catch(e){
+    console.error('Erreur suppression Supabase :', e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
+    showToast('Échec suppression cloud : ' + (e.message || e.code || 'voir console'), true);
+  }
+}
 let currentId = null;
 
 // ---------- Date du jour ----------
@@ -812,6 +992,7 @@ function autoSaveDraftToReports(){
     else if(idx === -1){ reports.unshift(data); }
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  saveReportToSupabase(data);
   saveDraft();
 }
 function goToList(){
@@ -1258,6 +1439,7 @@ document.getElementById('save-btn').addEventListener('click', () => {
     // delete-btn supprimé
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  saveReportToSupabase(data);
   clearDraft();
   showToast('Compte-rendu enregistré');
 });
@@ -1590,6 +1772,7 @@ function showDetail(r){
       reports[idx]['reste-encaisser'] = reste.toFixed(2);
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+      saveReportToSupabase(reports[idx]);
       showToast('Dossier mis à jour');
       showDetail(reports[idx]);
     });
@@ -1625,6 +1808,7 @@ document.getElementById('detail-delete-btn').addEventListener('click', () => {
   if(!confirm('Confirmer ? Action irréversible.')) return;
   reports = reports.filter(r => r.id !== currentDetailReport.id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  deleteReportFromSupabase(currentDetailReport.id);
   if(currentId === currentDetailReport.id){ clearDraft(); currentId = null; }
   currentDetailReport = null;
   showToast('Supprimé ✓');
@@ -1711,6 +1895,7 @@ function deleteDetailPhoto(idx){
   if(rIdx !== -1){
     reports[rIdx] = currentDetailReport;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+    saveReportToSupabase(currentDetailReport);
   }
   showToast('Photo supprimée');
   showDetail(currentDetailReport);
@@ -2003,10 +2188,24 @@ function downloadBytes(bytes, filename){
 }
 
 // ---------- Initialisation ----------
+// Affichage immédiat depuis le cache local (si présent) pendant que Supabase charge
+try{
+  const cached = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  if(Array.isArray(cached) && cached.length) reports = cached;
+}catch(e){}
+
 renderPhotos();
 resetForm();
 renderList();
 goToStep(1);
+
+// Callback appelé une fois les données Supabase chargées (remplace le cache local)
+function afterReportsLoaded(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  const listView = document.getElementById('view-list');
+  if(listView && listView.classList.contains('active')) renderList();
+}
+loadReportsFromSupabase();
 
 // Sauvegarde automatique du brouillon à chaque modification (debounce)
 let draftTimeout = null;
