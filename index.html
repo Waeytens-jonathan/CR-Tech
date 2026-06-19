@@ -365,7 +365,10 @@
   <!-- ===================== VUE AGENDA (RDV) ===================== -->
   <div class="view" id="view-agenda">
     <div class="card">
-      <h2>Rendez-vous à venir</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
+        <h2 style="margin:0;">Rendez-vous à venir</h2>
+        <button class="btn btn-primary" id="agenda-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Nouveau RDV</button>
+      </div>
       <div id="agenda-list"></div>
       <div class="empty" id="agenda-empty-msg" style="display:none;">Aucun rendez-vous à venir.</div>
     </div>
@@ -378,10 +381,73 @@
         <button class="btn btn-outline" id="agenda-detail-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
         <button class="btn btn-danger" id="agenda-detail-delete-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">🗑️ Supprimer</button>
       </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+        <button class="btn btn-secondary" id="agenda-detail-sms-arrival-btn">💬 J'arrive</button>
+        <button class="btn btn-outline" id="agenda-detail-cancel-btn">🚫 Annuler le RDV</button>
+        <button class="btn btn-outline" id="agenda-detail-done-btn">✅ Marquer effectué</button>
+      </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
         <button class="btn btn-primary" id="agenda-detail-create-cr" style="flex:1;min-width:200px;">📝 Faire le compte-rendu</button>
       </div>
       <div id="agenda-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE NOUVEAU RDV (ajout manuel) ===================== -->
+  <div class="view" id="view-agenda-new">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+        <button class="btn btn-outline" id="agenda-new-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+      </div>
+      <h2>Nouveau rendez-vous</h2>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="newrdv-date">
+      </div>
+      <div class="field">
+        <label>Créneau</label>
+        <select id="newrdv-creneau">
+          <option value="matin">Matin · 10h-12h</option>
+          <option value="apresmidi">Après-midi · 12h-18h</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Prénom</label>
+        <input type="text" id="newrdv-prenom">
+      </div>
+      <div class="field">
+        <label>Nom</label>
+        <input type="text" id="newrdv-nom">
+      </div>
+      <div class="field">
+        <label>Adresse</label>
+        <input type="text" id="newrdv-adresse">
+      </div>
+      <div class="field">
+        <label>Code postal</label>
+        <input type="text" id="newrdv-cp">
+      </div>
+      <div class="field">
+        <label>Ville</label>
+        <input type="text" id="newrdv-ville">
+      </div>
+      <div class="field">
+        <label>Téléphone</label>
+        <input type="tel" id="newrdv-tel">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="newrdv-email">
+      </div>
+      <div class="field">
+        <label>Appareil</label>
+        <select id="newrdv-appareil"></select>
+      </div>
+      <div class="field">
+        <label>Panne décrite</label>
+        <textarea id="newrdv-panne" rows="3"></textarea>
+      </div>
+      <button class="btn btn-primary" id="newrdv-save-btn" style="width:100%;margin-top:0.6rem;">Enregistrer le rendez-vous</button>
     </div>
   </div>
 
@@ -991,9 +1057,9 @@ async function renderAgenda(){
 
   agendaRdvs = await loadAgendaFromSupabase();
 
-  // On ne garde que les RDV à venir (aujourd'hui inclus)
+  // On ne garde que les RDV à venir (aujourd'hui inclus), hors annulés
   const todayStr = todayISO();
-  const upcoming = agendaRdvs.filter(r => r.date >= todayStr);
+  const upcoming = agendaRdvs.filter(r => r.date >= todayStr && r.statut !== 'annule');
 
   if(!upcoming.length){
     listEl.innerHTML = '';
@@ -1016,11 +1082,15 @@ async function renderAgenda(){
     // tri par créneau : matin avant après-midi
     const dayRdvs = byDate[dateKey].sort((a,b) => (a.creneau === 'matin' ? 0 : 1) - (b.creneau === 'matin' ? 0 : 1));
     dayRdvs.forEach(r => {
+      const doneBadge = r.statut === 'effectue' ? '<span class="badge green">Effectué</span>' : '';
       html += `
         <div class="list-item" data-rdv-id="${escapeHtml(r.app_id)}" style="cursor:pointer;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
             <strong>${escapeHtml(r.prenom || '')} ${escapeHtml(r.nom || '')}</strong>
-            <span class="badge orange">${escapeHtml(RDV_SLOT_LABELS[r.creneau] || r.creneau || '')}</span>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;justify-content:flex-end;">
+              ${doneBadge}
+              <span class="badge orange">${escapeHtml(RDV_SLOT_LABELS[r.creneau] || r.creneau || '')}</span>
+            </div>
           </div>
           <div style="color:#778;font-size:0.88rem;margin-top:0.2rem;">
             ${escapeHtml(r.appareil || '')} — ${escapeHtml(r.ville || '')}
@@ -1040,7 +1110,13 @@ function showAgendaDetail(appId){
   if(!r) return;
   currentAgendaRdv = r;
 
+  let statutLabel = '';
+  if(r.statut === 'effectue') statutLabel = '<span class="badge green">✅ Effectué</span>';
+  else if(r.statut === 'annule') statutLabel = '<span class="badge red">🚫 Annulé</span>';
+  else statutLabel = '<span class="badge orange">En attente</span>';
+
   const rows = [
+    ['Statut', statutLabel],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
     ['Client', `${r.prenom || ''} ${r.nom || ''}`.trim()],
@@ -1053,9 +1129,29 @@ function showAgendaDetail(appId){
   let html = '';
   rows.forEach(([label, value]) => {
     if(!value) return;
-    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${escapeHtml(String(value))}</div></div>`;
+    const isStatut = label === 'Statut';
+    const displayValue = isStatut ? value : escapeHtml(String(value));
+    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${displayValue}</div></div>`;
   });
+
+  // Boutons Waze / Copier adresse
+  const addrFull = `${r.adresse||''} ${r.cp||''} ${r.ville||''}`.trim();
+  if(addrFull){
+    html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.4rem;">';
+    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull)}'))">🗺️ Waze</button>`;
+    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrFull)}'))">📋 Copier adresse</button>`;
+    html += '</div>';
+  }
+
   document.getElementById('agenda-detail-content').innerHTML = html;
+
+  // État des boutons selon le statut actuel
+  const cancelBtn = document.getElementById('agenda-detail-cancel-btn');
+  const doneBtn = document.getElementById('agenda-detail-done-btn');
+  cancelBtn.style.display = r.statut === 'annule' ? 'none' : 'inline-flex';
+  doneBtn.style.display = r.statut === 'effectue' ? 'none' : 'inline-flex';
+  cancelBtn.textContent = '🚫 Annuler le RDV';
+  doneBtn.textContent = '✅ Marquer effectué';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1099,9 +1195,18 @@ function matchAppareilOption(rawValue){
   return partial || '';
 }
 
-document.getElementById('agenda-detail-create-cr').addEventListener('click', () => {
+document.getElementById('agenda-detail-create-cr').addEventListener('click', async () => {
   if(!currentAgendaRdv) return;
   const r = currentAgendaRdv;
+
+  // Marque automatiquement le RDV comme effectué
+  try{
+    const { error } = await sb.from(RDV_TABLE).update({ statut: 'effectue' }).eq('app_id', r.app_id);
+    if(error) throw error;
+    r.statut = 'effectue';
+  }catch(e){
+    console.error('Erreur mise à jour statut RDV :', e);
+  }
 
   resetForm();
   clearDraft();
@@ -1121,6 +1226,113 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', () 
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
   showToast('Infos client pré-remplies depuis le RDV');
+});
+
+document.getElementById('agenda-detail-sms-arrival-btn').addEventListener('click', () => {
+  if(!currentAgendaRdv) return;
+  const tel = (currentAgendaRdv.tel || '').replace(/[^\d+]/g, '');
+  if(!tel){ showToast('Numéro manquant', true); return; }
+  showSmsArrival(tel);
+});
+
+document.getElementById('agenda-detail-cancel-btn').addEventListener('click', async () => {
+  if(!currentAgendaRdv) return;
+  if(!confirm('Annuler ce rendez-vous ? Le créneau sera de nouveau disponible.')) return;
+  try{
+    const { error } = await sb.from(RDV_TABLE).update({ statut: 'annule' }).eq('app_id', currentAgendaRdv.app_id);
+    if(error) throw error;
+    currentAgendaRdv.statut = 'annule';
+    showToast('Rendez-vous annulé');
+    showAgendaDetail(currentAgendaRdv.app_id);
+  }catch(e){
+    console.error('Erreur annulation RDV :', e);
+    showToast('Échec de l\'annulation', true);
+  }
+});
+
+document.getElementById('agenda-detail-done-btn').addEventListener('click', async () => {
+  if(!currentAgendaRdv) return;
+  try{
+    const { error } = await sb.from(RDV_TABLE).update({ statut: 'effectue' }).eq('app_id', currentAgendaRdv.app_id);
+    if(error) throw error;
+    currentAgendaRdv.statut = 'effectue';
+    showToast('Rendez-vous marqué comme effectué');
+    showAgendaDetail(currentAgendaRdv.app_id);
+  }catch(e){
+    console.error('Erreur mise à jour RDV :', e);
+    showToast('Échec de la mise à jour', true);
+  }
+});
+
+// ---------- Nouveau RDV (ajout manuel, ex: appel téléphonique) ----------
+function populateNewRdvAppareilOptions(){
+  const sourceSelect = document.getElementById('f-appareil');
+  const targetSelect = document.getElementById('newrdv-appareil');
+  if(targetSelect.options.length > 0) return; // déjà rempli
+  targetSelect.innerHTML = sourceSelect.innerHTML;
+}
+
+document.getElementById('agenda-new-btn').addEventListener('click', () => {
+  populateNewRdvAppareilOptions();
+  ['date','prenom','nom','adresse','cp','ville','tel','email','appareil','panne'].forEach(id => {
+    const el = document.getElementById('newrdv-' + id);
+    if(el) el.value = '';
+  });
+  document.getElementById('newrdv-date').value = todayISO();
+  document.getElementById('newrdv-creneau').value = 'matin';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda-new').classList.add('active');
+});
+
+document.getElementById('agenda-new-back').addEventListener('click', () => {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda').classList.add('active');
+  document.querySelector('.tab-btn[data-view="agenda"]').classList.add('active');
+});
+
+document.getElementById('newrdv-save-btn').addEventListener('click', async () => {
+  const nom = document.getElementById('newrdv-nom').value.trim();
+  const prenom = document.getElementById('newrdv-prenom').value.trim();
+  const date = document.getElementById('newrdv-date').value;
+  if(!date){ showToast('Merci de choisir une date', true); return; }
+  if(!nom && !prenom){ showToast('Merci de renseigner au moins le nom du client', true); return; }
+
+  const btn = document.getElementById('newrdv-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enregistrement…';
+
+  const row = {
+    app_id: 'rdv_' + Date.now(),
+    date: date,
+    creneau: document.getElementById('newrdv-creneau').value,
+    nom: nom,
+    prenom: prenom,
+    adresse: document.getElementById('newrdv-adresse').value.trim(),
+    cp: document.getElementById('newrdv-cp').value.trim(),
+    ville: document.getElementById('newrdv-ville').value.trim(),
+    tel: document.getElementById('newrdv-tel').value.trim(),
+    email: document.getElementById('newrdv-email').value.trim(),
+    appareil: document.getElementById('newrdv-appareil').value,
+    panne: document.getElementById('newrdv-panne').value.trim(),
+    statut: 'en_attente'
+  };
+
+  try{
+    const { error } = await sb.from(RDV_TABLE).insert(row);
+    if(error) throw error;
+    showToast('Rendez-vous enregistré');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-agenda').classList.add('active');
+    document.querySelector('.tab-btn[data-view="agenda"]').classList.add('active');
+    renderAgenda();
+  }catch(e){
+    console.error('Erreur création RDV :', e);
+    showToast('Échec de l\'enregistrement du rendez-vous', true);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Enregistrer le rendez-vous';
 });
 
 let currentId = null;
