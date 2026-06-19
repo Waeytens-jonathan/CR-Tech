@@ -447,6 +447,10 @@
         <label>Panne décrite</label>
         <textarea id="newrdv-panne" rows="3"></textarea>
       </div>
+      <div class="field">
+        <label>Note pour le technicien</label>
+        <textarea id="newrdv-note" rows="2" placeholder="Ex : ne pas sonner, maison bleue…"></textarea>
+      </div>
       <button class="btn btn-primary" id="newrdv-save-btn" style="width:100%;margin-top:0.6rem;">Enregistrer le rendez-vous</button>
     </div>
   </div>
@@ -1125,6 +1129,7 @@ function showAgendaDetail(appId){
     ['Adresse', `${r.adresse || ''}, ${r.cp || ''} ${r.ville || ''}`],
     ['Appareil', r.appareil],
     ['Panne décrite', r.panne],
+    ['Note pour le technicien', r.note_technicien],
   ];
   let html = '';
   rows.forEach(([label, value]) => {
@@ -1274,7 +1279,7 @@ function populateNewRdvAppareilOptions(){
 
 document.getElementById('agenda-new-btn').addEventListener('click', () => {
   populateNewRdvAppareilOptions();
-  ['date','prenom','nom','adresse','cp','ville','tel','email','appareil','panne'].forEach(id => {
+  ['date','prenom','nom','adresse','cp','ville','tel','email','appareil','panne','note'].forEach(id => {
     const el = document.getElementById('newrdv-' + id);
     if(el) el.value = '';
   });
@@ -1316,6 +1321,7 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     email: document.getElementById('newrdv-email').value.trim(),
     appareil: document.getElementById('newrdv-appareil').value,
     panne: document.getElementById('newrdv-panne').value.trim(),
+    note_technicien: document.getElementById('newrdv-note').value.trim(),
     statut: 'en_attente'
   };
 
