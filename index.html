@@ -345,6 +345,7 @@
   <div class="tabs" style="justify-content:space-between;">
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <button class="tab-btn active" data-view="list">Historique</button>
+      <button class="tab-btn" data-view="agenda" id="tab-agenda">📅 Agenda</button>
       <button class="tab-btn" data-view="form" id="tab-new">Nouveau</button>
     </div>
   </div>
@@ -358,6 +359,29 @@
       </div>
       <div id="report-list"></div>
       <div class="empty" id="empty-msg">Aucun compte-rendu enregistré pour le moment.</div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE AGENDA (RDV) ===================== -->
+  <div class="view" id="view-agenda">
+    <div class="card">
+      <h2>Rendez-vous à venir</h2>
+      <div id="agenda-list"></div>
+      <div class="empty" id="agenda-empty-msg" style="display:none;">Aucun rendez-vous à venir.</div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE DÉTAIL RDV ===================== -->
+  <div class="view" id="view-agenda-detail">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+        <button class="btn btn-outline" id="agenda-detail-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <button class="btn btn-danger" id="agenda-detail-delete-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">🗑️ Supprimer</button>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <button class="btn btn-primary" id="agenda-detail-create-cr" style="flex:1;min-width:200px;">📝 Faire le compte-rendu</button>
+      </div>
+      <div id="agenda-detail-content"></div>
     </div>
   </div>
 
@@ -932,6 +956,173 @@ async function deleteReportFromSupabase(id){
     showToast('Échec suppression cloud : ' + (e.message || e.code || 'voir console'), true);
   }
 }
+
+// ---------- Agenda (RDV pris depuis le site) ----------
+const RDV_TABLE = 'rdv';
+const RDV_SLOT_LABELS = { matin: 'Matin · 10h-12h', apresmidi: 'Après-midi · 12h-18h' };
+let agendaRdvs = [];
+let currentAgendaRdv = null;
+
+async function loadAgendaFromSupabase(){
+  try{
+    const { data, error } = await sb
+      .from(RDV_TABLE)
+      .select('*')
+      .order('date', { ascending: true });
+    if(error) throw error;
+    return data || [];
+  }catch(e){
+    console.error('Erreur chargement agenda :', e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
+    showToast('Connexion au cloud impossible (agenda)', true);
+    return [];
+  }
+}
+
+function dateFrLong(iso){
+  if(!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
+}
+
+async function renderAgenda(){
+  const listEl = document.getElementById('agenda-list');
+  const emptyEl = document.getElementById('agenda-empty-msg');
+  listEl.innerHTML = '<div class="empty">Chargement…</div>';
+
+  agendaRdvs = await loadAgendaFromSupabase();
+
+  // On ne garde que les RDV à venir (aujourd'hui inclus)
+  const todayStr = todayISO();
+  const upcoming = agendaRdvs.filter(r => r.date >= todayStr);
+
+  if(!upcoming.length){
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  // Regroupement par date
+  const byDate = {};
+  upcoming.forEach(r => {
+    if(!byDate[r.date]) byDate[r.date] = [];
+    byDate[r.date].push(r);
+  });
+  const sortedDates = Object.keys(byDate).sort();
+
+  let html = '';
+  sortedDates.forEach(dateKey => {
+    html += `<div style="font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#f5a623;padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;">${escapeHtml(dateFrLong(dateKey))}</div>`;
+    // tri par créneau : matin avant après-midi
+    const dayRdvs = byDate[dateKey].sort((a,b) => (a.creneau === 'matin' ? 0 : 1) - (b.creneau === 'matin' ? 0 : 1));
+    dayRdvs.forEach(r => {
+      html += `
+        <div class="list-item" data-rdv-id="${escapeHtml(r.app_id)}" style="cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>${escapeHtml(r.prenom || '')} ${escapeHtml(r.nom || '')}</strong>
+            <span class="badge orange">${escapeHtml(RDV_SLOT_LABELS[r.creneau] || r.creneau || '')}</span>
+          </div>
+          <div style="color:#778;font-size:0.88rem;margin-top:0.2rem;">
+            ${escapeHtml(r.appareil || '')} — ${escapeHtml(r.ville || '')}
+          </div>
+        </div>`;
+    });
+  });
+  listEl.innerHTML = html;
+
+  listEl.querySelectorAll('[data-rdv-id]').forEach(card => {
+    card.addEventListener('click', () => showAgendaDetail(card.dataset.rdvId));
+  });
+}
+
+function showAgendaDetail(appId){
+  const r = agendaRdvs.find(x => x.app_id === appId);
+  if(!r) return;
+  currentAgendaRdv = r;
+
+  const rows = [
+    ['Date', dateFrLong(r.date)],
+    ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
+    ['Client', `${r.prenom || ''} ${r.nom || ''}`.trim()],
+    ['Téléphone', r.tel],
+    ['Email', r.email],
+    ['Adresse', `${r.adresse || ''}, ${r.cp || ''} ${r.ville || ''}`],
+    ['Appareil', r.appareil],
+    ['Panne décrite', r.panne],
+  ];
+  let html = '';
+  rows.forEach(([label, value]) => {
+    if(!value) return;
+    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${escapeHtml(String(value))}</div></div>`;
+  });
+  document.getElementById('agenda-detail-content').innerHTML = html;
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda-detail').classList.add('active');
+}
+
+document.getElementById('agenda-detail-back').addEventListener('click', () => {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda').classList.add('active');
+  document.querySelector('.tab-btn[data-view="agenda"]').classList.add('active');
+});
+
+document.getElementById('agenda-detail-delete-btn').addEventListener('click', async () => {
+  if(!currentAgendaRdv) return;
+  if(!confirm('Supprimer ce rendez-vous ?')) return;
+  try{
+    const { error } = await sb.from(RDV_TABLE).delete().eq('app_id', currentAgendaRdv.app_id);
+    if(error) throw error;
+    showToast('Rendez-vous supprimé');
+  }catch(e){
+    console.error('Erreur suppression RDV :', e);
+    showToast('Échec suppression du rendez-vous', true);
+    return;
+  }
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda').classList.add('active');
+  document.querySelector('.tab-btn[data-view="agenda"]').classList.add('active');
+  renderAgenda();
+});
+
+// Mapping souple des libellés d'appareil entre le site (rdv.html) et CR-Tech
+function matchAppareilOption(rawValue){
+  const select = document.getElementById('f-appareil');
+  if(!rawValue) return '';
+  const options = Array.from(select.options).map(o => o.value).filter(v => v);
+  // correspondance exacte
+  if(options.includes(rawValue)) return rawValue;
+  // correspondance partielle (insensible à la casse)
+  const lower = rawValue.toLowerCase();
+  const partial = options.find(o => lower.includes(o.toLowerCase()) || o.toLowerCase().includes(lower.split(' / ')[0]));
+  return partial || '';
+}
+
+document.getElementById('agenda-detail-create-cr').addEventListener('click', () => {
+  if(!currentAgendaRdv) return;
+  const r = currentAgendaRdv;
+
+  resetForm();
+  clearDraft();
+  document.getElementById('f-nom').value = r.nom || '';
+  document.getElementById('f-prenom').value = r.prenom || '';
+  document.getElementById('f-adresse').value = r.adresse || '';
+  document.getElementById('f-cp').value = r.cp || '';
+  document.getElementById('f-ville').value = r.ville || '';
+  document.getElementById('f-tel').value = r.tel || '';
+  document.getElementById('f-email').value = r.email || '';
+  document.getElementById('f-appareil').value = matchAppareilOption(r.appareil);
+  document.getElementById('f-panne').value = r.panne || '';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('tab-new').classList.add('active');
+  document.getElementById('view-form').classList.add('active');
+  goToStep(1);
+  showToast('Infos client pré-remplies depuis le RDV');
+});
+
 let currentId = null;
 
 // ---------- Date du jour ----------
@@ -950,6 +1141,7 @@ document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if(btn.dataset.view === 'list') renderList();
+    if(btn.dataset.view === 'agenda') renderAgenda();
     if(btn.dataset.view === 'form'){
       if(btn.id === 'tab-new'){
         resetForm();
