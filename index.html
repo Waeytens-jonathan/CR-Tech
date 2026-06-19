@@ -344,9 +344,8 @@
 
   <div class="tabs" style="justify-content:space-between;">
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-      <button class="tab-btn active" data-view="list">Historique</button>
+      <button class="tab-btn active" data-view="list">Compte-rendu</button>
       <button class="tab-btn" data-view="agenda" id="tab-agenda">📅 Agenda</button>
-      <button class="tab-btn" data-view="form" id="tab-new">Nouveau</button>
     </div>
   </div>
 
@@ -354,6 +353,7 @@
   <div class="view active" id="view-list">
     <div class="card">
       <h2>Comptes-rendus enregistrés</h2>
+      <button class="btn btn-primary" id="tab-new" style="width:100%;margin-bottom:0.9rem;">➕ Nouveau CR</button>
       <div class="search-bar">
         <input type="text" id="search-input" placeholder="Rechercher (nom, ville, référence...)">
       </div>
@@ -383,6 +383,7 @@
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem;">
         <button class="btn btn-secondary" id="agenda-detail-sms-arrival-btn">💬 J'arrive</button>
+        <button class="btn btn-outline" id="agenda-detail-edit-btn">✏️ Modifier</button>
         <button class="btn btn-outline" id="agenda-detail-cancel-btn">🚫 Annuler le RDV</button>
         <button class="btn btn-outline" id="agenda-detail-done-btn">✅ Marquer effectué</button>
       </div>
@@ -1227,7 +1228,6 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById('tab-new').classList.add('active');
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
   showToast('Infos client pré-remplies depuis le RDV');
@@ -1277,7 +1277,10 @@ function populateNewRdvAppareilOptions(){
   targetSelect.innerHTML = sourceSelect.innerHTML;
 }
 
+let editingRdvAppId = null;
+
 document.getElementById('agenda-new-btn').addEventListener('click', () => {
+  editingRdvAppId = null;
   populateNewRdvAppareilOptions();
   ['date','prenom','nom','adresse','cp','ville','tel','email','appareil','panne','note'].forEach(id => {
     const el = document.getElementById('newrdv-' + id);
@@ -1285,6 +1288,35 @@ document.getElementById('agenda-new-btn').addEventListener('click', () => {
   });
   document.getElementById('newrdv-date').value = todayISO();
   document.getElementById('newrdv-creneau').value = 'matin';
+  document.querySelector('#view-agenda-new h2').textContent = 'Nouveau rendez-vous';
+  document.getElementById('newrdv-save-btn').textContent = 'Enregistrer le rendez-vous';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda-new').classList.add('active');
+});
+
+document.getElementById('agenda-detail-edit-btn').addEventListener('click', () => {
+  if(!currentAgendaRdv) return;
+  const r = currentAgendaRdv;
+  editingRdvAppId = r.app_id;
+  populateNewRdvAppareilOptions();
+
+  document.getElementById('newrdv-date').value = r.date || '';
+  document.getElementById('newrdv-creneau').value = r.creneau || 'matin';
+  document.getElementById('newrdv-prenom').value = r.prenom || '';
+  document.getElementById('newrdv-nom').value = r.nom || '';
+  document.getElementById('newrdv-adresse').value = r.adresse || '';
+  document.getElementById('newrdv-cp').value = r.cp || '';
+  document.getElementById('newrdv-ville').value = r.ville || '';
+  document.getElementById('newrdv-tel').value = r.tel || '';
+  document.getElementById('newrdv-email').value = r.email || '';
+  document.getElementById('newrdv-appareil').value = r.appareil || '';
+  document.getElementById('newrdv-panne').value = r.panne || '';
+  document.getElementById('newrdv-note').value = r.note_technicien || '';
+
+  document.querySelector('#view-agenda-new h2').textContent = 'Modifier le rendez-vous';
+  document.getElementById('newrdv-save-btn').textContent = 'Enregistrer les modifications';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1301,17 +1333,38 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
   const nom = document.getElementById('newrdv-nom').value.trim();
   const prenom = document.getElementById('newrdv-prenom').value.trim();
   const date = document.getElementById('newrdv-date').value;
+  const creneau = document.getElementById('newrdv-creneau').value;
   if(!date){ showToast('Merci de choisir une date', true); return; }
   if(!nom && !prenom){ showToast('Merci de renseigner au moins le nom du client', true); return; }
 
+  const dow = new Date(date + 'T00:00:00').getDay();
+  if(dow === 0){
+    showToast('Pas de rendez-vous le dimanche', true);
+    return;
+  }
+
+  // Avertissement (non bloquant) si le quota du créneau est déjà atteint (uniquement à la création)
+  if(!editingRdvAppId){
+    const limit = (dow === 6) ? { matin: 2, apresmidi: 2 } : { matin: 2, apresmidi: 4 };
+    try{
+      const { data, error } = await sb.from(RDV_TABLE).select('creneau').eq('date', date).neq('statut', 'annule');
+      if(!error){
+        const used = (data || []).filter(r => r.creneau === creneau).length;
+        if(used >= limit[creneau]){
+          const ok = confirm(`Ce créneau affiche déjà ${used} rendez-vous (quota habituel : ${limit[creneau]}). Continuer quand même ?`);
+          if(!ok) return;
+        }
+      }
+    }catch(e){ console.error('Vérif quota agenda :', e); }
+  }
+
   const btn = document.getElementById('newrdv-save-btn');
   btn.disabled = true;
-  btn.textContent = 'Enregistrement…';
+  btn.textContent = editingRdvAppId ? 'Mise à jour…' : 'Enregistrement…';
 
   const row = {
-    app_id: 'rdv_' + Date.now(),
     date: date,
-    creneau: document.getElementById('newrdv-creneau').value,
+    creneau: creneau,
     nom: nom,
     prenom: prenom,
     adresse: document.getElementById('newrdv-adresse').value.trim(),
@@ -1321,14 +1374,20 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     email: document.getElementById('newrdv-email').value.trim(),
     appareil: document.getElementById('newrdv-appareil').value,
     panne: document.getElementById('newrdv-panne').value.trim(),
-    note_technicien: document.getElementById('newrdv-note').value.trim(),
-    statut: 'en_attente'
+    note_technicien: document.getElementById('newrdv-note').value.trim()
   };
+  if(!editingRdvAppId){
+    row.app_id = 'rdv_' + Date.now();
+    row.statut = 'en_attente';
+  }
 
   try{
-    const { error } = await sb.from(RDV_TABLE).insert(row);
+    const { error } = editingRdvAppId
+      ? await sb.from(RDV_TABLE).update(row).eq('app_id', editingRdvAppId)
+      : await sb.from(RDV_TABLE).insert(row);
     if(error) throw error;
-    showToast('Rendez-vous enregistré');
+    showToast(editingRdvAppId ? 'Rendez-vous modifié' : 'Rendez-vous enregistré');
+    editingRdvAppId = null;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-agenda').classList.add('active');
     document.querySelector('.tab-btn[data-view="agenda"]').classList.add('active');
@@ -1338,7 +1397,7 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     showToast('Échec de l\'enregistrement du rendez-vous', true);
   }
   btn.disabled = false;
-  btn.textContent = 'Enregistrer le rendez-vous';
+  btn.textContent = editingRdvAppId ? 'Enregistrer les modifications' : 'Enregistrer le rendez-vous';
 });
 
 let currentId = null;
@@ -1360,14 +1419,16 @@ document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if(btn.dataset.view === 'list') renderList();
     if(btn.dataset.view === 'agenda') renderAgenda();
-    if(btn.dataset.view === 'form'){
-      if(btn.id === 'tab-new'){
-        resetForm();
-        clearDraft();
-      }
-      goToStep(1);
-    }
   });
+});
+
+document.getElementById('tab-new').addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-form').classList.add('active');
+  resetForm();
+  clearDraft();
+  goToStep(1);
 });
 
 // ---------- Mode étapes ----------
@@ -2292,12 +2353,23 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
   const r = currentDetailReport;
   if(!r.email){ showToast('Email du client manquant', true); return; }
 
+  const btn = document.getElementById('detail-email-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Génération du PDF…';
+
   // 1. Générer et télécharger le PDF (à partir des données du dossier consulté, pas du formulaire)
   try {
     await generatePdfFor(r);
   } catch(e) { console.error('PDF error', e); }
 
-  // 2. Ouvrir le client mail avec le message
+  // 2. Laisser le temps au navigateur de finaliser le téléchargement avant de changer de page
+  await new Promise(resolve => setTimeout(resolve, 1200));
+
+  btn.disabled = false;
+  btn.textContent = originalText;
+
+  // 3. Ouvrir le client mail avec le message
   const subject = `Compte-rendu d'intervention ${r.ref||''} — Technik-Home`;
   const body = buildMessage(r);
   const url = `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
