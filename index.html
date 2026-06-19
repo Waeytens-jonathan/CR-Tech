@@ -710,26 +710,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_EKs2eR3Du9MYSnUgeTFtBQ_vnOOFqHt';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLE = 'rapports';
 
-// Mapping entre les clés internes (camelCase/kebab JS) et les colonnes Supabase (snake_case)
-const FIELD_TO_COLUMN = {
-  'id':'id','ref':'ref','date':'date','heure':'heure','technicien':'technicien',
-  'nom':'nom','prenom':'prenom','adresse':'adresse','cp':'cp','ville':'ville','tel':'tel','email':'email',
-  'appareil':'appareil','marque':'marque','modele':'modele','serie':'serie','age':'age',
-  'panne':'panne','diagnostic':'notes','travaux':'travaux','statut':'statut','duree':'duree',
-  'piece-desc':'piece_desc','piece-cout':'piece_prix','piece-delai':'notes',
-  'cout-mo':'cout_main_oeuvre','cout-pieces':'cout_pieces','cout-deplacement':'cout_deplacement',
-  'cout-total':'cout_total','reste-encaisser':'reste_encaisser',
-  'paiement-statut':'paiement_statut','acompte-montant':'notes','paiement-moyen':'mode_paiement',
-  'notes':'notes',
-  'commande-piece':'commande_piece','piece-recue':'piece_recue','piece-posee':'piece_posee',
-  'garantie':'garantie','conseils-entretien':'conseils_entretien','facture-creee':'facture_creee',
-  'photos':'photos','plaquePhoto':'photos_plaque','signature':'signature','_isDraft':'_is_draft'
-};
-
 // Convertit un objet "report" (format interne JS) -> ligne Supabase
 function reportToRow(r){
   const row = {
-    id: r.id,
+    app_id: r.id,
     ref: r.ref || '',
     date: r.date || '',
     heure: r.heure || '',
@@ -748,7 +732,7 @@ function reportToRow(r){
     age: r.age || '',
     panne: r.panne || '',
     travaux: r.travaux || '',
-    statut: r.statut || '',
+    statue: r.statut || '',
     duree: r.duree || '',
     notes: r.notes || '',
     commande_piece: !!r['commande-piece'],
@@ -756,16 +740,16 @@ function reportToRow(r){
     piece_posee: !!r['piece-posee'],
     piece_desc: r['piece-desc'] || '',
     piece_prix: r['piece-cout'] || '',
-    cout_pieces: r['cout-pieces'] || '',
+    cout_piece: r['cout-pieces'] || '',
     cout_main_oeuvre: r['cout-mo'] || '',
     cout_deplacement: r['cout-deplacement'] || '',
     cout_total: r['cout-total'] || '',
-    paiement_statut: r['paiement-statut'] || '',
+    paiement_statue: r['paiement-statut'] || '',
     reste_encaisser: r['reste-encaisser'] || '',
     mode_paiement: r['paiement-moyen'] || '',
     garantie: !!r.garantie,
     facture_creee: !!r['facture-creee'],
-    conseils_entretien: !!r['conseils-entretien'],
+    conseil_entretien: !!r['conseils-entretien'],
     photos: JSON.stringify(r.photos || []),
     photos_plaque: JSON.stringify(r.plaquePhoto ? [r.plaquePhoto] : []),
     photos_pieces: JSON.stringify([]),
@@ -796,7 +780,7 @@ function rowToReport(row){
   try{ photos = row.photos ? JSON.parse(row.photos) : []; }catch(e){ photos = []; }
   try{ plaquePhotoArr = row.photos_plaque ? JSON.parse(row.photos_plaque) : []; }catch(e){ plaquePhotoArr = []; }
   return {
-    id: row.id,
+    id: row.app_id,
     ref: row.ref,
     date: row.date,
     heure: row.heure,
@@ -815,7 +799,7 @@ function rowToReport(row){
     age: row.age,
     panne: row.panne,
     travaux: row.travaux,
-    statut: row.statut,
+    statut: row.statue,
     duree: row.duree,
     notes: notes,
     'commande-piece': !!row.commande_piece,
@@ -824,17 +808,17 @@ function rowToReport(row){
     'piece-desc': row.piece_desc,
     'piece-cout': row.piece_prix,
     'piece-delai': extra.piece_delai || '',
-    'cout-pieces': row.cout_pieces,
+    'cout-pieces': row.cout_piece,
     'cout-mo': row.cout_main_oeuvre,
     'cout-deplacement': row.cout_deplacement,
     'cout-total': row.cout_total,
-    'paiement-statut': row.paiement_statut,
+    'paiement-statut': row.paiement_statue,
     'reste-encaisser': row.reste_encaisser,
     'acompte-montant': extra.acompte_montant || '',
     'paiement-moyen': row.mode_paiement,
     garantie: !!row.garantie,
     'facture-creee': !!row.facture_creee,
-    'conseils-entretien': !!row.conseils_entretien,
+    'conseils-entretien': !!row.conseil_entretien,
     photos: photos,
     plaquePhoto: plaquePhotoArr[0] || null,
     signature: row.signature || null,
@@ -866,7 +850,7 @@ async function loadReportsFromSupabase(){
 async function saveReportToSupabase(report){
   const row = reportToRow(report);
   try{
-    const { error } = await sb.from(TABLE).upsert(row, { onConflict: 'id' });
+    const { error } = await sb.from(TABLE).upsert(row, { onConflict: 'app_id' });
     if(error) throw error;
   }catch(e){
     console.error('Erreur sauvegarde Supabase :', e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
@@ -876,7 +860,7 @@ async function saveReportToSupabase(report){
 
 async function deleteReportFromSupabase(id){
   try{
-    const { error } = await sb.from(TABLE).delete().eq('id', id);
+    const { error } = await sb.from(TABLE).delete().eq('app_id', id);
     if(error) throw error;
   }catch(e){
     console.error('Erreur suppression Supabase :', e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
