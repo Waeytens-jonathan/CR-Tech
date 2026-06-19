@@ -1817,10 +1817,9 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
   const r = currentDetailReport;
   if(!r.email){ showToast('Email du client manquant', true); return; }
 
-  // 1. Générer et télécharger le PDF
+  // 1. Générer et télécharger le PDF (à partir des données du dossier consulté, pas du formulaire)
   try {
-    document.getElementById('pdf-btn').click();
-    await new Promise(res => setTimeout(res, 800));
+    await generatePdfFor(r);
   } catch(e) { console.error('PDF error', e); }
 
   // 2. Ouvrir le client mail avec le message
@@ -1933,8 +1932,7 @@ function getImageDimensions(dataUrl){
 }
 
 // ---------- Export PDF ----------
-document.getElementById('pdf-btn').addEventListener('click', async () => {
-  const data = collectFormData();
+async function generatePdfFor(data){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:'a4'});
   const navy = [13,27,42];
@@ -2148,6 +2146,10 @@ document.getElementById('pdf-btn').addEventListener('click', async () => {
 
   doc.save(filename);
   showToast('PDF généré');
+}
+
+document.getElementById('pdf-btn').addEventListener('click', async () => {
+  await generatePdfFor(collectFormData());
 });
 
 function base64ToArrayBuffer(base64){
