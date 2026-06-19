@@ -346,6 +346,7 @@
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <button class="tab-btn active" data-view="list">Compte-rendu</button>
       <button class="tab-btn" data-view="agenda" id="tab-agenda">📅 Agenda</button>
+      <button class="tab-btn" data-view="stats" id="tab-stats">📊 Stats</button>
     </div>
   </div>
 
@@ -453,6 +454,53 @@
         <textarea id="newrdv-note" rows="2" placeholder="Ex : ne pas sonner, maison bleue…"></textarea>
       </div>
       <button class="btn btn-primary" id="newrdv-save-btn" style="width:100%;margin-top:0.6rem;">Enregistrer le rendez-vous</button>
+    </div>
+  </div>
+
+  <!-- ===================== VUE STATS ===================== -->
+  <div class="view" id="view-stats">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
+        <h2 style="margin:0;">Statistiques</h2>
+        <select id="stats-period" style="max-width:200px;">
+          <option value="month">Ce mois-ci</option>
+          <option value="last_month">Mois dernier</option>
+          <option value="year">Cette année</option>
+          <option value="all">Tout l'historique</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;margin-bottom:0.7rem;">
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Interventions</div>
+          <div style="font-size:1.5rem;font-weight:700;" id="stat-nb-interventions">0</div>
+        </div>
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">CA encaissé</div>
+          <div style="font-size:1.5rem;font-weight:700;" id="stat-ca">0,00 €</div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;margin-bottom:0.7rem;">
+        <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#f5a623;margin-bottom:0.6rem;">Détail du chiffre d'affaires</div>
+        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);"><span style="color:#aab;">Main d'œuvre</span><span id="stat-mo">0,00 €</span></div>
+        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);"><span style="color:#aab;">Pièces facturées</span><span id="stat-pieces-facturees">0,00 €</span></div>
+        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;"><span style="color:#aab;">Déplacements</span><span id="stat-deplacement">0,00 €</span></div>
+      </div>
+
+      <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;margin-bottom:0.7rem;">
+        <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#f5a623;margin-bottom:0.6rem;">Charges déduites</div>
+        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);"><span style="color:#aab;">Coût réel des pièces (achat fournisseur)</span><span id="stat-cout-fournisseur">0,00 €</span></div>
+        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;"><span style="color:#aab;">URSSAF (20% du CA)</span><span id="stat-urssaf">0,00 €</span></div>
+      </div>
+
+      <div style="background:rgba(63,191,111,0.12);border:1px solid rgba(63,191,111,0.3);border-radius:10px;padding:1rem;">
+        <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--green,#3fbf6f);margin-bottom:0.3rem;">Argent réellement gagné</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--green,#3fbf6f);" id="stat-net">0,00 €</div>
+      </div>
+
+      <div class="empty" id="stats-no-data-msg" style="display:none;margin-top:1rem;">Aucun compte-rendu sur cette période.</div>
+      <div style="font-size:0.75rem;color:#778;margin-top:0.8rem;">Les dossiers sans prix fournisseur saisi comptent pour 0€ de coût pièce réel sur cette estimation.</div>
     </div>
   </div>
 
@@ -659,7 +707,11 @@
           <textarea id="f-piece-desc" placeholder="Référence(s) et désignation des pièces commandées"></textarea>
         </div>
         <div class="field">
-          <label>Coût estimé de la / des pièce(s)</label>
+          <label>Prix d'achat fournisseur (€)</label>
+          <input type="number" id="f-prix-fournisseur" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Prix facturé au client (€)</label>
           <input type="number" id="f-piece-cout" placeholder="0.00" step="0.01" min="0">
         </div>
         <div class="field">
@@ -900,6 +952,7 @@ function reportToRow(r){
     piece_posee: !!r['piece-posee'],
     piece_desc: r['piece-desc'] || '',
     piece_prix: r['piece-cout'] || '',
+    prix_fournisseur: r['prix-fournisseur'] || '',
     cout_piece: r['cout-pieces'] || '',
     cout_main_oeuvre: r['cout-mo'] || '',
     cout_deplacement: r['cout-deplacement'] || '',
@@ -967,6 +1020,7 @@ function rowToReport(row){
     'piece-posee': !!row.piece_posee,
     'piece-desc': row.piece_desc,
     'piece-cout': row.piece_prix,
+    'prix-fournisseur': row.prix_fournisseur,
     'piece-delai': extra.piece_delai || '',
     'cout-pieces': row.cout_piece,
     'cout-mo': row.cout_main_oeuvre,
@@ -1109,6 +1163,67 @@ async function renderAgenda(){
     card.addEventListener('click', () => showAgendaDetail(card.dataset.rdvId));
   });
 }
+
+// ---------- Statistiques ----------
+const URSSAF_TAUX = 0.20;
+
+function getStatsDateRange(period){
+  const now = new Date();
+  let start, end;
+  if(period === 'month'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if(period === 'last_month'){
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if(period === 'year'){
+    start = new Date(now.getFullYear(), 0, 1);
+    end = new Date(now.getFullYear(), 11, 31);
+  } else {
+    return null; // 'all'
+  }
+  const toISO = d => d.toISOString().slice(0,10);
+  return { start: toISO(start), end: toISO(end) };
+}
+
+function formatEur(n){
+  return (Math.round(n * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+}
+
+function renderStats(){
+  const period = document.getElementById('stats-period').value;
+  const range = getStatsDateRange(period);
+
+  const candidats = reports.filter(r => !r._isDraft && r.date);
+  const filtered = range
+    ? candidats.filter(r => r.date >= range.start && r.date <= range.end)
+    : candidats;
+
+  let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0;
+  filtered.forEach(r => {
+    totalMo += parseFloat(r['cout-mo']) || 0;
+    totalPieces += parseFloat(r['cout-pieces']) || 0;
+    totalDepl += parseFloat(r['cout-deplacement']) || 0;
+    totalFournisseur += parseFloat(r['prix-fournisseur']) || 0;
+  });
+
+  const ca = totalMo + totalPieces + totalDepl;
+  const urssaf = ca * URSSAF_TAUX;
+  const net = ca - totalFournisseur - urssaf;
+
+  document.getElementById('stat-nb-interventions').textContent = filtered.length;
+  document.getElementById('stat-ca').textContent = formatEur(ca);
+  document.getElementById('stat-mo').textContent = formatEur(totalMo);
+  document.getElementById('stat-pieces-facturees').textContent = formatEur(totalPieces);
+  document.getElementById('stat-deplacement').textContent = formatEur(totalDepl);
+  document.getElementById('stat-cout-fournisseur').textContent = formatEur(totalFournisseur);
+  document.getElementById('stat-urssaf').textContent = formatEur(urssaf);
+  document.getElementById('stat-net').textContent = formatEur(net);
+
+  document.getElementById('stats-no-data-msg').style.display = filtered.length ? 'none' : 'block';
+}
+
+document.getElementById('stats-period').addEventListener('change', renderStats);
 
 function showAgendaDetail(appId){
   const r = agendaRdvs.find(x => x.app_id === appId);
@@ -1419,6 +1534,7 @@ document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if(btn.dataset.view === 'list') renderList();
     if(btn.dataset.view === 'agenda') renderAgenda();
+    if(btn.dataset.view === 'stats') renderStats();
   });
 });
 
@@ -1609,6 +1725,30 @@ document.getElementById('f-piece-cout').addEventListener('input', () => {
   const pieceCout = document.getElementById('f-piece-cout').value;
   document.getElementById('f-cout-pieces').value = pieceCout;
   recalcTotal();
+});
+
+// ---------- Barème de marge automatique sur prix fournisseur ----------
+const BAREME_MARGE = [
+  { min: 0,   max: 20,       taux: 0.50 },
+  { min: 20,  max: 50,       taux: 0.40 },
+  { min: 50,  max: 100,      taux: 0.30 },
+  { min: 100, max: 200,      taux: 0.25 },
+  { min: 200, max: Infinity, taux: 0.20 }
+];
+
+function calculerPrixVente(prixFournisseur){
+  const palier = BAREME_MARGE.find(p => prixFournisseur >= p.min && prixFournisseur < p.max) || BAREME_MARGE[BAREME_MARGE.length - 1];
+  return Math.round(prixFournisseur * (1 + palier.taux) * 100) / 100;
+}
+
+document.getElementById('f-prix-fournisseur').addEventListener('input', () => {
+  const prixFournisseur = parseFloat(document.getElementById('f-prix-fournisseur').value) || 0;
+  if(prixFournisseur > 0){
+    const prixVente = calculerPrixVente(prixFournisseur);
+    document.getElementById('f-piece-cout').value = prixVente.toFixed(2);
+    document.getElementById('f-cout-pieces').value = prixVente.toFixed(2);
+    recalcTotal();
+  }
 });
 
 
@@ -1871,7 +2011,7 @@ const fieldIds = [
   'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-cp','f-ville','f-tel','f-email',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
-  'f-piece-desc','f-piece-cout','f-piece-delai',
+  'f-piece-desc','f-prix-fournisseur','f-piece-cout','f-piece-delai',
   'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-cout-total','f-reste-encaisser',
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen',
   'f-notes'
