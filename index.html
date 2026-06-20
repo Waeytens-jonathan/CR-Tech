@@ -490,7 +490,7 @@
 
       <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;margin-bottom:0.7rem;">
         <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#f5a623;margin-bottom:0.6rem;">Charges déduites</div>
-        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);"><span style="color:#aab;">Coût réel des pièces (achat fournisseur)</span><span id="stat-cout-fournisseur">0,00 €</span></div>
+        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);"><span style="color:#aab;">Coût réel des pièces (achat fournisseur + livraison)</span><span id="stat-cout-fournisseur">0,00 €</span></div>
         <div style="display:flex;justify-content:space-between;padding:0.3rem 0;"><span style="color:#aab;">URSSAF (20% du CA)</span><span id="stat-urssaf">0,00 €</span></div>
       </div>
 
@@ -709,6 +709,13 @@
         <div class="field">
           <label>Prix d'achat fournisseur (€)</label>
           <input type="number" id="f-prix-fournisseur" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Livraison</label>
+          <select id="f-livraison">
+            <option value="standard">Standard (10€)</option>
+            <option value="24h">24h (12€)</option>
+          </select>
         </div>
         <div class="field">
           <label>Prix facturé au client (€)</label>
@@ -972,6 +979,7 @@ function reportToRow(r){
   // Champs sans colonne dédiée -> regroupés dans "notes" pour ne rien perdre
   const extra = {};
   if(r['piece-delai']) extra.piece_delai = r['piece-delai'];
+  if(r['livraison']) extra.livraison = r['livraison'];
   if(r['acompte-montant']) extra.acompte_montant = r['acompte-montant'];
   if(r._draftStep !== undefined) extra._draftStep = r._draftStep;
   if(Object.keys(extra).length){
@@ -1022,6 +1030,7 @@ function rowToReport(row){
     'piece-cout': row.piece_prix,
     'prix-fournisseur': row.prix_fournisseur,
     'piece-delai': extra.piece_delai || '',
+    'livraison': extra.livraison || 'standard',
     'cout-pieces': row.cout_piece,
     'cout-mo': row.cout_main_oeuvre,
     'cout-deplacement': row.cout_deplacement,
@@ -1199,24 +1208,28 @@ function renderStats(){
     ? candidats.filter(r => r.date >= range.start && r.date <= range.end)
     : candidats;
 
-  let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0;
+  let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0;
   filtered.forEach(r => {
     totalMo += parseFloat(r['cout-mo']) || 0;
     totalPieces += parseFloat(r['cout-pieces']) || 0;
     totalDepl += parseFloat(r['cout-deplacement']) || 0;
-    totalFournisseur += parseFloat(r['prix-fournisseur']) || 0;
+    const prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
+    totalFournisseur += prixFournisseur;
+    if(prixFournisseur > 0){
+      totalLivraison += (r['livraison'] === '24h') ? 12 : 10;
+    }
   });
 
   const ca = totalMo + totalPieces + totalDepl;
   const urssaf = ca * URSSAF_TAUX;
-  const net = ca - totalFournisseur - urssaf;
+  const net = ca - totalFournisseur - totalLivraison - urssaf;
 
   document.getElementById('stat-nb-interventions').textContent = filtered.length;
   document.getElementById('stat-ca').textContent = formatEur(ca);
   document.getElementById('stat-mo').textContent = formatEur(totalMo);
   document.getElementById('stat-pieces-facturees').textContent = formatEur(totalPieces);
   document.getElementById('stat-deplacement').textContent = formatEur(totalDepl);
-  document.getElementById('stat-cout-fournisseur').textContent = formatEur(totalFournisseur);
+  document.getElementById('stat-cout-fournisseur').textContent = formatEur(totalFournisseur + totalLivraison);
   document.getElementById('stat-urssaf').textContent = formatEur(urssaf);
   document.getElementById('stat-net').textContent = formatEur(net);
 
@@ -1729,27 +1742,32 @@ document.getElementById('f-piece-cout').addEventListener('input', () => {
 
 // ---------- Barème de marge automatique sur prix fournisseur ----------
 const BAREME_MARGE = [
-  { min: 0,   max: 20,       taux: 0.50 },
-  { min: 20,  max: 50,       taux: 0.40 },
-  { min: 50,  max: 100,      taux: 0.30 },
+  { min: 0,   max: 20,       taux: 3.00 },
+  { min: 20,  max: 50,       taux: 0.70 },
+  { min: 50,  max: 100,      taux: 0.50 },
   { min: 100, max: 200,      taux: 0.25 },
   { min: 200, max: Infinity, taux: 0.20 }
 ];
 
-function calculerPrixVente(prixFournisseur){
+function calculerPrixVente(prixFournisseur, fraisLivraison){
   const palier = BAREME_MARGE.find(p => prixFournisseur >= p.min && prixFournisseur < p.max) || BAREME_MARGE[BAREME_MARGE.length - 1];
-  return Math.round(prixFournisseur * (1 + palier.taux) * 100) / 100;
+  const prixAvecMarge = prixFournisseur * (1 + palier.taux);
+  return Math.round((prixAvecMarge + (fraisLivraison || 0)) * 100) / 100;
 }
 
-document.getElementById('f-prix-fournisseur').addEventListener('input', () => {
+function recalculerPrixPiece(){
   const prixFournisseur = parseFloat(document.getElementById('f-prix-fournisseur').value) || 0;
   if(prixFournisseur > 0){
-    const prixVente = calculerPrixVente(prixFournisseur);
+    const livraison = document.getElementById('f-livraison').value === '24h' ? 12 : 10;
+    const prixVente = calculerPrixVente(prixFournisseur, livraison);
     document.getElementById('f-piece-cout').value = prixVente.toFixed(2);
     document.getElementById('f-cout-pieces').value = prixVente.toFixed(2);
     recalcTotal();
   }
-});
+}
+
+document.getElementById('f-prix-fournisseur').addEventListener('input', recalculerPrixPiece);
+document.getElementById('f-livraison').addEventListener('change', recalculerPrixPiece);
 
 
 // ---------- Signature ----------
@@ -2011,7 +2029,7 @@ const fieldIds = [
   'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-cp','f-ville','f-tel','f-email',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
-  'f-piece-desc','f-prix-fournisseur','f-piece-cout','f-piece-delai',
+  'f-piece-desc','f-prix-fournisseur','f-livraison','f-piece-cout','f-piece-delai',
   'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-cout-total','f-reste-encaisser',
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen',
   'f-notes'
@@ -2025,6 +2043,7 @@ function resetForm(){
   document.getElementById('f-heure').value = new Date().toTimeString().slice(0,5);
   document.getElementById('f-technicien').value = 'Jonathan';
   document.getElementById('f-statut').value = 'Terminée';
+  document.getElementById('f-livraison').value = 'standard';
   document.getElementById('f-paiement-statut').value = 'Paye_total';
   document.getElementById('f-reste-encaisser').value = '0.00';
   document.getElementById('piece-fields').style.display = 'none';
@@ -2456,7 +2475,6 @@ document.getElementById('detail-edit').addEventListener('click', () => {
   loadIntoForm(currentDetailReport);
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelector('.tab-btn[data-view="form"]').classList.add('active');
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
 });
@@ -2469,7 +2487,8 @@ document.getElementById('detail-delete-btn').addEventListener('click', () => {
   reports = reports.filter(r => r.id !== currentDetailReport.id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
   deleteReportFromSupabase(currentDetailReport.id);
-  if(currentId === currentDetailReport.id){ clearDraft(); currentId = null; }
+  if(currentDetailReport._isDraft){ clearDraft(); }
+  if(currentId === currentDetailReport.id){ currentId = null; }
   currentDetailReport = null;
   showToast('Supprimé ✓');
   goToList();
@@ -2916,7 +2935,6 @@ document.getElementById('view-form').addEventListener('change', () => {
       }
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.querySelector('.tab-btn[data-view="form"]').classList.add('active');
       document.getElementById('view-form').classList.add('active');
       goToStep(draft._draftStep || 1);
     } else {
