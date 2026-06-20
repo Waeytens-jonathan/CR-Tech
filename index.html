@@ -2726,6 +2726,11 @@ function renderList(){
   const EN_COURS_STATUTS = ['A_suivre', 'Attente_piece', 'Devis'];
   const TERMINES_STATUTS = ['Terminée', 'Non_reparable'];
   const encours  = filtered.filter(r => !r._isDraft && (EN_COURS_STATUTS.includes(r.statut) || (!TERMINES_STATUTS.includes(r.statut) && r.statut)));
+  encours.sort((a, b) => {
+    const dateA = (a.date || '') + ' ' + (a.heure || '');
+    const dateB = (b.date || '') + ' ' + (b.heure || '');
+    return dateB.localeCompare(dateA);
+  });
   const termines = filtered.filter(r => !r._isDraft && TERMINES_STATUTS.includes(r.statut));
   if(drafts.length > 0){
     container.appendChild(renderSectionTitle('✏️ Brouillons (' + drafts.length + ')', '#f5a623'));
