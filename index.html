@@ -1744,9 +1744,9 @@ function showAgendaDetail(appId){
   const cancelBtn = document.getElementById('agenda-detail-cancel-btn');
   const doneBtn = document.getElementById('agenda-detail-done-btn');
   cancelBtn.style.display = r.statut === 'annule' ? 'none' : 'inline-flex';
-  doneBtn.style.display = r.statut === 'effectue' ? 'none' : 'inline-flex';
+  doneBtn.style.display = 'inline-flex';
   cancelBtn.textContent = '🚫 Annuler le RDV';
-  doneBtn.textContent = '✅ Marquer effectué';
+  doneBtn.textContent = r.statut === 'effectue' ? '↩️ Annuler le statut effectué' : '✅ Marquer effectué';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1846,11 +1846,13 @@ document.getElementById('agenda-detail-cancel-btn').addEventListener('click', as
 
 document.getElementById('agenda-detail-done-btn').addEventListener('click', async () => {
   if(!currentAgendaRdv) return;
+  const isCurrentlyDone = currentAgendaRdv.statut === 'effectue';
+  const nouveauStatut = isCurrentlyDone ? 'en_attente' : 'effectue';
   try{
-    const { error } = await sb.from(RDV_TABLE).update({ statut: 'effectue' }).eq('app_id', currentAgendaRdv.app_id);
+    const { error } = await sb.from(RDV_TABLE).update({ statut: nouveauStatut }).eq('app_id', currentAgendaRdv.app_id);
     if(error) throw error;
-    currentAgendaRdv.statut = 'effectue';
-    showToast('Rendez-vous marqué comme effectué');
+    currentAgendaRdv.statut = nouveauStatut;
+    showToast(isCurrentlyDone ? 'Statut "effectué" annulé' : 'Rendez-vous marqué comme effectué');
     showAgendaDetail(currentAgendaRdv.app_id);
   }catch(e){
     console.error('Erreur mise à jour RDV :', e);
