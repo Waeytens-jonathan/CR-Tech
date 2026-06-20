@@ -333,7 +333,12 @@
       <h3 style="margin:0;color:#fff;">Choisir une pièce en stock</h3>
       <button id="stock-picker-close" style="background:none;border:none;color:#9fb0c3;font-size:1.4rem;cursor:pointer;line-height:1;">✕</button>
     </div>
-    <input type="text" id="stock-picker-search" placeholder="Rechercher par nom ou référence…" style="padding:0.6rem 0.8rem;border-radius:8px;border:1px solid #2a3f56;background:#0d1b2a;color:#fff;margin-bottom:0.8rem;">
+    <input type="text" id="stock-picker-search" placeholder="Rechercher par nom ou référence…" style="padding:0.6rem 0.8rem;border-radius:8px;border:1px solid #2a3f56;background:#0d1b2a;color:#fff;margin-bottom:0.6rem;">
+    <div style="display:flex;gap:0.5rem;margin-bottom:0.8rem;flex-wrap:wrap;">
+      <button type="button" class="stock-picker-filter-btn active" data-filter="all" style="padding:0.4rem 0.8rem;border-radius:20px;border:1px solid #2a3f56;background:#1a73c8;color:#fff;font-size:0.82rem;cursor:pointer;">Tous</button>
+      <button type="button" class="stock-picker-filter-btn" data-filter="embarque" style="padding:0.4rem 0.8rem;border-radius:20px;border:1px solid #2a3f56;background:transparent;color:#9fb0c3;font-size:0.82rem;cursor:pointer;">Stock embarqué</button>
+      <button type="button" class="stock-picker-filter-btn" data-filter="pieces" style="padding:0.4rem 0.8rem;border-radius:20px;border:1px solid #2a3f56;background:transparent;color:#9fb0c3;font-size:0.82rem;cursor:pointer;">Pièces commandées</button>
+    </div>
     <div id="stock-picker-list" style="overflow-y:auto;flex:1;"></div>
   </div>
 </div>
@@ -824,7 +829,7 @@
         <label class="btn btn-outline" for="f-photo-piece-posee" style="cursor:pointer; display:inline-block;">
           📷 Ajouter la photo de la pièce posée
         </label>
-        <input type="file" id="f-photo-piece-posee" accept="image/*" capture="environment" style="display:none;">
+        <input type="file" id="f-photo-piece-posee" accept="image/*" style="display:none;">
       </div>
     </div>
 
@@ -1551,15 +1556,23 @@ document.getElementById('stock-edit-delete-btn').addEventListener('click', async
 // ---------- Sélecteur "Pose pièce stock" depuis le formulaire CR ----------
 let selectedStockPiece = null; // { type:'embarque'|'pieces', app_id, nom, ref, prix_vente }
 
+let stockPickerFilter = 'all';
+
 function renderStockPickerList(filterText){
   const listEl = document.getElementById('stock-picker-list');
   const search = (filterText || '').toLowerCase().trim();
 
   const embarqueDispo = stockEmbarque.filter(p => p.statut === 'en_stock');
-  const allItems = [
+  let allItems = [
     ...embarqueDispo.map(p => ({ ...p, _type: 'embarque' })),
     ...stockPieces.map(p => ({ ...p, _type: 'pieces' }))
-  ].filter(p => {
+  ];
+
+  if(stockPickerFilter !== 'all'){
+    allItems = allItems.filter(p => p._type === stockPickerFilter);
+  }
+
+  allItems = allItems.filter(p => {
     if(!search) return true;
     return (p.nom || '').toLowerCase().includes(search) || (p.ref || '').toLowerCase().includes(search);
   });
@@ -1620,8 +1633,28 @@ document.getElementById('open-stock-picker-btn').addEventListener('click', async
   stockEmbarque = await loadStockEmbarque();
   stockPieces = await loadStockPieces();
   document.getElementById('stock-picker-search').value = '';
+  stockPickerFilter = 'all';
+  document.querySelectorAll('.stock-picker-filter-btn').forEach(btn => {
+    const isActive = btn.dataset.filter === 'all';
+    btn.classList.toggle('active', isActive);
+    btn.style.background = isActive ? '#1a73c8' : 'transparent';
+    btn.style.color = isActive ? '#fff' : '#9fb0c3';
+  });
   renderStockPickerList('');
   document.getElementById('stock-picker-overlay').style.display = 'flex';
+});
+
+document.querySelectorAll('.stock-picker-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    stockPickerFilter = btn.dataset.filter;
+    document.querySelectorAll('.stock-picker-filter-btn').forEach(b => {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.style.background = isActive ? '#1a73c8' : 'transparent';
+      b.style.color = isActive ? '#fff' : '#9fb0c3';
+    });
+    renderStockPickerList(document.getElementById('stock-picker-search').value);
+  });
 });
 
 document.getElementById('stock-picker-close').addEventListener('click', () => {
