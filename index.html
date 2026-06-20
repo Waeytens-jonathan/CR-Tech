@@ -820,8 +820,11 @@
       </div>
       <div class="field">
         <label>Photo de la pièce posée</label>
-        <input type="file" id="f-photo-piece-posee" accept="image/*" capture="environment">
-        <div id="photo-piece-posee-preview" style="margin-top:0.6rem;"></div>
+        <div id="photo-piece-posee-preview" style="margin-bottom:0.6rem;"></div>
+        <label class="btn btn-outline" for="f-photo-piece-posee" style="cursor:pointer; display:inline-block;">
+          📷 Ajouter la photo de la pièce posée
+        </label>
+        <input type="file" id="f-photo-piece-posee" accept="image/*" capture="environment" style="display:none;">
       </div>
     </div>
 
@@ -1591,6 +1594,11 @@ function renderStockPickerList(filterText){
       if(!item) return;
       selectedStockPiece = { type, app_id: item.app_id, nom: item.nom, ref: item.ref, prix_vente: item.prix_vente };
       renderStockPieceSelected();
+      if(item.prix_vente){
+        document.getElementById('f-piece-cout').value = parseFloat(item.prix_vente).toFixed(2);
+        document.getElementById('f-cout-pieces').value = parseFloat(item.prix_vente).toFixed(2);
+        recalcTotal();
+      }
       document.getElementById('stock-picker-overlay').style.display = 'none';
     });
   });
