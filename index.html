@@ -638,6 +638,7 @@
       <div class="field">
         <label>Ville</label>
         <input type="text" id="depot-edit-ville">
+        <div id="depot-edit-ville-suggestions" style="display:none;margin-top:0.4rem;gap:0.4rem;flex-wrap:wrap;"></div>
       </div>
       <div class="field">
         <label>Téléphone</label>
@@ -649,7 +650,7 @@
       </div>
       <div class="field">
         <label>Appareil déposé</label>
-        <input type="text" id="depot-edit-appareil" placeholder="ex : Manette PS5 / XBOX etc ...">
+        <input type="text" id="depot-edit-appareil" placeholder="ex : Lave-linge Bosch">
       </div>
       <div class="field">
         <label>Description / panne signalée</label>
@@ -738,6 +739,7 @@
         <div class="field">
           <label>Ville</label>
           <input type="text" id="f-ville" placeholder="Lens">
+          <div id="f-ville-suggestions" style="display:none;margin-top:0.4rem;gap:0.4rem;flex-wrap:wrap;"></div>
         </div>
         <div class="field">
           <label>Téléphone</label>
@@ -2398,6 +2400,55 @@ function todayISO(){
   const d = new Date();
   return d.toISOString().split('T')[0];
 }
+
+// ---------- Auto-suggestion ville depuis le code postal (API officielle gouv.fr) ----------
+let villeAutocompleteTimeout = null;
+
+function setupVilleAutocomplete(cpId, villeId, suggestionsId){
+  const cpInput = document.getElementById(cpId);
+  const villeInput = document.getElementById(villeId);
+  const suggBox = document.getElementById(suggestionsId);
+  if(!cpInput || !villeInput || !suggBox) return;
+
+  cpInput.addEventListener('input', () => {
+    clearTimeout(villeAutocompleteTimeout);
+    suggBox.style.display = 'none';
+    suggBox.innerHTML = '';
+    const cp = cpInput.value.trim();
+    if(!/^\d{5}$/.test(cp)) return;
+
+    villeAutocompleteTimeout = setTimeout(async () => {
+      try{
+        const res = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
+        if(!res.ok) return;
+        const villes = await res.json();
+        if(!villes.length) return;
+
+        if(villes.length === 1){
+          villeInput.value = villes[0].nom;
+        } else {
+          suggBox.innerHTML = villes.map(v =>
+            `<button type="button" class="btn btn-outline" style="font-size:0.8rem;padding:0.35rem 0.7rem;" data-ville="${escapeHtml(v.nom)}">${escapeHtml(v.nom)}</button>`
+          ).join('');
+          suggBox.style.display = 'flex';
+          suggBox.querySelectorAll('[data-ville]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              villeInput.value = btn.dataset.ville;
+              suggBox.style.display = 'none';
+              suggBox.innerHTML = '';
+            });
+          });
+        }
+      }catch(e){
+        console.error('Erreur autocomplétion ville :', e);
+      }
+    }, 400);
+  });
+}
+
+setupVilleAutocomplete('f-cp', 'f-ville', 'f-ville-suggestions');
+setupVilleAutocomplete('depot-edit-cp', 'depot-edit-ville', 'depot-edit-ville-suggestions');
+
 document.getElementById('header-date').textContent = new Date().toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
 document.getElementById('f-date').value = todayISO();
 
