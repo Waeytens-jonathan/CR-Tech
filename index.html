@@ -880,16 +880,8 @@
 
       <!-- Mode STOCK -->
       <div id="piece-mode-stock-section">
-        <button type="button" class="btn btn-secondary" id="open-stock-picker-btn" style="margin-bottom:0.8rem;">📦 Choisir une pièce en stock</button>
-        <div id="stock-piece-selected" style="display:none;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <strong id="stock-piece-selected-nom"></strong>
-              <div style="color:#778;font-size:0.85rem;" id="stock-piece-selected-ref"></div>
-            </div>
-            <button type="button" class="btn btn-outline" id="stock-piece-remove-btn" style="padding:0.35rem 0.7rem;font-size:0.82rem;">✕ Retirer</button>
-          </div>
-        </div>
+        <button type="button" class="btn btn-secondary" id="open-stock-picker-btn" style="margin-bottom:0.8rem;">📦 Ajouter une pièce du stock</button>
+        <div id="stock-pieces-selected-list"></div>
       </div>
 
       <!-- Mode COMMANDE -->
@@ -1187,7 +1179,7 @@ function reportToRow(r){
     photos_plaque: JSON.stringify(r.plaquePhoto ? [r.plaquePhoto] : []),
     photos_pieces: JSON.stringify([]),
     signature: r.signature || '',
-    stock_piece: r.stockPiece ? JSON.stringify(r.stockPiece) : '',
+    stock_piece: (r.stockPieces && r.stockPieces.length) ? JSON.stringify(r.stockPieces) : '',
     photo_piece_posee: r.photoPiecePosee || '',
     piece_depose_nom: r.pieceDeposeNom || '',
     piece_depose_ref: r.pieceDeposeRef || '',
@@ -1263,7 +1255,12 @@ function rowToReport(row){
     photos: photos,
     plaquePhoto: plaquePhotoArr[0] || null,
     signature: row.signature || null,
-    stockPiece: row.stock_piece ? (() => { try{ return JSON.parse(row.stock_piece); }catch(e){ return null; } })() : null,
+    stockPieces: row.stock_piece ? (() => {
+      try{
+        const parsed = JSON.parse(row.stock_piece);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      }catch(e){ return []; }
+    })() : [],
     photoPiecePosee: row.photo_piece_posee || null,
     pieceDeposeNom: row.piece_depose_nom || '',
     pieceDeposeRef: row.piece_depose_ref || '',
@@ -1676,7 +1673,7 @@ document.getElementById('stock-edit-delete-btn').addEventListener('click', async
 });
 
 // ---------- Sélecteur "Pose pièce stock" depuis le formulaire CR ----------
-let selectedStockPiece = null; // { type:'embarque'|'pieces', app_id, nom, ref, prix_vente }
+let selectedStockPieces = []; // [{ type:'embarque'|'pieces', app_id, nom, ref, prix_vente }, ...]
 
 let stockPickerFilter = 'all';
 
@@ -1727,27 +1724,48 @@ function renderStockPickerList(filterText){
       const source = type === 'embarque' ? stockEmbarque : stockPieces;
       const item = source.find(p => p.app_id === appId);
       if(!item) return;
-      selectedStockPiece = { type, app_id: item.app_id, nom: item.nom, ref: item.ref, prix_vente: item.prix_vente };
-      renderStockPieceSelected();
-      if(item.prix_vente){
-        document.getElementById('f-piece-cout').value = parseFloat(item.prix_vente).toFixed(2);
-        document.getElementById('f-cout-pieces').value = parseFloat(item.prix_vente).toFixed(2);
-        recalcTotal();
+      // Empêche d'ajouter deux fois la même pièce
+      if(selectedStockPieces.some(p => p.app_id === item.app_id)){
+        showToast('Cette pièce est déjà ajoutée', true);
+        return;
       }
+      selectedStockPieces.push({ type, app_id: item.app_id, nom: item.nom, ref: item.ref, prix_vente: item.prix_vente });
+      renderStockPiecesSelectedList();
+      recalcPieceCoutFromStock();
       document.getElementById('stock-picker-overlay').style.display = 'none';
     });
   });
 }
 
-function renderStockPieceSelected(){
-  const wrap = document.getElementById('stock-piece-selected');
-  if(selectedStockPiece){
-    document.getElementById('stock-piece-selected-nom').textContent = selectedStockPiece.nom || '';
-    document.getElementById('stock-piece-selected-ref').textContent = selectedStockPiece.ref || '';
-    wrap.style.display = 'block';
-  } else {
-    wrap.style.display = 'none';
+function recalcPieceCoutFromStock(){
+  const total = selectedStockPieces.reduce((sum, p) => sum + (parseFloat(p.prix_vente) || 0), 0);
+  document.getElementById('f-piece-cout').value = total.toFixed(2);
+  document.getElementById('f-cout-pieces').value = total.toFixed(2);
+  recalcTotal();
+}
+
+function renderStockPiecesSelectedList(){
+  const wrap = document.getElementById('stock-pieces-selected-list');
+  if(!selectedStockPieces.length){
+    wrap.innerHTML = '';
+    return;
   }
+  wrap.innerHTML = selectedStockPieces.map((p, idx) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.8rem;margin-bottom:0.6rem;">
+      <div>
+        <strong>${escapeHtml(p.nom || '')}</strong>
+        <div style="color:#778;font-size:0.85rem;">${escapeHtml(p.ref || '')}${p.prix_vente ? ' — ' + parseFloat(p.prix_vente).toFixed(2) + ' €' : ''}</div>
+      </div>
+      <button type="button" class="btn btn-outline stock-piece-remove-item" data-idx="${idx}" style="padding:0.35rem 0.7rem;font-size:0.82rem;">✕ Retirer</button>
+    </div>`).join('');
+
+  wrap.querySelectorAll('.stock-piece-remove-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedStockPieces.splice(parseInt(btn.dataset.idx), 1);
+      renderStockPiecesSelectedList();
+      recalcPieceCoutFromStock();
+    });
+  });
 }
 
 document.getElementById('open-stock-picker-btn').addEventListener('click', async () => {
@@ -1785,11 +1803,6 @@ document.getElementById('stock-picker-close').addEventListener('click', () => {
 
 document.getElementById('stock-picker-search').addEventListener('input', (e) => {
   renderStockPickerList(e.target.value);
-});
-
-document.getElementById('stock-piece-remove-btn').addEventListener('click', () => {
-  selectedStockPiece = null;
-  renderStockPieceSelected();
 });
 
 // ---------- Dépôt (bons de dépôt d'appareils) ----------
@@ -2996,8 +3009,8 @@ function resetForm(){
   renderPhotos();
   plaquePhoto = null;
   renderPlaqueThumb();
-  selectedStockPiece = null;
-  renderStockPieceSelected();
+  selectedStockPieces = [];
+  renderStockPiecesSelectedList();
   currentId = null;
   document.getElementById('ref-display').textContent = generateRef();
 }
@@ -3014,7 +3027,7 @@ function loadIntoForm(report){
     document.getElementById(id).checked = !!report[key];
   });
   // Rétrocompatibilité : anciens dossiers avec pièce déjà commandée/en stock mais sans la case "besoin-piece"
-  if(report['commande-piece'] || report.stockPiece){
+  if(report['commande-piece'] || report.stockPiece || (Array.isArray(report.stockPieces) && report.stockPieces.length)){
     document.getElementById('f-besoin-piece').checked = true;
   }
   document.getElementById('piece-fields').style.display = report['commande-piece'] ? 'grid' : 'none';
@@ -3026,9 +3039,16 @@ function loadIntoForm(report){
   renderPhotos();
   plaquePhoto = report.plaquePhoto || null;
   renderPlaqueThumb();
-  selectedStockPiece = report.stockPiece || null;
-  renderStockPieceSelected();
-  setPieceMode(report['commande-piece'] ? 'commande' : 'stock');
+  // Rétrocompatibilité : anciens dossiers avec une seule pièce stockée (objet) au lieu d'un tableau
+  if(Array.isArray(report.stockPieces)){
+    selectedStockPieces = report.stockPieces;
+  } else if(report.stockPiece){
+    selectedStockPieces = [report.stockPiece];
+  } else {
+    selectedStockPieces = [];
+  }
+  renderStockPiecesSelectedList();
+  setPieceMode((report['commande-piece'] || selectedStockPieces.length) ? (report['commande-piece'] ? 'commande' : 'stock') : 'stock');
   document.getElementById('f-paiement-statut').disabled = !!report.garantie;
 }
 
@@ -3046,7 +3066,7 @@ function collectFormData(){
   data.photos = photos.slice(0, MAX_PHOTOS);
   data.plaquePhoto = plaquePhoto;
   data.signature = signatureData || null;
-  data.stockPiece = selectedStockPiece || null;
+  data.stockPieces = selectedStockPieces.slice();
   return data;
 }
 
@@ -3071,25 +3091,28 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
   saveReportToSupabase(data);
-  await consumeStockPieceIfAny(data.stockPiece);
+  await consumeStockPiecesIfAny(data.stockPieces);
   clearDraft();
   showToast('Compte-rendu enregistré');
 });
 
-// Met à jour/supprime la pièce de stock consommée par ce compte-rendu
-async function consumeStockPieceIfAny(stockPiece){
-  if(!stockPiece || !stockPiece.app_id) return;
-  try{
-    if(stockPiece.type === 'embarque'){
-      const { error } = await sb.from('stock_embarque').update({ statut: 'hors_stock' }).eq('app_id', stockPiece.app_id);
-      if(error) throw error;
-    } else if(stockPiece.type === 'pieces'){
-      const { error } = await sb.from('stock_pieces').delete().eq('app_id', stockPiece.app_id);
-      if(error) throw error;
+// Met à jour/supprime les pièces de stock consommées par ce compte-rendu
+async function consumeStockPiecesIfAny(stockPieces){
+  if(!Array.isArray(stockPieces) || !stockPieces.length) return;
+  for(const stockPiece of stockPieces){
+    if(!stockPiece || !stockPiece.app_id) continue;
+    try{
+      if(stockPiece.type === 'embarque'){
+        const { error } = await sb.from('stock_embarque').update({ statut: 'hors_stock' }).eq('app_id', stockPiece.app_id);
+        if(error) throw error;
+      } else if(stockPiece.type === 'pieces'){
+        const { error } = await sb.from('stock_pieces').delete().eq('app_id', stockPiece.app_id);
+        if(error) throw error;
+      }
+    }catch(e){
+      console.error('Erreur mise à jour stock après pose pièce :', e);
+      showToast('CR enregistré, mais échec de la mise à jour du stock', true);
     }
-  }catch(e){
-    console.error('Erreur mise à jour stock après pose pièce :', e);
-    showToast('CR enregistré, mais échec de la mise à jour du stock', true);
   }
 }
 
@@ -3140,7 +3163,7 @@ function buildListItem(r){
     pieceBadge = '<span class="badge green">Pièce posée</span>';
   } else if(r['commande-piece']){
     pieceBadge = '<span class="badge orange">Commande pièce</span>';
-  } else if(r.stockPiece){
+  } else if((Array.isArray(r.stockPieces) && r.stockPieces.length) || r.stockPiece){
     pieceBadge = '<span class="badge orange">Pièce stock à poser</span>';
   }
 
@@ -3327,13 +3350,17 @@ function showDetail(r){
   html += dRow('Durée', formatDuree(r.duree));
   html += '</div>';
 
-  if(r.garantie || r['commande-piece'] || r.stockPiece){
+  // Normalise les pièces de stock (tableau ou ancien format objet unique)
+  const stockPiecesArr = Array.isArray(r.stockPieces) ? r.stockPieces : (r.stockPiece ? [r.stockPiece] : []);
+
+  if(r.garantie || r['commande-piece'] || stockPiecesArr.length){
     html += '<div class="detail-section"><h3>Pièces détachées</h3>';
     if(r.garantie){
       html += dRow('Garantie', 'Intervention sous garantie — client non facturé');
-    } else if(r.stockPiece){
-      html += dRow('Pièce (stock)', escapeHtml(r.stockPiece.nom || ''));
-      html += dRow('Référence', escapeHtml(r.stockPiece.ref || ''));
+    } else if(stockPiecesArr.length){
+      stockPiecesArr.forEach(p => {
+        html += dRow('Pièce (stock)', escapeHtml(p.nom || '') + (p.ref ? ' — ' + escapeHtml(p.ref) : ''));
+      });
     } else {
       html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
       html += dRow('Prix facturé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
@@ -3725,14 +3752,17 @@ async function generatePdfFor(data){
   y += 2;
 
   // Pièces
+  const pdfStockPieces = Array.isArray(data.stockPieces) ? data.stockPieces : (data.stockPiece ? [data.stockPiece] : []);
   if(data.garantie){
     section('Pièces détachées');
     line('Garantie', 'Intervention sous garantie — client non facturé');
     y += 2;
-  } else if(data.stockPiece){
-    section('Pièce (stock)');
-    line('Désignation', data.stockPiece.nom || '');
-    line('Référence', data.stockPiece.ref || '');
+  } else if(pdfStockPieces.length){
+    section(pdfStockPieces.length > 1 ? 'Pièces (stock)' : 'Pièce (stock)');
+    pdfStockPieces.forEach(p => {
+      line('Désignation', p.nom || '');
+      if(p.ref) line('Référence', p.ref);
+    });
     y += 2;
   } else if(data['commande-piece']){
     section('Commande de pièces');
