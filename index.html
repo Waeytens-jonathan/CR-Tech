@@ -3136,14 +3136,12 @@ function buildListItem(r){
   }
 
   let pieceBadge = '';
-  if(r['commande-piece']){
-    if(r['piece-posee']){
-      pieceBadge = '<span class="badge green">Pièce posée</span>';
-    } else if(r['piece-recue']){
-      pieceBadge = '<span class="badge orange">Pièce reçue — pose à programmer</span>';
-    } else {
-      pieceBadge = '<span class="badge orange">Commande pièce</span>';
-    }
+  if(r.pieceDeposeNom){
+    pieceBadge = '<span class="badge green">Pièce posée</span>';
+  } else if(r['commande-piece']){
+    pieceBadge = '<span class="badge orange">Commande pièce</span>';
+  } else if(r.stockPiece){
+    pieceBadge = '<span class="badge orange">Pièce stock à poser</span>';
   }
 
   const reste = parseFloat(r['reste-encaisser']) || 0;
@@ -3803,6 +3801,29 @@ async function generatePdfFor(data){
     const imgW = 85, imgH = 65, gap = 8;
     let col = 0;
     data.photos.forEach((src) => {
+      if(y + imgH > 285){
+        doc.addPage();
+        y = 18;
+        col = 0;
+      }
+      const x = 16 + col * (imgW + gap);
+      try{ doc.addImage(src, 'JPEG', x, y, imgW, imgH); }catch(e){}
+      col++;
+      if(col >= 2){ col = 0; y += imgH + gap; }
+    });
+  }
+
+  // Photos de la pièce posée
+  if(Array.isArray(data.pieceDeposePhotos) && data.pieceDeposePhotos.length){
+    doc.addPage();
+    y = 18;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(12);
+    doc.text('Photos de la pièce posée', 16, y);
+    y += 8;
+    const imgW = 85, imgH = 65, gap = 8;
+    let col = 0;
+    data.pieceDeposePhotos.forEach((src) => {
       if(y + imgH > 285){
         doc.addPage();
         y = 18;
