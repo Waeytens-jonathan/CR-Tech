@@ -629,7 +629,8 @@
       </div>
       <div class="field">
         <label>Adresse</label>
-        <input type="text" id="depot-edit-adresse">
+        <input type="text" id="depot-edit-adresse" autocomplete="off">
+        <div id="depot-edit-adresse-suggestions" style="display:none;margin-top:0.4rem;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;"></div>
       </div>
       <div class="field">
         <label>Code postal</label>
@@ -733,7 +734,8 @@
         </div>
         <div class="field full">
           <label>Adresse</label>
-          <input type="text" id="f-adresse" placeholder="N° et rue">
+          <input type="text" id="f-adresse" placeholder="N° et rue" autocomplete="off">
+          <div id="f-adresse-suggestions" style="display:none;margin-top:0.4rem;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;"></div>
         </div>
         <div class="field">
           <label>Code postal</label>
@@ -2464,6 +2466,73 @@ function setupVilleAutocomplete(cpId, villeId, suggestionsId){
 
 setupVilleAutocomplete('f-cp', 'f-ville', 'f-ville-suggestions');
 setupVilleAutocomplete('depot-edit-cp', 'depot-edit-ville', 'depot-edit-ville-suggestions');
+
+// ---------- Auto-suggestion adresse complète (API officielle Géoplateforme/IGN) ----------
+let adresseAutocompleteTimeout = null;
+
+function setupAdresseAutocomplete(adresseId, cpId, villeId, suggestionsId){
+  const adresseInput = document.getElementById(adresseId);
+  const cpInput = document.getElementById(cpId);
+  const villeInput = document.getElementById(villeId);
+  const suggBox = document.getElementById(suggestionsId);
+  if(!adresseInput || !cpInput || !villeInput || !suggBox) return;
+
+  function hideSuggestions(){
+    suggBox.style.display = 'none';
+    suggBox.innerHTML = '';
+  }
+
+  adresseInput.addEventListener('input', () => {
+    clearTimeout(adresseAutocompleteTimeout);
+    const text = adresseInput.value.trim();
+    if(text.length < 4){ hideSuggestions(); return; }
+
+    adresseAutocompleteTimeout = setTimeout(async () => {
+      try{
+        const url = `https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(text)}&type=StreetAddress&maximumResponses=5&terr=METROPOLE`;
+        const res = await fetch(url);
+        if(!res.ok){ hideSuggestions(); return; }
+        const data = await res.json();
+        const results = data.results || [];
+        if(!results.length){ hideSuggestions(); return; }
+
+        suggBox.innerHTML = results.map((r, idx) =>
+          `<div class="addr-suggestion-item" data-idx="${idx}" style="padding:0.6rem 0.8rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.88rem;">${escapeHtml(r.fulltext || '')}</div>`
+        ).join('');
+        suggBox.style.display = 'block';
+
+        suggBox.querySelectorAll('.addr-suggestion-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const r = results[parseInt(item.dataset.idx)];
+            // fulltext est du type "12 Rue Emile Zola, 62300 Lens" -> on garde la partie avant la virgule
+            let streetPart = r.fulltext || r.name || '';
+            const commaIdx = streetPart.indexOf(',');
+            if(commaIdx !== -1) streetPart = streetPart.slice(0, commaIdx);
+            adresseInput.value = streetPart.trim();
+            if(r.zipcode) cpInput.value = r.zipcode;
+            if(r.city) villeInput.value = r.city;
+            hideSuggestions();
+          });
+          item.addEventListener('mouseenter', () => { item.style.background = 'rgba(255,255,255,0.08)'; });
+          item.addEventListener('mouseleave', () => { item.style.background = 'transparent'; });
+        });
+      }catch(e){
+        console.error('Erreur autocomplétion adresse :', e);
+        hideSuggestions();
+      }
+    }, 350);
+  });
+
+  // Ferme les suggestions si on clique ailleurs
+  document.addEventListener('click', (e) => {
+    if(e.target !== adresseInput && !suggBox.contains(e.target)){
+      hideSuggestions();
+    }
+  });
+}
+
+setupAdresseAutocomplete('f-adresse', 'f-cp', 'f-ville', 'f-adresse-suggestions');
+setupAdresseAutocomplete('depot-edit-adresse', 'depot-edit-cp', 'depot-edit-ville', 'depot-edit-adresse-suggestions');
 
 document.getElementById('header-date').textContent = new Date().toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
 document.getElementById('f-date').value = todayISO();
