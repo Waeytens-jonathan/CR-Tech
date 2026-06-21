@@ -365,6 +365,7 @@
       <button class="tab-btn" data-view="agenda" id="tab-agenda">📅 Agenda</button>
       <button class="tab-btn" data-view="stats" id="tab-stats">📊 Stats</button>
       <button class="tab-btn" data-view="stock" id="tab-stock">📦 Stock</button>
+      <button class="tab-btn" data-view="depot" id="tab-depot">📥 Dépôt</button>
     </div>
   </div>
 
@@ -576,6 +577,93 @@
       </div>
       <button class="btn btn-primary" id="stock-edit-save-btn" style="width:100%;margin-top:0.6rem;">Enregistrer</button>
       <button class="btn btn-danger" id="stock-edit-delete-btn" style="width:100%;margin-top:0.6rem;display:none;">🗑️ Supprimer</button>
+    </div>
+  </div>
+
+  <!-- ===================== VUE DÉPÔT (LISTE) ===================== -->
+  <div class="view" id="view-depot">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
+        <h2 style="margin:0;">📥 Bons de dépôt</h2>
+        <button class="btn btn-primary" id="depot-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Nouveau dépôt</button>
+      </div>
+      <div id="depot-list"></div>
+      <div class="empty" id="depot-empty-msg" style="display:none;">Aucun bon de dépôt enregistré.</div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE DÉPÔT (DÉTAIL) ===================== -->
+  <div class="view" id="view-depot-detail">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+        <button class="btn btn-outline" id="depot-detail-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <button class="btn btn-danger" id="depot-detail-delete-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">🗑️ Supprimer</button>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+        <button class="btn btn-secondary" id="depot-detail-sms-btn">💬 Envoyer le bon de dépôt</button>
+        <button class="btn btn-outline" id="depot-detail-edit-btn">✏️ Modifier</button>
+        <button class="btn btn-outline" id="depot-detail-statut-btn"></button>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <button class="btn btn-primary" id="depot-detail-create-cr" style="flex:1;min-width:200px;">📝 Faire le compte-rendu</button>
+      </div>
+      <div id="depot-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE DÉPÔT (AJOUT/EDIT) ===================== -->
+  <div class="view" id="view-depot-edit">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+        <button class="btn btn-outline" id="depot-edit-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+      </div>
+      <h2 id="depot-edit-title">Nouveau dépôt</h2>
+
+      <div class="field">
+        <label>Prénom</label>
+        <input type="text" id="depot-edit-prenom">
+      </div>
+      <div class="field">
+        <label>Nom</label>
+        <input type="text" id="depot-edit-nom">
+      </div>
+      <div class="field">
+        <label>Adresse</label>
+        <input type="text" id="depot-edit-adresse">
+      </div>
+      <div class="field">
+        <label>Code postal</label>
+        <input type="text" id="depot-edit-cp">
+      </div>
+      <div class="field">
+        <label>Ville</label>
+        <input type="text" id="depot-edit-ville">
+      </div>
+      <div class="field">
+        <label>Téléphone</label>
+        <input type="tel" id="depot-edit-tel">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="depot-edit-email">
+      </div>
+      <div class="field">
+        <label>Appareil déposé</label>
+        <input type="text" id="depot-edit-appareil" placeholder="ex : Lave-linge Bosch">
+      </div>
+      <div class="field">
+        <label>Description / panne signalée</label>
+        <textarea id="depot-edit-description" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <label>Photos de l'appareil (3 max)</label>
+        <div class="grid" id="depot-photo-grid" style="grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:0.6rem;"></div>
+        <label class="btn btn-outline" for="depot-photo-input" style="cursor:pointer; display:inline-block; margin-top:0.5rem;">
+          📷 Ajouter une photo
+        </label>
+        <input type="file" id="depot-photo-input" accept="image/*" multiple style="display:none;">
+      </div>
+      <button class="btn btn-primary" id="depot-edit-save-btn" style="width:100%;margin-top:0.6rem;">Enregistrer le dépôt</button>
     </div>
   </div>
 
@@ -1699,6 +1787,318 @@ document.getElementById('f-photo-piece-posee').addEventListener('change', async 
   e.target.value = '';
 });
 
+// ---------- Dépôt (bons de dépôt d'appareils) ----------
+const DEPOT_TABLE = 'depots';
+const MAX_DEPOT_PHOTOS = 3;
+let depots = [];
+let currentDepot = null;
+let editingDepotAppId = null;
+let depotPhotos = [];
+
+async function loadDepots(){
+  try{
+    const { data, error } = await sb.from(DEPOT_TABLE).select('*').order('created_at', { ascending: false });
+    if(error) throw error;
+    return data || [];
+  }catch(e){
+    console.error('Erreur chargement dépôts :', e);
+    showToast('Connexion au cloud impossible (dépôts)', true);
+    return [];
+  }
+}
+
+async function renderDepots(){
+  document.getElementById('depot-list').innerHTML = '<div class="empty">Chargement…</div>';
+  depots = await loadDepots();
+  renderDepotList();
+}
+
+function renderDepotList(){
+  const listEl = document.getElementById('depot-list');
+  const emptyEl = document.getElementById('depot-empty-msg');
+
+  if(!depots.length){
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  listEl.innerHTML = depots.map(d => {
+    const badge = d.statut === 'recupere'
+      ? '<span class="badge green">Récupéré</span>'
+      : '<span class="badge orange">Déposé</span>';
+    return `
+      <div class="list-item" data-depot-id="${escapeHtml(d.app_id)}" style="cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
+          <strong>${escapeHtml(d.prenom || '')} ${escapeHtml(d.nom || '')}</strong>
+          ${badge}
+        </div>
+        <div style="color:#778;font-size:0.88rem;margin-top:0.2rem;">
+          ${escapeHtml(d.appareil || '')} — déposé le ${escapeHtml(d.date_depot || '')}
+        </div>
+      </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('[data-depot-id]').forEach(card => {
+    card.addEventListener('click', () => showDepotDetail(card.dataset.depotId));
+  });
+}
+
+function dateFrLongFromISO(iso){
+  if(!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function showDepotDetail(appId){
+  const d = depots.find(x => x.app_id === appId);
+  if(!d) return;
+  currentDepot = d;
+
+  let depotPhotosArr = [];
+  try{ depotPhotosArr = d.photos ? JSON.parse(d.photos) : []; }catch(e){ depotPhotosArr = []; }
+
+  const rows = [
+    ['Statut', d.statut === 'recupere' ? '<span class="badge green">Récupéré</span>' : '<span class="badge orange">Déposé</span>'],
+    ['Date de dépôt', dateFrLongFromISO(d.date_depot) + (d.heure_depot ? ' à ' + d.heure_depot : '')],
+    ['Client', `${d.prenom || ''} ${d.nom || ''}`.trim()],
+    ['Téléphone', d.tel],
+    ['Email', d.email],
+    ['Adresse', `${d.adresse || ''}, ${d.cp || ''} ${d.ville || ''}`],
+    ['Appareil', d.appareil],
+    ['Description', d.description],
+  ];
+  let html = '';
+  rows.forEach(([label, value]) => {
+    if(!value) return;
+    const isStatut = label === 'Statut';
+    const displayValue = isStatut ? value : escapeHtml(String(value));
+    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${displayValue}</div></div>`;
+  });
+
+  if(depotPhotosArr.length){
+    html += '<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);margin-bottom:0.4rem;">Photos</div>';
+    html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">';
+    depotPhotosArr.forEach(src => {
+      html += `<img src="${src}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">`;
+    });
+    html += '</div></div>';
+  }
+
+  document.getElementById('depot-detail-content').innerHTML = html;
+
+  const statutBtn = document.getElementById('depot-detail-statut-btn');
+  statutBtn.textContent = d.statut === 'recupere' ? '↩️ Remettre en "Déposé"' : '✅ Marquer comme récupéré';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-depot-detail').classList.add('active');
+}
+
+document.getElementById('depot-detail-back').addEventListener('click', () => {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-depot').classList.add('active');
+  document.querySelector('.tab-btn[data-view="depot"]').classList.add('active');
+});
+
+document.getElementById('depot-detail-delete-btn').addEventListener('click', async () => {
+  if(!currentDepot) return;
+  if(!confirm('Supprimer ce bon de dépôt ?')) return;
+  try{
+    const { error } = await sb.from(DEPOT_TABLE).delete().eq('app_id', currentDepot.app_id);
+    if(error) throw error;
+    showToast('Bon de dépôt supprimé');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-depot').classList.add('active');
+    document.querySelector('.tab-btn[data-view="depot"]').classList.add('active');
+    renderDepots();
+  }catch(e){
+    console.error('Erreur suppression dépôt :', e);
+    showToast('Échec de la suppression', true);
+  }
+});
+
+document.getElementById('depot-detail-statut-btn').addEventListener('click', async () => {
+  if(!currentDepot) return;
+  const nouveauStatut = currentDepot.statut === 'recupere' ? 'depose' : 'recupere';
+  try{
+    const { error } = await sb.from(DEPOT_TABLE).update({ statut: nouveauStatut }).eq('app_id', currentDepot.app_id);
+    if(error) throw error;
+    currentDepot.statut = nouveauStatut;
+    showToast(nouveauStatut === 'recupere' ? 'Appareil marqué comme récupéré' : 'Statut remis à "Déposé"');
+    showDepotDetail(currentDepot.app_id);
+  }catch(e){
+    console.error('Erreur mise à jour statut dépôt :', e);
+    showToast('Échec de la mise à jour', true);
+  }
+});
+
+document.getElementById('depot-detail-sms-btn').addEventListener('click', () => {
+  if(!currentDepot) return;
+  const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
+  if(!tel){ showToast('Numéro de téléphone manquant', true); return; }
+  const dateLabel = dateFrLongFromISO(currentDepot.date_depot);
+  const heureLabel = currentDepot.heure_depot || '';
+  const message = `Bonjour ${currentDepot.prenom||''}, je vous confirme le dépôt de votre appareil (${currentDepot.appareil||''}) le ${dateLabel} à ${heureLabel}. Je vous recontacte dès le diagnostic effectué. Jonathan – Technik-Home.`;
+  window.location.href = `sms:${tel}?body=${encodeURIComponent(message)}`;
+});
+
+document.getElementById('depot-detail-create-cr').addEventListener('click', () => {
+  if(!currentDepot) return;
+  const d = currentDepot;
+
+  resetForm();
+  clearDraft();
+  document.getElementById('f-nom').value = d.nom || '';
+  document.getElementById('f-prenom').value = d.prenom || '';
+  document.getElementById('f-adresse').value = d.adresse || '';
+  document.getElementById('f-cp').value = d.cp || '';
+  document.getElementById('f-ville').value = d.ville || '';
+  document.getElementById('f-tel').value = d.tel || '';
+  document.getElementById('f-email').value = d.email || '';
+  document.getElementById('f-appareil').value = matchAppareilOption(d.appareil);
+  document.getElementById('f-panne').value = d.description || '';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-form').classList.add('active');
+  goToStep(1);
+  showToast('Infos client pré-remplies depuis le bon de dépôt');
+});
+
+// ---------- Ajout/édition d'un bon de dépôt ----------
+function renderDepotPhotosGrid(){
+  const grid = document.getElementById('depot-photo-grid');
+  grid.innerHTML = '';
+  depotPhotos.forEach((src, idx) => {
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${src}" alt="Photo ${idx+1}"><button class="remove-photo" data-idx="${idx}" aria-label="Supprimer">×</button>`;
+    grid.appendChild(div);
+  });
+  grid.querySelectorAll('.remove-photo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      depotPhotos.splice(parseInt(btn.dataset.idx), 1);
+      renderDepotPhotosGrid();
+    });
+  });
+  const addLabel = document.querySelector('label[for="depot-photo-input"]');
+  if(addLabel){
+    addLabel.style.opacity = depotPhotos.length >= MAX_DEPOT_PHOTOS ? '0.4' : '1';
+    addLabel.style.pointerEvents = depotPhotos.length >= MAX_DEPOT_PHOTOS ? 'none' : 'auto';
+  }
+}
+
+document.getElementById('depot-photo-input').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  const remaining = MAX_DEPOT_PHOTOS - depotPhotos.length;
+  if(remaining <= 0){
+    showToast(`Limite de ${MAX_DEPOT_PHOTOS} photos atteinte`, true);
+    e.target.value = '';
+    return;
+  }
+  const toProcess = files.slice(0, remaining);
+  for(const file of toProcess){
+    try{
+      const dataUrl = await resizeImage(file);
+      depotPhotos.push(dataUrl);
+    }catch(err){}
+  }
+  if(files.length > remaining){
+    showToast(`Limite de ${MAX_DEPOT_PHOTOS} photos : seules ${remaining} ont été ajoutées`, true);
+  }
+  renderDepotPhotosGrid();
+  e.target.value = '';
+});
+
+function openDepotEdit(appId){
+  editingDepotAppId = appId || null;
+
+  if(appId){
+    const d = depots.find(x => x.app_id === appId);
+    document.getElementById('depot-edit-title').textContent = 'Modifier le dépôt';
+    document.getElementById('depot-edit-prenom').value = d.prenom || '';
+    document.getElementById('depot-edit-nom').value = d.nom || '';
+    document.getElementById('depot-edit-adresse').value = d.adresse || '';
+    document.getElementById('depot-edit-cp').value = d.cp || '';
+    document.getElementById('depot-edit-ville').value = d.ville || '';
+    document.getElementById('depot-edit-tel').value = d.tel || '';
+    document.getElementById('depot-edit-email').value = d.email || '';
+    document.getElementById('depot-edit-appareil').value = d.appareil || '';
+    document.getElementById('depot-edit-description').value = d.description || '';
+    try{ depotPhotos = d.photos ? JSON.parse(d.photos) : []; }catch(e){ depotPhotos = []; }
+  } else {
+    document.getElementById('depot-edit-title').textContent = 'Nouveau dépôt';
+    ['prenom','nom','adresse','cp','ville','tel','email','appareil','description'].forEach(f => {
+      document.getElementById('depot-edit-' + f).value = '';
+    });
+    depotPhotos = [];
+  }
+  renderDepotPhotosGrid();
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-depot-edit').classList.add('active');
+}
+
+document.getElementById('depot-new-btn').addEventListener('click', () => openDepotEdit(null));
+document.getElementById('depot-detail-edit-btn').addEventListener('click', () => {
+  if(currentDepot) openDepotEdit(currentDepot.app_id);
+});
+
+document.getElementById('depot-edit-back').addEventListener('click', () => {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-depot').classList.add('active');
+  document.querySelector('.tab-btn[data-view="depot"]').classList.add('active');
+});
+
+document.getElementById('depot-edit-save-btn').addEventListener('click', async () => {
+  const nom = document.getElementById('depot-edit-nom').value.trim();
+  const prenom = document.getElementById('depot-edit-prenom').value.trim();
+  if(!nom && !prenom){ showToast('Merci de renseigner au moins le nom du client', true); return; }
+
+  const btn = document.getElementById('depot-edit-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enregistrement…';
+
+  const row = {
+    nom: nom,
+    prenom: prenom,
+    adresse: document.getElementById('depot-edit-adresse').value.trim(),
+    cp: document.getElementById('depot-edit-cp').value.trim(),
+    ville: document.getElementById('depot-edit-ville').value.trim(),
+    tel: document.getElementById('depot-edit-tel').value.trim(),
+    email: document.getElementById('depot-edit-email').value.trim(),
+    appareil: document.getElementById('depot-edit-appareil').value.trim(),
+    description: document.getElementById('depot-edit-description').value.trim(),
+    photos: JSON.stringify(depotPhotos)
+  };
+  if(!editingDepotAppId){
+    row.app_id = 'dep_' + Date.now();
+    row.date_depot = todayISO();
+    row.heure_depot = new Date().toTimeString().slice(0,5);
+    row.statut = 'depose';
+  }
+
+  try{
+    const { error } = editingDepotAppId
+      ? await sb.from(DEPOT_TABLE).update(row).eq('app_id', editingDepotAppId)
+      : await sb.from(DEPOT_TABLE).insert(row);
+    if(error) throw error;
+    showToast('Bon de dépôt enregistré');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-depot').classList.add('active');
+    document.querySelector('.tab-btn[data-view="depot"]').classList.add('active');
+    renderDepots();
+  }catch(e){
+    console.error('Erreur enregistrement dépôt :', e);
+    showToast('Échec de l\'enregistrement', true);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Enregistrer le dépôt';
+});
+
 function showAgendaDetail(appId){
   const r = agendaRdvs.find(x => x.app_id === appId);
   if(!r) return;
@@ -2012,6 +2412,7 @@ document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
     if(btn.dataset.view === 'agenda') renderAgenda();
     if(btn.dataset.view === 'stats') renderStats();
     if(btn.dataset.view === 'stock') renderStock();
+    if(btn.dataset.view === 'depot') renderDepots();
   });
 });
 
