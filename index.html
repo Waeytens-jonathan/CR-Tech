@@ -681,6 +681,9 @@
         <button class="btn btn-secondary" id="detail-sms-avis">⭐ Avis</button>
         <button class="btn btn-outline" id="detail-email-btn">📧 Email</button>
       </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
+        <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;">🔧 Poser la pièce</button>
+      </div>
       <div id="detail-content"></div>
     </div>
   </div>
@@ -847,79 +850,75 @@
           <label>Statut de l'intervention</label>
           <select id="f-statut">
             <option value="Terminée">Terminée — appareil fonctionnel</option>
-            <option value="A_suivre">À suivre — diagnostic posé</option>
-            <option value="Attente_piece">En attente de pièce</option>
+            <option value="Attente_piece">En cours (attente de pièce)</option>
             <option value="Non_reparable">Non réparable / irréparable</option>
-            <option value="Devis">Devis remis, en attente accord</option>
           </select>
         </div>
         <div class="field">
           <label>Durée de l'intervention (minutes)</label>
           <input type="number" id="f-duree" placeholder="ex : 90" step="1" min="0" inputmode="numeric" pattern="[0-9]*">
         </div>
+        <div class="checkbox-row full">
+          <input type="checkbox" id="f-besoin-piece">
+          <label for="f-besoin-piece">Cette intervention nécessite une pièce détachée</label>
+        </div>
       </div>
     </div>
 
     <div class="card step" data-step="5">
       <h2>Pièces détachées</h2>
+
       <div class="checkbox-row">
-        <input type="checkbox" id="f-commande-piece">
-        <label for="f-commande-piece">Une commande de pièce est nécessaire</label>
-      </div>
-      <div class="grid" id="piece-fields" style="margin-top:0.8rem; display:none;">
-        <div class="field full">
-          <label>Désignation de la / des pièce(s)</label>
-          <textarea id="f-piece-desc" placeholder="Référence(s) et désignation des pièces commandées"></textarea>
-        </div>
-        <div class="field">
-          <label>Prix d'achat fournisseur (€)</label>
-          <input type="number" id="f-prix-fournisseur" placeholder="0.00" step="0.01" min="0">
-        </div>
-        <div class="field">
-          <label>Livraison</label>
-          <select id="f-livraison">
-            <option value="standard">Standard (10€)</option>
-            <option value="24h">24h (12€)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Prix facturé au client (€)</label>
-          <input type="number" id="f-piece-cout" placeholder="0.00" step="0.01" min="0">
-        </div>
-        <div class="field">
-          <label>Délai estimé de réception (jours)</label>
-          <input type="number" id="f-piece-delai" placeholder="ex : 5" step="1" min="0" inputmode="numeric" pattern="[0-9]*">
-        </div>
-        <div class="checkbox-row full">
-          <input type="checkbox" id="f-piece-recue">
-          <label for="f-piece-recue">Pièce reçue (en stock, RDV de pose à programmer)</label>
-        </div>
-        <div class="checkbox-row full">
-          <input type="checkbox" id="f-piece-posee">
-          <label for="f-piece-posee">Pièce posée (intervention terminée)</label>
-        </div>
+        <input type="checkbox" id="f-garantie">
+        <label for="f-garantie">Intervention sous garantie (le client ne paie rien)</label>
       </div>
 
-      <hr style="border:none;border-top:1px solid var(--border);margin:1.2rem 0;">
+      <div style="display:flex;gap:0.6rem;margin:1rem 0;">
+        <button type="button" class="btn btn-secondary piece-mode-btn active" data-mode="stock" id="piece-mode-stock-btn" style="flex:1;">📦 Pièce en stock</button>
+        <button type="button" class="btn btn-outline piece-mode-btn" data-mode="commande" id="piece-mode-commande-btn" style="flex:1;">🛒 Commander une pièce</button>
+      </div>
 
-      <h2 style="font-size:1.05rem;">Pose pièce stock</h2>
-      <button type="button" class="btn btn-secondary" id="open-stock-picker-btn" style="margin-bottom:0.8rem;">📦 Choisir une pièce en stock</button>
-      <div id="stock-piece-selected" style="display:none;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <strong id="stock-piece-selected-nom"></strong>
-            <div style="color:#778;font-size:0.85rem;" id="stock-piece-selected-ref"></div>
+      <!-- Mode STOCK -->
+      <div id="piece-mode-stock-section">
+        <button type="button" class="btn btn-secondary" id="open-stock-picker-btn" style="margin-bottom:0.8rem;">📦 Choisir une pièce en stock</button>
+        <div id="stock-piece-selected" style="display:none;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong id="stock-piece-selected-nom"></strong>
+              <div style="color:#778;font-size:0.85rem;" id="stock-piece-selected-ref"></div>
+            </div>
+            <button type="button" class="btn btn-outline" id="stock-piece-remove-btn" style="padding:0.35rem 0.7rem;font-size:0.82rem;">✕ Retirer</button>
           </div>
-          <button type="button" class="btn btn-outline" id="stock-piece-remove-btn" style="padding:0.35rem 0.7rem;font-size:0.82rem;">✕ Retirer</button>
         </div>
       </div>
-      <div class="field">
-        <label>Photo de la pièce posée</label>
-        <div id="photo-piece-posee-preview" style="margin-bottom:0.6rem;"></div>
-        <label class="btn btn-outline" for="f-photo-piece-posee" style="cursor:pointer; display:inline-block;">
-          📷 Ajouter la photo de la pièce posée
-        </label>
-        <input type="file" id="f-photo-piece-posee" accept="image/*" style="display:none;">
+
+      <!-- Mode COMMANDE -->
+      <div id="piece-mode-commande-section" style="display:none;">
+        <div class="checkbox-row">
+          <input type="checkbox" id="f-commande-piece">
+          <label for="f-commande-piece">Une commande de pièce est nécessaire</label>
+        </div>
+        <div class="grid" id="piece-fields" style="margin-top:0.8rem; display:none;">
+          <div class="field full">
+            <label>Désignation de la / des pièce(s)</label>
+            <textarea id="f-piece-desc" placeholder="Référence(s) et désignation des pièces commandées"></textarea>
+          </div>
+          <div class="field">
+            <label>Prix d'achat fournisseur (€)</label>
+            <input type="number" id="f-prix-fournisseur" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="field">
+            <label>Livraison</label>
+            <select id="f-livraison">
+              <option value="standard">Standard (10€)</option>
+              <option value="24h">24h (12€)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Prix facturé au client (€)</label>
+            <input type="number" id="f-piece-cout" placeholder="0.00" step="0.01" min="0">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -968,10 +967,6 @@
           <input type="number" id="f-reste-encaisser" placeholder="0.00" step="0.01" readonly style="font-weight:500; color:var(--orange);">
         </div>
       </div>
-      <div class="checkbox-row" style="margin-top:0.6rem;">
-        <input type="checkbox" id="f-facture-creee">
-        <label for="f-facture-creee">Facture créée</label>
-      </div>
     </div>
 
     <div class="card step" data-step="7">
@@ -980,10 +975,6 @@
         <div class="field full">
           <label>Remarques / recommandations au client</label>
           <textarea id="f-notes" placeholder="Conseils d'entretien, points de vigilance, prochaine visite..."></textarea>
-        </div>
-        <div class="checkbox-row full">
-          <input type="checkbox" id="f-garantie">
-          <label for="f-garantie">Intervention sous garantie</label>
         </div>
         <div class="checkbox-row full">
           <input type="checkbox" id="f-conseils-entretien">
@@ -1163,6 +1154,9 @@ function reportToRow(r){
     signature: r.signature || '',
     stock_piece: r.stockPiece ? JSON.stringify(r.stockPiece) : '',
     photo_piece_posee: r.photoPiecePosee || '',
+    piece_depose_nom: r.pieceDeposeNom || '',
+    piece_depose_ref: r.pieceDeposeRef || '',
+    piece_depose_photos: r.pieceDeposePhotos ? JSON.stringify(r.pieceDeposePhotos) : '',
     _is_draft: false
   };
   // Champs sans colonne dédiée -> regroupés dans "notes" pour ne rien perdre
@@ -1236,6 +1230,9 @@ function rowToReport(row){
     signature: row.signature || null,
     stockPiece: row.stock_piece ? (() => { try{ return JSON.parse(row.stock_piece); }catch(e){ return null; } })() : null,
     photoPiecePosee: row.photo_piece_posee || null,
+    pieceDeposeNom: row.piece_depose_nom || '',
+    pieceDeposeRef: row.piece_depose_ref || '',
+    pieceDeposePhotos: row.piece_depose_photos ? (() => { try{ return JSON.parse(row.piece_depose_photos); }catch(e){ return []; } })() : [],
     _isDraft: !!row._is_draft,
     _draftStep: extra._draftStep
   };
@@ -1778,16 +1775,6 @@ function renderPhotoPiecePoseePreview(){
     wrap.innerHTML = '';
   }
 }
-
-document.getElementById('f-photo-piece-posee').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
-  try{
-    photoPiecePosee = await resizeImage(file);
-    renderPhotoPiecePoseePreview();
-  }catch(err){}
-  e.target.value = '';
-});
 
 // ---------- Dépôt (bons de dépôt d'appareils) ----------
 const DEPOT_TABLE = 'depots';
@@ -2509,9 +2496,16 @@ function hasDraftContent(data){
   return false;
 }
 
-function goToStep(n){
+function goToStep(n, direction){
   if(n < 1) n = 1;
   if(n > TOTAL_STEPS) n = TOTAL_STEPS;
+
+  // Étape 5 (Pièces) sautée si l'intervention ne nécessite pas de pièce
+  const besoinPiece = document.getElementById('f-besoin-piece').checked;
+  if(n === 5 && !besoinPiece){
+    n = (direction === 'back') ? 4 : 6;
+  }
+
   currentStep = n;
   document.querySelectorAll('.step').forEach(el => {
     el.classList.toggle('active', parseInt(el.dataset.step, 10) === currentStep);
@@ -2534,12 +2528,12 @@ function goToStep(n){
   saveDraft();
 }
 
-document.getElementById('step-prev').addEventListener('click', () => goToStep(currentStep - 1));
+document.getElementById('step-prev').addEventListener('click', () => goToStep(currentStep - 1, 'back'));
 document.getElementById('step-next').addEventListener('click', () => {
   if(currentStep === TOTAL_STEPS){
     document.getElementById('save-btn').click();
   } else {
-    goToStep(currentStep + 1);
+    goToStep(currentStep + 1, 'forward');
   }
 });
 function goToList(){
@@ -2560,10 +2554,8 @@ document.addEventListener('visibilitychange', () => {
 // ---------- Libellés partagés ----------
 const STATUT_LABELS = {
   'Terminée':'Terminée — appareil fonctionnel',
-  'A_suivre':'À suivre — diagnostic posé',
-  'Attente_piece':'En attente de pièce',
-  'Non_reparable':'Non réparable / irréparable',
-  'Devis':'Devis remis, en attente accord'
+  'Attente_piece':'En cours (attente de pièce)',
+  'Non_reparable':'Non réparable / irréparable'
 };
 const PAIEMENT_LABELS = {
   'Paye_total':'Payé en totalité',
@@ -2587,6 +2579,39 @@ function generateRef(){
 // ---------- Affichage / masquage champs conditionnels ----------
 document.getElementById('f-commande-piece').addEventListener('change', e => {
   document.getElementById('piece-fields').style.display = e.target.checked ? 'grid' : 'none';
+});
+
+// ---------- Bascule Stock / Commande (étape Pièces) ----------
+function setPieceMode(mode){
+  const stockBtn = document.getElementById('piece-mode-stock-btn');
+  const commandeBtn = document.getElementById('piece-mode-commande-btn');
+  const stockSection = document.getElementById('piece-mode-stock-section');
+  const commandeSection = document.getElementById('piece-mode-commande-section');
+
+  stockBtn.classList.toggle('btn-secondary', mode === 'stock');
+  stockBtn.classList.toggle('btn-outline', mode !== 'stock');
+  commandeBtn.classList.toggle('btn-secondary', mode === 'commande');
+  commandeBtn.classList.toggle('btn-outline', mode !== 'commande');
+
+  stockSection.style.display = mode === 'stock' ? 'block' : 'none';
+  commandeSection.style.display = mode === 'commande' ? 'block' : 'none';
+}
+
+document.getElementById('piece-mode-stock-btn').addEventListener('click', () => setPieceMode('stock'));
+document.getElementById('piece-mode-commande-btn').addEventListener('click', () => setPieceMode('commande'));
+
+// ---------- Effet de la garantie : client ne paie rien ----------
+document.getElementById('f-garantie').addEventListener('change', e => {
+  const paiementSelect = document.getElementById('f-paiement-statut');
+  if(e.target.checked){
+    paiementSelect.value = 'Gratuit';
+    paiementSelect.disabled = true;
+  } else {
+    paiementSelect.disabled = false;
+    paiementSelect.value = 'Paye_total';
+  }
+  paiementSelect.dispatchEvent(new Event('change'));
+  recalcTotal();
 });
 document.getElementById('f-paiement-statut').addEventListener('change', e => {
   document.getElementById('acompte-field').style.display = (e.target.value === 'Acompte') ? 'block' : 'none';
@@ -2927,12 +2952,12 @@ const fieldIds = [
   'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-cp','f-ville','f-tel','f-email',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
-  'f-piece-desc','f-prix-fournisseur','f-livraison','f-piece-cout','f-piece-delai',
+  'f-piece-desc','f-prix-fournisseur','f-livraison','f-piece-cout',
   'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-cout-total','f-reste-encaisser',
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen',
   'f-notes'
 ];
-const checkboxIds = ['f-commande-piece','f-piece-recue','f-piece-posee','f-garantie','f-conseils-entretien','f-facture-creee'];
+const checkboxIds = ['f-besoin-piece','f-commande-piece','f-garantie','f-conseils-entretien'];
 
 function resetForm(){
   fieldIds.forEach(id => document.getElementById(id).value = '');
@@ -2943,9 +2968,11 @@ function resetForm(){
   document.getElementById('f-statut').value = 'Terminée';
   document.getElementById('f-livraison').value = 'standard';
   document.getElementById('f-paiement-statut').value = 'Paye_total';
+  document.getElementById('f-paiement-statut').disabled = false;
   document.getElementById('f-reste-encaisser').value = '0.00';
   document.getElementById('piece-fields').style.display = 'none';
   document.getElementById('acompte-field').style.display = 'none';
+  setPieceMode('stock');
   // delete-btn supprimé
   signatureData = null;
   updateSigPreview();
@@ -2972,6 +2999,10 @@ function loadIntoForm(report){
     const key = id.replace('f-','');
     document.getElementById(id).checked = !!report[key];
   });
+  // Rétrocompatibilité : anciens dossiers avec pièce déjà commandée/en stock mais sans la case "besoin-piece"
+  if(report['commande-piece'] || report.stockPiece){
+    document.getElementById('f-besoin-piece').checked = true;
+  }
   document.getElementById('piece-fields').style.display = report['commande-piece'] ? 'grid' : 'none';
   document.getElementById('acompte-field').style.display = (report['paiement-statut'] === 'Acompte') ? 'block' : 'none';
   // delete-btn supprimé
@@ -2985,6 +3016,8 @@ function loadIntoForm(report){
   renderStockPieceSelected();
   photoPiecePosee = report.photoPiecePosee || null;
   renderPhotoPiecePoseePreview();
+  setPieceMode(report['commande-piece'] ? 'commande' : 'stock');
+  document.getElementById('f-paiement-statut').disabled = !!report.garantie;
 }
 
 function collectFormData(){
@@ -3120,7 +3153,6 @@ function buildListItem(r){
       case 'Terminée': statutBadge = '<span class="badge green">✅ Terminé</span>'; break;
       case 'Non_reparable': statutBadge = '<span class="badge red">❌ Irréparable</span>'; break;
       case 'Attente_piece': statutBadge = '<span class="badge orange">⏳ Attente pièce</span>'; break;
-      case 'Devis': statutBadge = '<span class="badge" style="background:rgba(26,115,200,0.15);color:#1a73c8;">📋 Devis</span>'; break;
       default: statutBadge = '<span class="badge orange">🔄 En cours</span>';
     }
   }
@@ -3177,7 +3209,7 @@ function renderList(){
 
   const drafts   = filtered.filter(r => r._isDraft === true);
   // En cours = dossiers validés (étape 10) mais pas encore clôturés
-  const EN_COURS_STATUTS = ['A_suivre', 'Attente_piece', 'Devis'];
+  const EN_COURS_STATUTS = ['Attente_piece'];
   const TERMINES_STATUTS = ['Terminée', 'Non_reparable'];
   const encours  = filtered.filter(r => !r._isDraft && (EN_COURS_STATUTS.includes(r.statut) || (!TERMINES_STATUTS.includes(r.statut) && r.statut)));
   encours.sort((a, b) => {
@@ -3244,15 +3276,6 @@ function showDetail(r){
   html += `<input type="checkbox" id="quick-facture" ${r['facture-creee'] ? 'checked' : ''}>`;
   html += '<label for="quick-facture">Facture créée / envoyée</label></div>';
 
-  if(r['commande-piece']){
-    html += '<div class="checkbox-row">';
-    html += `<input type="checkbox" id="quick-piece-recue" ${r['piece-recue'] ? 'checked' : ''}>`;
-    html += '<label for="quick-piece-recue">Pièce reçue (en stock)</label></div>';
-    html += '<div class="checkbox-row">';
-    html += `<input type="checkbox" id="quick-piece-posee" ${r['piece-posee'] ? 'checked' : ''}>`;
-    html += '<label for="quick-piece-posee">Pièce posée (terminé)</label></div>';
-  }
-
   html += '<div class="actions" style="margin-top:0.8rem;">';
   html += '<button class="btn btn-primary" id="quick-update-btn">Mettre à jour le dossier</button>';
   html += '</div>';
@@ -3295,13 +3318,31 @@ function showDetail(r){
   html += dRow('Durée', formatDuree(r.duree));
   html += '</div>';
 
-  if(r['commande-piece']){
+  if(r.garantie || r['commande-piece'] || r.stockPiece){
     html += '<div class="detail-section"><h3>Pièces détachées</h3>';
-    html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
-    html += dRow('Coût estimé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
-    html += dRow('Délai estimé', formatDelai(r['piece-delai']));
-    html += dRow('Pièce reçue', r['piece-recue'] ? 'Oui' : 'Non');
-    html += dRow('Pièce posée', r['piece-posee'] ? 'Oui' : 'Non');
+    if(r.garantie){
+      html += dRow('Garantie', 'Intervention sous garantie — client non facturé');
+    } else if(r.stockPiece){
+      html += dRow('Pièce (stock)', escapeHtml(r.stockPiece.nom || ''));
+      html += dRow('Référence', escapeHtml(r.stockPiece.ref || ''));
+    } else {
+      html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
+      html += dRow('Prix facturé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
+    }
+    html += '</div>';
+  }
+
+  if(r.pieceDeposeNom){
+    html += '<div class="detail-section"><h3>Pièce posée</h3>';
+    html += dRow('Nom', escapeHtml(r.pieceDeposeNom));
+    html += dRow('Référence', escapeHtml(r.pieceDeposeRef));
+    if(Array.isArray(r.pieceDeposePhotos) && r.pieceDeposePhotos.length){
+      html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.4rem;">';
+      r.pieceDeposePhotos.forEach(src => {
+        html += `<img src="${src}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">`;
+      });
+      html += '</div>';
+    }
     html += '</div>';
   }
 
@@ -3356,18 +3397,10 @@ function showDetail(r){
       const statutEl = document.getElementById('quick-statut');
       const paiementEl = document.getElementById('quick-paiement');
       const factureEl = document.getElementById('quick-facture');
-      const pieceRecueEl = document.getElementById('quick-piece-recue');
-      const piecePoseeEl = document.getElementById('quick-piece-posee');
 
       reports[idx].statut = statutEl.value;
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
-      if(pieceRecueEl){
-        reports[idx]['piece-recue'] = pieceRecueEl.checked;
-      }
-      if(piecePoseeEl){
-        reports[idx]['piece-posee'] = piecePoseeEl.checked;
-      }
 
       // Recalcul du reste à encaisser selon le nouveau statut de paiement
       const total = parseFloat(reports[idx]['cout-total']) || 0;
@@ -3392,6 +3425,9 @@ function showDetail(r){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-detail').classList.add('active');
   window.scrollTo({top:0, behavior:'smooth'});
+
+  // Bouton "Poser la pièce" : visible uniquement si le dossier est en attente de pièce
+  document.getElementById('detail-pose-piece-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
 }
 
 document.getElementById('detail-back').addEventListener('click', () => {
@@ -3680,13 +3716,25 @@ async function generatePdfFor(data){
   y += 2;
 
   // Pièces
-  if(data['commande-piece']){
+  if(data.garantie){
+    section('Pièces détachées');
+    line('Garantie', 'Intervention sous garantie — client non facturé');
+    y += 2;
+  } else if(data.stockPiece){
+    section('Pièce (stock)');
+    line('Désignation', data.stockPiece.nom || '');
+    line('Référence', data.stockPiece.ref || '');
+    y += 2;
+  } else if(data['commande-piece']){
     section('Commande de pièces');
     line('Désignation', data['piece-desc']);
-    line('Coût estimé', data['piece-cout'] ? data['piece-cout'] + ' €' : '—');
-    line('Délai estimé', formatDelai(data['piece-delai']));
-    line('Pièce reçue', data['piece-recue'] ? 'Oui' : 'Non');
-    line('Pièce posée', data['piece-posee'] ? 'Oui' : 'Non');
+    line('Prix facturé', data['piece-cout'] ? data['piece-cout'] + ' €' : '—');
+    y += 2;
+  }
+  if(data.pieceDeposeNom){
+    section('Pièce posée');
+    line('Nom', data.pieceDeposeNom);
+    line('Référence', data.pieceDeposeRef || '');
     y += 2;
   }
 
@@ -3843,6 +3891,94 @@ document.getElementById('view-form').addEventListener('change', () => {
 });
 
 // Reprise d'un brouillon existant au chargement de la page
+
+// ---------- Modale "Poser la pièce" (reprise d'un dossier en cours) ----------
+const MAX_POSE_PIECE_PHOTOS = 2;
+let posePiecePhotos = [];
+
+function renderPosePiecePhotoGrid(){
+  const grid = document.getElementById('pose-piece-photo-grid');
+  grid.innerHTML = '';
+  posePiecePhotos.forEach((src, idx) => {
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${src}" alt="Photo ${idx+1}"><button class="remove-photo" data-idx="${idx}" aria-label="Supprimer">×</button>`;
+    grid.appendChild(div);
+  });
+  grid.querySelectorAll('.remove-photo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      posePiecePhotos.splice(parseInt(btn.dataset.idx), 1);
+      renderPosePiecePhotoGrid();
+    });
+  });
+  const addLabel = document.querySelector('label[for="pose-piece-photo-input"]');
+  if(addLabel){
+    addLabel.style.opacity = posePiecePhotos.length >= MAX_POSE_PIECE_PHOTOS ? '0.4' : '1';
+    addLabel.style.pointerEvents = posePiecePhotos.length >= MAX_POSE_PIECE_PHOTOS ? 'none' : 'auto';
+  }
+}
+
+document.getElementById('pose-piece-photo-input').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  const remaining = MAX_POSE_PIECE_PHOTOS - posePiecePhotos.length;
+  if(remaining <= 0){
+    showToast(`Limite de ${MAX_POSE_PIECE_PHOTOS} photos atteinte`, true);
+    e.target.value = '';
+    return;
+  }
+  const toProcess = files.slice(0, remaining);
+  for(const file of toProcess){
+    try{
+      const dataUrl = await resizeImage(file);
+      posePiecePhotos.push(dataUrl);
+    }catch(err){}
+  }
+  renderPosePiecePhotoGrid();
+  e.target.value = '';
+});
+
+document.getElementById('detail-pose-piece-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  document.getElementById('pose-piece-nom').value = '';
+  document.getElementById('pose-piece-ref').value = '';
+  document.getElementById('pose-piece-statut').value = 'Terminée';
+  posePiecePhotos = [];
+  renderPosePiecePhotoGrid();
+  document.getElementById('pose-piece-modal').style.display = 'flex';
+});
+
+document.getElementById('pose-piece-cancel-btn').addEventListener('click', () => {
+  document.getElementById('pose-piece-modal').style.display = 'none';
+});
+
+document.getElementById('pose-piece-save-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const nom = document.getElementById('pose-piece-nom').value.trim();
+  if(!nom){ showToast('Merci de renseigner le nom de la pièce', true); return; }
+
+  const idx = reports.findIndex(rep => rep.id === currentDetailReport.id);
+  if(idx === -1){ showToast('Compte-rendu introuvable', true); return; }
+
+  const btn = document.getElementById('pose-piece-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enregistrement…';
+
+  reports[idx].pieceDeposeNom = nom;
+  reports[idx].pieceDeposeRef = document.getElementById('pose-piece-ref').value.trim();
+  reports[idx].pieceDeposePhotos = posePiecePhotos.slice();
+  reports[idx].statut = document.getElementById('pose-piece-statut').value;
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  await saveReportToSupabase(reports[idx]);
+
+  currentDetailReport = reports[idx];
+  document.getElementById('pose-piece-modal').style.display = 'none';
+  btn.disabled = false;
+  btn.textContent = 'Valider ✓';
+  showToast('Pièce posée enregistrée');
+  showDetail(currentDetailReport);
+});
+
 (function checkDraft(){
   try{
     const raw = localStorage.getItem(DRAFT_KEY);
@@ -3889,6 +4025,41 @@ document.getElementById('view-form').addEventListener('change', () => {
     <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
       <button class="btn btn-outline" onclick="document.getElementById('sms-arrival-modal').style.display='none'">Annuler</button>
       <button class="btn btn-primary" onclick="sendSmsArrival()">Envoyer 💬</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODALE POSE PIÈCE (reprise dossier) ===================== -->
+<div id="pose-piece-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <h3 style="margin:0 0 0.8rem;color:var(--orange);">🔧 Poser la pièce</h3>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 1rem;">Renseignez la pièce posée sur ce dossier. Vous choisirez ensuite le nouveau statut.</p>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Nom de la pièce</label>
+    <input id="pose-piece-nom" type="text" placeholder="ex : Courroie lave-linge"
+      style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Référence</label>
+    <input id="pose-piece-ref" type="text" placeholder="ex : REF-1234"
+      style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Photo(s) de la pièce posée (2 max)</label>
+    <div class="grid" id="pose-piece-photo-grid" style="grid-template-columns:repeat(auto-fill, minmax(90px,1fr)); gap:0.5rem;margin-bottom:0.6rem;"></div>
+    <label class="btn btn-outline" for="pose-piece-photo-input" style="cursor:pointer; display:inline-block; margin-bottom:1rem;">
+      📷 Ajouter une photo
+    </label>
+    <input type="file" id="pose-piece-photo-input" accept="image/*" multiple style="display:none;">
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Nouveau statut du dossier</label>
+    <select id="pose-piece-statut" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:1rem;">
+      <option value="Terminée">Terminée — appareil fonctionnel</option>
+      <option value="Attente_piece">En cours (attente de pièce)</option>
+      <option value="Non_reparable">Non réparable / irréparable</option>
+    </select>
+
+    <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
+      <button class="btn btn-outline" id="pose-piece-cancel-btn">Annuler</button>
+      <button class="btn btn-primary" id="pose-piece-save-btn">Valider ✓</button>
     </div>
   </div>
 </div>
