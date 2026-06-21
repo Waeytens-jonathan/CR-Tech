@@ -1757,25 +1757,6 @@ document.getElementById('stock-piece-remove-btn').addEventListener('click', () =
   renderStockPieceSelected();
 });
 
-// Photo de la pièce posée (même logique que la photo plaque signalétique)
-let photoPiecePosee = null;
-
-function renderPhotoPiecePoseePreview(){
-  const wrap = document.getElementById('photo-piece-posee-preview');
-  if(photoPiecePosee){
-    wrap.innerHTML = `<div style="position:relative;display:inline-block;">
-      <img src="${photoPiecePosee}" style="max-width:140px;border-radius:8px;display:block;">
-      <button type="button" id="remove-photo-piece-posee" style="position:absolute;top:-8px;right:-8px;background:#e0584f;color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.85rem;">✕</button>
-    </div>`;
-    document.getElementById('remove-photo-piece-posee').addEventListener('click', () => {
-      photoPiecePosee = null;
-      renderPhotoPiecePoseePreview();
-    });
-  } else {
-    wrap.innerHTML = '';
-  }
-}
-
 // ---------- Dépôt (bons de dépôt d'appareils) ----------
 const DEPOT_TABLE = 'depots';
 const MAX_DEPOT_PHOTOS = 3;
@@ -2982,8 +2963,6 @@ function resetForm(){
   renderPlaqueThumb();
   selectedStockPiece = null;
   renderStockPieceSelected();
-  photoPiecePosee = null;
-  renderPhotoPiecePoseePreview();
   currentId = null;
   document.getElementById('ref-display').textContent = generateRef();
 }
@@ -3014,8 +2993,6 @@ function loadIntoForm(report){
   renderPlaqueThumb();
   selectedStockPiece = report.stockPiece || null;
   renderStockPieceSelected();
-  photoPiecePosee = report.photoPiecePosee || null;
-  renderPhotoPiecePoseePreview();
   setPieceMode(report['commande-piece'] ? 'commande' : 'stock');
   document.getElementById('f-paiement-statut').disabled = !!report.garantie;
 }
@@ -3035,7 +3012,6 @@ function collectFormData(){
   data.plaquePhoto = plaquePhoto;
   data.signature = signatureData || null;
   data.stockPiece = selectedStockPiece || null;
-  data.photoPiecePosee = photoPiecePosee || null;
   return data;
 }
 
