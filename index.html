@@ -1363,7 +1363,7 @@ function renderAgendaList(){
   } else if(filterValue === 'week'){
     const weekEnd = new Date();
     weekEnd.setDate(weekEnd.getDate() + 7);
-    const weekEndStr = weekEnd.toISOString().slice(0,10);
+    const weekEndStr = dateToLocalISO(weekEnd);
     upcoming = upcoming.filter(r => r.date <= weekEndStr);
   }
 
@@ -1431,7 +1431,7 @@ function getStatsDateRange(period){
   } else {
     return null; // 'all'
   }
-  const toISO = d => d.toISOString().slice(0,10);
+  const toISO = d => dateToLocalISO(d);
   return { start: toISO(start), end: toISO(end) };
 }
 
@@ -2415,8 +2415,20 @@ let currentId = null;
 
 // ---------- Date du jour ----------
 function todayISO(){
+  // Construit la date au format YYYY-MM-DD à partir des composants LOCAUX
+  // (toISOString() convertit en UTC et peut décaler d'un jour selon le fuseau horaire)
   const d = new Date();
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function dateToLocalISO(d){
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // ---------- Auto-suggestion ville depuis le code postal (API officielle gouv.fr) ----------
