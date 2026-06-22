@@ -2570,6 +2570,15 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
       ? await sb.from(RDV_TABLE).update(row).eq('app_id', editingRdvAppId)
       : await sb.from(RDV_TABLE).insert(row);
     if(error) throw error;
+
+    // Créer ou lier le client automatiquement (uniquement à la création)
+    if(!editingRdvAppId){
+      const clientId = await findOrCreateClient(row.nom, row.prenom, row.tel, row.email, row.adresse, row.cp, row.ville);
+      if(clientId){
+        await sb.from(RDV_TABLE).update({ client_id: clientId }).eq('app_id', row.app_id);
+      }
+    }
+
     showToast(editingRdvAppId ? 'Rendez-vous modifié' : 'Rendez-vous enregistré');
     editingRdvAppId = null;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
