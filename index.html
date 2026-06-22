@@ -366,6 +366,7 @@
       <button class="tab-btn" data-view="stats" id="tab-stats">📊 Stats</button>
       <button class="tab-btn" data-view="stock" id="tab-stock">📦 Stock</button>
       <button class="tab-btn" data-view="depot" id="tab-depot">📥 Dépôt</button>
+      <button class="tab-btn" data-view="clients" id="tab-clients">👤 Clients</button>
     </div>
   </div>
 
@@ -680,6 +681,54 @@
     </div>
   </div>
 
+  <!-- ===================== VUE CLIENTS ===================== -->
+  <div class="view" id="view-clients">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h2 style="margin:0;">👤 Clients</h2>
+        <button class="btn btn-primary" id="client-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Nouveau client</button>
+      </div>
+      <input type="text" id="client-search" placeholder="🔍 Rechercher un client (nom, tél, email)…"
+        style="width:100%;padding:0.7rem 0.9rem;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:1rem;">
+      <div id="clients-list"><div class="empty">Chargement…</div></div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE FICHE CLIENT ===================== -->
+  <div class="view" id="view-client-detail">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <button class="btn btn-outline" id="client-detail-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-secondary" id="client-detail-edit-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">✏️ Modifier</button>
+          <button class="btn btn-danger" id="client-detail-delete-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">🗑️</button>
+        </div>
+      </div>
+      <div id="client-detail-content"></div>
+      <h3 style="margin:1.2rem 0 0.6rem;font-size:0.95rem;color:var(--text-muted);letter-spacing:0.05em;">INTERVENTIONS</h3>
+      <div id="client-interventions-list"><div class="empty">Aucune intervention</div></div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE FORMULAIRE CLIENT ===================== -->
+  <div class="view" id="view-client-form">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <button class="btn btn-outline" id="client-form-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <h2 id="client-form-title" style="margin:0;font-size:1.1rem;">Nouveau client</h2>
+      </div>
+      <div class="field"><label>Prénom</label><input type="text" id="cf-prenom" placeholder="Prénom"></div>
+      <div class="field"><label>Nom</label><input type="text" id="cf-nom" placeholder="Nom"></div>
+      <div class="field"><label>Téléphone</label><input type="tel" id="cf-tel" placeholder="06 12 34 56 78"></div>
+      <div class="field"><label>Email</label><input type="email" id="cf-email" placeholder="client@email.fr"></div>
+      <div class="field"><label>Adresse</label><input type="text" id="cf-adresse" placeholder="N° et rue"></div>
+      <div class="field"><label>Code postal</label><input type="text" id="cf-cp" placeholder="62300"></div>
+      <div class="field"><label>Ville</label><input type="text" id="cf-ville" placeholder="Lens"></div>
+      <div class="field"><label>Note</label><textarea id="cf-note" rows="3" placeholder="Note interne…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;resize:vertical;"></textarea></div>
+      <button class="btn btn-primary" id="client-form-save" style="width:100%;margin-top:0.5rem;">Enregistrer ✓</button>
+    </div>
+  </div>
+
   <!-- ===================== VUE DÉTAIL (RAPPORT COMPLET) ===================== -->
   <div class="view" id="view-detail">
     <div class="card">
@@ -735,6 +784,12 @@
 
     <div class="card step" data-step="2">
       <h2>Informations client</h2>
+      <!-- Recherche client existant -->
+      <div class="field full" style="position:relative;margin-bottom:0.5rem;">
+        <label>🔍 Client existant <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;">(optionnel — pré-remplit les champs)</span></label>
+        <input type="text" id="f-client-search" placeholder="Rechercher par nom, tél ou email…" autocomplete="off">
+        <div id="f-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+      </div>
       <div class="grid">
         <div class="field">
           <label>Nom</label>
@@ -1274,6 +1329,7 @@ function reportToRow(r){
     piece_depose_nom: r.pieceDeposeNom || '',
     piece_depose_ref: r.pieceDeposeRef || '',
     piece_depose_photos: r.pieceDeposePhotos ? JSON.stringify(r.pieceDeposePhotos) : '',
+    client_id: r.client_id || null,
     _is_draft: false
   };
   // Champs sans colonne dédiée -> regroupés dans "notes" pour ne rien perdre
@@ -1355,6 +1411,7 @@ function rowToReport(row){
     pieceDeposeNom: row.piece_depose_nom || '',
     pieceDeposeRef: row.piece_depose_ref || '',
     pieceDeposePhotos: row.piece_depose_photos ? (() => { try{ return JSON.parse(row.piece_depose_photos); }catch(e){ return []; } })() : [],
+    client_id: row.client_id || null,
     _isDraft: !!row._is_draft,
     _draftStep: extra._draftStep
   };
@@ -3287,6 +3344,17 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     // delete-btn supprimé
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+
+  // Créer ou lier le client automatiquement
+  const clientSearchInput = document.getElementById('f-client-search');
+  const preselectedClientId = clientSearchInput && clientSearchInput.dataset.selectedClientId;
+  if(preselectedClientId){
+    data.client_id = preselectedClientId;
+  } else {
+    data.client_id = await findOrCreateClient(data.nom, data.prenom, data.tel, data.email, data.adresse, data.cp, data.ville);
+  }
+  if(clientSearchInput){ clientSearchInput.value = ''; delete clientSearchInput.dataset.selectedClientId; }
+
   saveReportToSupabase(data);
   await consumeStockPiecesIfAny(data.stockPieces);
   clearDraft();
@@ -4539,6 +4607,263 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
 const _origShowDetail = typeof showDetail !== 'undefined' ? showDetail : null;
 // Patch via l'event du bouton "detail-pose-piece-btn" — on accroche sur showDetail via override
 // On surcharge renderAgendaList pour afficher la séparation matin/AM et les jours bloqués
+
+// ==================== MODULE CLIENTS ====================
+const CLIENTS_TABLE = 'clients';
+let allClients = []; // cache local
+let editingClientId = null; // app_id en cours d'édition
+
+// --- Helpers ---
+function clientDisplayName(c){ return `${c.prenom||''} ${c.nom||''}`.trim() || '—'; }
+
+// --- Chargement ---
+async function loadClients(){
+  try{
+    const { data, error } = await sb.from(CLIENTS_TABLE).select('*').order('nom', { ascending: true });
+    if(error) throw error;
+    allClients = data || [];
+    return allClients;
+  }catch(e){ console.error('Erreur chargement clients :', e); return []; }
+}
+
+// --- Rendu liste ---
+function renderClientsList(filter){
+  const el = document.getElementById('clients-list');
+  if(!el) return;
+  const q = (filter||'').trim().toLowerCase();
+  const list = q
+    ? allClients.filter(c =>
+        (c.nom||'').toLowerCase().includes(q) ||
+        (c.prenom||'').toLowerCase().includes(q) ||
+        (c.tel||'').includes(q) ||
+        (c.email||'').toLowerCase().includes(q))
+    : allClients;
+  if(!list.length){
+    el.innerHTML = '<div class="empty">' + (q ? 'Aucun client trouvé' : 'Aucun client') + '</div>';
+    return;
+  }
+  el.innerHTML = list.map(c => `
+    <div class="list-item" data-client-id="${escapeHtml(c.app_id)}" style="cursor:pointer;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>${escapeHtml(clientDisplayName(c))}</strong>
+        <span style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(c.ville||'')}</span>
+      </div>
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">
+        ${c.tel ? '📞 '+escapeHtml(c.tel) : ''}${c.tel && c.email ? ' · ' : ''}${c.email ? escapeHtml(c.email) : ''}
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('.list-item').forEach(item => {
+    item.addEventListener('click', () => showClientDetail(item.dataset.clientId));
+  });
+}
+
+// --- Fiche client ---
+async function showClientDetail(appId){
+  const c = allClients.find(x => x.app_id === appId);
+  if(!c) return;
+  showView('client-detail');
+
+  const content = document.getElementById('client-detail-content');
+  content.innerHTML = `
+    <h2 style="margin:0 0 0.8rem;">${escapeHtml(clientDisplayName(c))}</h2>
+    <div class="detail-rows">
+      ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--blue);">${escapeHtml(c.tel)}</a></span></div>` : ''}
+      ${c.email  ? `<div class="detail-row"><span>Email</span><span><a href="mailto:${escapeHtml(c.email)}" style="color:var(--blue);">${escapeHtml(c.email)}</a></span></div>` : ''}
+      ${c.adresse? `<div class="detail-row"><span>Adresse</span><span>${escapeHtml(c.adresse)}, ${escapeHtml(c.cp||'')} ${escapeHtml(c.ville||'')}</span></div>` : ''}
+      ${c.note   ? `<div class="detail-row"><span>Note</span><span>${escapeHtml(c.note)}</span></div>` : ''}
+    </div>`;
+
+  // Interventions liées
+  const interList = document.getElementById('client-interventions-list');
+  const linked = reports.filter(r => r.client_id === appId || r.tel === c.tel || r.email === c.email);
+  if(!linked.length){
+    interList.innerHTML = '<div class="empty">Aucune intervention</div>';
+  } else {
+    interList.innerHTML = linked.map(r => `
+      <div class="list-item" data-report-id="${escapeHtml(r.app_id||r.id)}" style="cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;">
+          <strong>${escapeHtml(r.appareil||'Appareil')}</strong>
+          <span class="badge ${r.statut==='Terminée'?'green':r.statut==='Non_reparable'?'red':''}">${escapeHtml(r.statut||'')}</span>
+        </div>
+        <div style="font-size:0.85rem;color:var(--text-muted);">${escapeHtml(r.panne||'')}</div>
+      </div>`).join('');
+    interList.querySelectorAll('.list-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const r = reports.find(x => (x.app_id||x.id) == item.dataset.reportId);
+        if(r){ showView('detail'); showDetail(r); }
+      });
+    });
+  }
+
+  document.getElementById('client-detail-edit-btn').onclick = () => openClientForm(appId);
+  document.getElementById('client-detail-delete-btn').onclick = () => deleteClient(appId);
+}
+
+// --- Formulaire ---
+function openClientForm(appId){
+  editingClientId = appId || null;
+  const c = appId ? allClients.find(x => x.app_id === appId) : null;
+  document.getElementById('client-form-title').textContent = c ? 'Modifier le client' : 'Nouveau client';
+  document.getElementById('cf-prenom').value  = c ? (c.prenom||'') : '';
+  document.getElementById('cf-nom').value     = c ? (c.nom||'')    : '';
+  document.getElementById('cf-tel').value     = c ? (c.tel||'')    : '';
+  document.getElementById('cf-email').value   = c ? (c.email||'')  : '';
+  document.getElementById('cf-adresse').value = c ? (c.adresse||''): '';
+  document.getElementById('cf-cp').value      = c ? (c.cp||'')     : '';
+  document.getElementById('cf-ville').value   = c ? (c.ville||'')  : '';
+  document.getElementById('cf-note').value    = c ? (c.note||'')   : '';
+  showView('client-form');
+}
+
+// --- Sauvegarde ---
+document.getElementById('client-form-save').addEventListener('click', async () => {
+  const nom = document.getElementById('cf-nom').value.trim();
+  const prenom = document.getElementById('cf-prenom').value.trim();
+  if(!nom && !prenom){ showToast('Renseignez au moins le nom ou le prénom', true); return; }
+  const btn = document.getElementById('client-form-save');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  const row = {
+    nom, prenom,
+    tel:     document.getElementById('cf-tel').value.trim(),
+    email:   document.getElementById('cf-email').value.trim(),
+    adresse: document.getElementById('cf-adresse').value.trim(),
+    cp:      document.getElementById('cf-cp').value.trim(),
+    ville:   document.getElementById('cf-ville').value.trim(),
+    note:    document.getElementById('cf-note').value.trim(),
+  };
+  try{
+    if(editingClientId){
+      const { error } = await sb.from(CLIENTS_TABLE).update(row).eq('app_id', editingClientId);
+      if(error) throw error;
+    } else {
+      row.app_id = 'cli_' + Date.now();
+      const { error } = await sb.from(CLIENTS_TABLE).insert(row);
+      if(error) throw error;
+      editingClientId = row.app_id;
+    }
+    await loadClients();
+    showToast('Client enregistré ✓');
+    showClientDetail(editingClientId);
+    showView('client-detail');
+  }catch(e){
+    console.error('Erreur sauvegarde client :', e);
+    showToast('Erreur sauvegarde client', true);
+  }
+  btn.disabled = false; btn.textContent = 'Enregistrer ✓';
+});
+
+// --- Suppression ---
+async function deleteClient(appId){
+  if(!confirm('Supprimer ce client ? Les interventions ne seront pas supprimées.')) return;
+  try{
+    const { error } = await sb.from(CLIENTS_TABLE).delete().eq('app_id', appId);
+    if(error) throw error;
+    await loadClients();
+    showToast('Client supprimé');
+    showView('clients');
+    renderClientsList(document.getElementById('client-search').value);
+  }catch(e){ showToast('Erreur suppression', true); }
+}
+
+// --- Navigation onglet Clients ---
+document.getElementById('tab-clients') && document.getElementById('tab-clients').addEventListener('click', async () => {
+  if(!allClients.length) await loadClients();
+  renderClientsList('');
+});
+
+document.getElementById('client-new-btn') && document.getElementById('client-new-btn').addEventListener('click', () => openClientForm(null));
+document.getElementById('client-detail-back') && document.getElementById('client-detail-back').addEventListener('click', () => { showView('clients'); renderClientsList(document.getElementById('client-search').value); });
+document.getElementById('client-form-back') && document.getElementById('client-form-back').addEventListener('click', () => {
+  if(editingClientId) showClientDetail(editingClientId);
+  else { showView('clients'); renderClientsList(''); }
+});
+
+document.getElementById('client-search') && document.getElementById('client-search').addEventListener('input', e => {
+  renderClientsList(e.target.value);
+});
+
+// --- Recherche client dans formulaire CR ---
+(function initCRClientSearch(){
+  const input = document.getElementById('f-client-search');
+  const box   = document.getElementById('f-client-results');
+  if(!input || !box) return;
+
+  let timer = null;
+  function renderResults(q){
+    const list = q
+      ? allClients.filter(c =>
+          (c.nom||'').toLowerCase().includes(q) ||
+          (c.prenom||'').toLowerCase().includes(q) ||
+          (c.tel||'').includes(q) ||
+          (c.email||'').toLowerCase().includes(q))
+      : [];
+    if(!list.length){ box.style.display = 'none'; return; }
+    box.innerHTML = list.map(c => `
+      <div class="cr-client-item" data-app-id="${escapeHtml(c.app_id)}"
+        style="padding:0.55rem 0.8rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.88rem;">
+        <strong>${escapeHtml(clientDisplayName(c))}</strong>
+        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.4rem;">${escapeHtml(c.tel||'')} ${escapeHtml(c.ville||'')}</span>
+      </div>`).join('');
+    box.style.display = 'block';
+    box.querySelectorAll('.cr-client-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const c = allClients.find(x => x.app_id === el.dataset.appId);
+        if(!c) return;
+        document.getElementById('f-nom').value     = c.nom     || '';
+        document.getElementById('f-prenom').value  = c.prenom  || '';
+        document.getElementById('f-tel').value     = c.tel     || '';
+        document.getElementById('f-email').value   = c.email   || '';
+        document.getElementById('f-adresse').value = c.adresse || '';
+        document.getElementById('f-cp').value      = c.cp      || '';
+        document.getElementById('f-ville').value   = c.ville   || '';
+        input.value = clientDisplayName(c);
+        input.dataset.selectedClientId = c.app_id;
+        box.style.display = 'none';
+        showToast('Infos client pré-remplies ✓');
+      });
+    });
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim().toLowerCase();
+    timer = setTimeout(async () => {
+      if(!allClients.length) await loadClients();
+      renderResults(q);
+    }, 200);
+  });
+  input.addEventListener('focus', async () => {
+    if(!allClients.length) await loadClients();
+    renderResults(input.value.trim().toLowerCase());
+  });
+  document.addEventListener('click', e => {
+    if(!box.contains(e.target) && e.target !== input) box.style.display = 'none';
+  });
+})();
+
+// --- Création auto client à la validation d'un CR ---
+async function findOrCreateClient(nom, prenom, tel, email, adresse, cp, ville){
+  if(!nom && !prenom && !tel && !email) return null;
+  // Chercher par tel ou email
+  let existing = null;
+  if(tel)   existing = allClients.find(c => c.tel && c.tel === tel);
+  if(!existing && email) existing = allClients.find(c => c.email && c.email === email);
+  if(existing) return existing.app_id;
+  // Créer
+  try{
+    const row = { app_id: 'cli_'+Date.now(), nom: nom||'', prenom: prenom||'', tel: tel||'', email: email||'', adresse: adresse||'', cp: cp||'', ville: ville||'' };
+    const { error } = await sb.from(CLIENTS_TABLE).insert(row);
+    if(error) throw error;
+    allClients.push(row);
+    return row.app_id;
+  }catch(e){ console.error('Erreur création client auto :', e); return null; }
+}
+
+// --- showView helper (si pas déjà existant) ---
+function showView(viewName){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === viewName));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + viewName));
+}
 
 (function checkDraft(){
   try{
