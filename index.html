@@ -3279,34 +3279,17 @@ document.getElementById('plaque-analyze-btn').addEventListener('click', async ()
   try{
     const base64Data = plaquePhoto.split(',')[1];
     const mediaType  = plaquePhoto.split(';')[0].split(':')[1];
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 300,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } },
-            { type: 'text', text: 'Analyse cette plaque signalétique d\'appareil électroménager ou électronique. Réponds UNIQUEMENT en JSON avec ce format exact (sans markdown, sans explication) : {"marque":"...","modele":"...","numero_serie":"..."} . Si une valeur est illisible ou absente, mets une chaîne vide.' }
-          ]
-        }]
-      })
+
+    const { data, error } = await sb.functions.invoke('analyze-plaque', {
+      body: { image_base64: base64Data, media_type: mediaType }
     });
-    const data = await response.json();
-    const text = data.content && data.content[0] && data.content[0].text;
-    if(!text) throw new Error('Réponse vide');
-    const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-    if(result.marque)       document.getElementById('f-marque').value = result.marque;
-    if(result.modele)       document.getElementById('f-modele').value = result.modele;
-    if(result.numero_serie) document.getElementById('f-serie').value  = result.numero_serie;
-    const filled = [result.marque, result.modele, result.numero_serie].filter(Boolean).length;
+    if(error) throw error;
+
+    if(data.marque)       document.getElementById('f-marque').value = data.marque;
+    if(data.modele)       document.getElementById('f-modele').value = data.modele;
+    if(data.numero_serie) document.getElementById('f-serie').value  = data.numero_serie;
+
+    const filled = [data.marque, data.modele, data.numero_serie].filter(Boolean).length;
     status.textContent = filled > 0 ? `✅ ${filled} champ${filled>1?'s':''} rempli${filled>1?'s':''}` : '⚠️ Aucune info détectée — vérifiez la photo';
     status.style.color = filled > 0 ? '#4caf50' : 'var(--orange)';
     showToast(filled > 0 ? 'Plaque analysée ✓' : 'Aucune info détectée', filled === 0);
