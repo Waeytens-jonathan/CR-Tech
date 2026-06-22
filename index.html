@@ -1472,7 +1472,7 @@ function renderAgendaList(){
     dayRdvs.forEach(r => {
       // Séparateur matin / après-midi
       if(r.creneau !== lastCreneau){
-        const params = getAgendaParams();
+        const params = _agendaConfigCache || { matinDebut:'08:00', matinFin:'12:00', amDebut:'12:00', amFin:'18:00' };
         const crLabel = r.creneau === 'matin'
           ? `☀️ Matin · ${params.matinDebut||'08:00'}–${params.matinFin||'12:00'}`
           : `🌤 Après-midi · ${params.amDebut||'12:00'}–${params.amFin||'18:00'}`;
@@ -4129,6 +4129,8 @@ function afterReportsLoaded(){
   if(listView && listView.classList.contains('active')) renderList();
 }
 initAuth();
+// Pré-charger la config agenda dès le démarrage
+getAgendaParams().then(updateSlotLabels);
 
 // Sauvegarde automatique du brouillon à chaque modification (debounce)
 let draftTimeout = null;
@@ -4380,9 +4382,6 @@ document.getElementById('agenda-settings-save').addEventListener('click', async 
   }
   btn.disabled = false; btn.textContent = 'Enregistrer ✓';
 });
-
-// Charger la config au démarrage et appliquer les labels
-getAgendaParams().then(updateSlotLabels);
 
 // ==================== BOUTON RDV POSE PIÈCE ====================
 document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
