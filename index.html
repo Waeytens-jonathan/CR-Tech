@@ -1466,6 +1466,8 @@ async function deleteReportFromSupabase(id){
 
 // ---------- Agenda (RDV pris depuis le site) ----------
 const RDV_TABLE = 'rdv';
+const AGENDA_CONFIG_TABLE = 'agenda_config';
+let _agendaConfigCache = null;
 const RDV_SLOT_LABELS = { matin: 'Matin · 10h-12h', apresmidi: 'Après-midi · 12h-18h' };
 let agendaRdvs = [];
 let currentAgendaRdv = null;
@@ -4356,8 +4358,6 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
 });
 
 // ==================== PARAMÈTRES AGENDA (Supabase) ====================
-const AGENDA_CONFIG_TABLE = 'agenda_config';
-let _agendaConfigCache = null;
 
 async function getAgendaParams(){
   if(_agendaConfigCache) return _agendaConfigCache;
