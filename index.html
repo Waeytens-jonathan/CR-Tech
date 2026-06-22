@@ -4233,6 +4233,34 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
   await saveReportToSupabase(reports[idx]);
 
+  // Mettre à jour le stock si une pièce a été sélectionnée
+  const stockInput = document.getElementById('pose-piece-stock-search');
+  const selectedAppId = stockInput && stockInput.dataset.selectedAppId;
+  const selectedType  = stockInput && stockInput.dataset.selectedType;
+  if(selectedAppId && selectedType){
+    try{
+      if(selectedType === 'embarque'){
+        // Stock van → passer hors_stock
+        await sb.from('stock_embarque').update({ statut: 'hors_stock' }).eq('app_id', selectedAppId);
+        showToast('Pièce du van marquée hors stock ✓');
+      } else {
+        // Stock pièces → supprimer
+        await sb.from('stock_pieces').delete().eq('app_id', selectedAppId);
+        showToast('Pièce retirée du stock ✓');
+      }
+      // Vider le cache stock local pour forcer rechargement
+      stockEmbarque = [];
+      stockPieces = [];
+    }catch(e){
+      console.error('Erreur mise à jour stock :', e);
+      showToast('Pièce posée, mais erreur MAJ stock', true);
+    }
+    // Réinitialiser la sélection
+    delete stockInput.dataset.selectedAppId;
+    delete stockInput.dataset.selectedType;
+    stockInput.value = '';
+  }
+
   currentDetailReport = reports[idx];
   document.getElementById('pose-piece-modal').style.display = 'none';
   btn.disabled = false;
