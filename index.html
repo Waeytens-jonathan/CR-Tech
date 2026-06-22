@@ -4396,10 +4396,18 @@ document.getElementById('agenda-settings-save').addEventListener('click', async 
 (function initPosePieceStockPicker(){
   let _ppSearchTimer = null;
 
-  function renderPPResults(text){
+  async function renderPPResults(text){
     const input = document.getElementById('pose-piece-stock-search');
     const box   = document.getElementById('pose-piece-stock-results');
     if(!box) return;
+
+    // Charger le stock si pas encore fait
+    if(!stockEmbarque.length && !stockPieces.length){
+      box.innerHTML = '<div style="padding:0.6rem 0.8rem;color:var(--text-muted);font-size:0.85rem;">Chargement…</div>';
+      box.style.display = 'block';
+      stockEmbarque = await loadStockEmbarque();
+      stockPieces   = await loadStockPieces();
+    }
 
     const embarque = (stockEmbarque || []).filter(p => p.statut === 'en_stock');
     const pieces   = (stockPieces   || []);
