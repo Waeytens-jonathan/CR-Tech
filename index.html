@@ -430,6 +430,12 @@
         <button class="btn btn-outline" id="agenda-new-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
       </div>
       <h2>Nouveau rendez-vous</h2>
+      <!-- Recherche client existant -->
+      <div class="field" style="position:relative;">
+        <label>🔍 Client existant <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;">(optionnel — pré-remplit les champs)</span></label>
+        <input type="text" id="newrdv-client-search" placeholder="Rechercher par nom, tél ou email…" autocomplete="off">
+        <div id="newrdv-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+      </div>
       <div class="field">
         <label>Date</label>
         <input type="date" id="newrdv-date">
@@ -2573,10 +2579,13 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
 
     // Créer ou lier le client automatiquement (uniquement à la création)
     if(!editingRdvAppId){
-      const clientId = await findOrCreateClient(row.nom, row.prenom, row.tel, row.email, row.adresse, row.cp, row.ville);
+      const clientSearchInput = document.getElementById('newrdv-client-search');
+      const preselectedId = clientSearchInput && clientSearchInput.dataset.selectedClientId;
+      const clientId = preselectedId || await findOrCreateClient(row.nom, row.prenom, row.tel, row.email, row.adresse, row.cp, row.ville);
       if(clientId){
         await sb.from(RDV_TABLE).update({ client_id: clientId }).eq('app_id', row.app_id);
       }
+      if(clientSearchInput){ clientSearchInput.value = ''; delete clientSearchInput.dataset.selectedClientId; }
     }
 
     showToast(editingRdvAppId ? 'Rendez-vous modifié' : 'Rendez-vous enregistré');
@@ -4849,6 +4858,78 @@ document.getElementById('client-search') && document.getElementById('client-sear
     if(!box.contains(e.target) && e.target !== input) box.style.display = 'none';
   });
 })();
+
+// --- Recherche client dans formulaire Nouveau RDV ---
+(function initNewRdvClientSearch(){
+  const input = document.getElementById('newrdv-client-search');
+  const box   = document.getElementById('newrdv-client-results');
+  if(!input || !box) return;
+
+  let timer = null;
+  function renderResults(q){
+    const list = q
+      ? allClients.filter(c =>
+          (c.nom||'').toLowerCase().includes(q) ||
+          (c.prenom||'').toLowerCase().includes(q) ||
+          (c.tel||'').includes(q) ||
+          (c.email||'').toLowerCase().includes(q))
+      : [];
+    if(!list.length){ box.style.display = 'none'; return; }
+    box.innerHTML = list.map(c => `
+      <div class="newrdv-client-item" data-app-id="${escapeHtml(c.app_id)}"
+        style="padding:0.55rem 0.8rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.88rem;">
+        <strong>${escapeHtml(clientDisplayName(c))}</strong>
+        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.4rem;">${escapeHtml(c.tel||'')} ${escapeHtml(c.ville||'')}</span>
+      </div>`).join('');
+    box.style.display = 'block';
+    box.querySelectorAll('.newrdv-client-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const c = allClients.find(x => x.app_id === el.dataset.appId);
+        if(!c) return;
+        document.getElementById('newrdv-prenom').value  = c.prenom  || '';
+        document.getElementById('newrdv-nom').value     = c.nom     || '';
+        document.getElementById('newrdv-tel').value     = c.tel     || '';
+        document.getElementById('newrdv-email').value   = c.email   || '';
+        document.getElementById('newrdv-adresse').value = c.adresse || '';
+        document.getElementById('newrdv-cp').value      = c.cp      || '';
+        document.getElementById('newrdv-ville').value   = c.ville   || '';
+        input.value = clientDisplayName(c);
+        input.dataset.selectedClientId = c.app_id;
+        box.style.display = 'none';
+        showToast('Infos client pré-remplies ✓');
+      });
+    });
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim().toLowerCase();
+    timer = setTimeout(async () => {
+      if(!allClients.length) await loadClients();
+      renderResults(q);
+    }, 200);
+  });
+  input.addEventListener('focus', async () => {
+    if(!allClients.length) await loadClients();
+    renderResults(input.value.trim().toLowerCase());
+  });
+  document.addEventListener('click', e => {
+    if(!box.contains(e.target) && e.target !== input) box.style.display = 'none';
+  });
+})();
+
+// --- Réinitialiser la recherche client quand on ouvre un nouveau RDV ---
+const _origAgendaNewBtn = document.getElementById('agenda-new-btn');
+if(_origAgendaNewBtn){
+  _origAgendaNewBtn.addEventListener('click', () => {
+    setTimeout(() => {
+      const inp = document.getElementById('newrdv-client-search');
+      if(inp){ inp.value = ''; delete inp.dataset.selectedClientId; }
+      const box = document.getElementById('newrdv-client-results');
+      if(box) box.style.display = 'none';
+    }, 50);
+  });
+}
 
 // --- Création auto client à la validation d'un CR ---
 async function findOrCreateClient(nom, prenom, tel, email, adresse, cp, ville){
