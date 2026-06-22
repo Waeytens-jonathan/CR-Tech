@@ -387,7 +387,10 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
         <h2 style="margin:0;">Rendez-vous à venir</h2>
-        <button class="btn btn-primary" id="agenda-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Nouveau RDV</button>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-outline" id="agenda-settings-btn" style="padding:0.5rem 0.8rem;font-size:0.88rem;" title="Paramètres agenda">⚙️</button>
+          <button class="btn btn-primary" id="agenda-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Nouveau RDV</button>
+        </div>
       </div>
       <select id="agenda-filter" style="margin-bottom:0.9rem;max-width:220px;">
         <option value="today">Aujourd'hui</option>
@@ -429,6 +432,14 @@
       <div class="field">
         <label>Date</label>
         <input type="date" id="newrdv-date">
+      </div>
+      <div class="field">
+        <label>Type de RDV</label>
+        <select id="newrdv-type">
+          <option value="">Standard</option>
+          <option value="pose_piece">🔧 Pose pièce</option>
+          <option value="diagnostic">🔍 Diagnostic</option>
+        </select>
       </div>
       <div class="field">
         <label>Créneau</label>
@@ -684,6 +695,7 @@
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
         <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;">🔧 Poser la pièce</button>
+        <button class="btn btn-outline" id="detail-rdv-pose-btn" style="display:none;">📅 RDV pose pièce</button>
       </div>
       <div id="detail-content"></div>
     </div>
@@ -1042,6 +1054,73 @@
 
 <!-- ===================== MODALE POSE PIÈCE (reprise dossier) ===================== -->
 <div id="pose-piece-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
+
+<!-- ===================== MODAL PARAMÈTRES AGENDA ===================== -->
+<div id="agenda-settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:460px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 1rem;color:var(--orange);">⚙️ Paramètres de l'agenda</h3>
+
+    <h4 style="margin:0.8rem 0 0.5rem;font-size:0.9rem;color:var(--text-muted);letter-spacing:0.05em;">TRANCHES HORAIRES</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — heure début</label>
+        <input type="time" id="param-matin-debut" value="08:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — heure fin</label>
+        <input type="time" id="param-matin-fin" value="12:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — heure début</label>
+        <input type="time" id="param-am-debut" value="12:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — heure fin</label>
+        <input type="time" id="param-am-fin" value="18:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+    </div>
+
+    <h4 style="margin:0.8rem 0 0.5rem;font-size:0.9rem;color:var(--text-muted);letter-spacing:0.05em;">QUOTAS (places max par créneau)</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — Lun-Ven</label>
+        <input type="number" id="param-quota-matin" min="1" max="20" value="2" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — Lun-Ven</label>
+        <input type="number" id="param-quota-am" min="1" max="20" value="4" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — Samedi</label>
+        <input type="number" id="param-quota-matin-sam" min="1" max="20" value="2" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — Samedi</label>
+        <input type="number" id="param-quota-am-sam" min="1" max="20" value="2" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+    </div>
+
+    <h4 style="margin:0.8rem 0 0.5rem;font-size:0.9rem;color:var(--text-muted);letter-spacing:0.05em;">JOURS FERMÉS (vacances / formation)</h4>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.6rem;">Ajoutez des dates ou plages de dates où vous n'êtes pas disponible.</p>
+    <div id="jours-bloques-list" style="margin-bottom:0.7rem;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.5rem;align-items:end;margin-bottom:1rem;">
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Du</label>
+        <input type="date" id="param-bloc-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Au</label>
+        <input type="date" id="param-bloc-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <button class="btn btn-secondary" id="param-bloc-add-btn" style="padding:0.5rem 0.8rem;white-space:nowrap;">+ Ajouter</button>
+    </div>
+
+    <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
+      <button class="btn btn-outline" id="agenda-settings-cancel">Annuler</button>
+      <button class="btn btn-primary" id="agenda-settings-save">Enregistrer ✓</button>
+    </div>
+  </div>
+</div>
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
     <h3 style="margin:0 0 0.8rem;color:var(--orange);">🔧 Poser la pièce</h3>
     <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 1rem;">Renseignez la pièce posée sur ce dossier. Vous choisirez ensuite le nouveau statut.</p>
@@ -1384,18 +1463,30 @@ function renderAgendaList(){
 
   let html = '';
   sortedDates.forEach(dateKey => {
-    html += `<div style="font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#f5a623;padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;">${escapeHtml(dateFrLong(dateKey))}</div>`;
+    const isBlocked = isDateBlocked(dateKey);
+    const blockedBadge = isBlocked ? ' <span style="font-size:0.72rem;background:rgba(224,88,79,0.2);color:#e0584f;border-radius:4px;padding:0.1rem 0.4rem;vertical-align:middle;">🔴 Indispo</span>' : '';
+    html += `<div style="font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#f5a623;padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;">${escapeHtml(dateFrLong(dateKey))}${blockedBadge}</div>`;
     // tri par créneau : matin avant après-midi
     const dayRdvs = byDate[dateKey].sort((a,b) => (a.creneau === 'matin' ? 0 : 1) - (b.creneau === 'matin' ? 0 : 1));
+    let lastCreneau = null;
     dayRdvs.forEach(r => {
+      // Séparateur matin / après-midi
+      if(r.creneau !== lastCreneau){
+        const params = getAgendaParams();
+        const crLabel = r.creneau === 'matin'
+          ? `☀️ Matin · ${params.matinDebut||'08:00'}–${params.matinFin||'12:00'}`
+          : `🌤 Après-midi · ${params.amDebut||'12:00'}–${params.amFin||'18:00'}`;
+        html += `<div style="font-size:0.75rem;font-weight:600;color:var(--blue);padding:0.5rem 0 0.2rem;letter-spacing:0.06em;">${crLabel}</div>`;
+        lastCreneau = r.creneau;
+      }
       const doneBadge = r.statut === 'effectue' ? '<span class="badge green">Effectué</span>' : '';
+      const typeBadge = r.type_rdv === 'pose_piece' ? '<span class="badge orange" style="font-size:0.72rem;">🔧 Pose pièce</span>' : (r.type_rdv === 'diagnostic' ? '<span class="badge" style="font-size:0.72rem;background:rgba(26,115,200,0.15);color:var(--blue);">🔍 Diag</span>' : '');
       html += `
         <div class="list-item" data-rdv-id="${escapeHtml(r.app_id)}" style="cursor:pointer;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
             <strong>${escapeHtml(r.prenom || '')} ${escapeHtml(r.nom || '')}</strong>
             <div style="display:flex;gap:0.4rem;flex-wrap:wrap;justify-content:flex-end;">
-              ${doneBadge}
-              <span class="badge orange">${escapeHtml(RDV_SLOT_LABELS[r.creneau] || r.creneau || '')}</span>
+              ${doneBadge}${typeBadge}
             </div>
           </div>
           <div style="color:#778;font-size:0.88rem;margin-top:0.2rem;">
@@ -2129,10 +2220,12 @@ function showAgendaDetail(appId){
   else if(r.statut === 'annule') statutLabel = '<span class="badge red">🚫 Annulé</span>';
   else statutLabel = '<span class="badge orange">En attente</span>';
 
+  const TYPE_RDV_LABELS = { pose_piece: '🔧 Pose pièce', diagnostic: '🔍 Diagnostic' };
   const rows = [
     ['Statut', statutLabel],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
+    ['Type', r.type_rdv ? (TYPE_RDV_LABELS[r.type_rdv] || r.type_rdv) : null],
     ['Client', `${r.prenom || ''} ${r.nom || ''}`.trim()],
     ['Téléphone', r.tel],
     ['Email', r.email],
@@ -2299,6 +2392,7 @@ document.getElementById('agenda-new-btn').addEventListener('click', () => {
   });
   document.getElementById('newrdv-date').value = todayISO();
   document.getElementById('newrdv-creneau').value = 'matin';
+  document.getElementById('newrdv-type').value = '';
   document.querySelector('#view-agenda-new h2').textContent = 'Nouveau rendez-vous';
   document.getElementById('newrdv-save-btn').textContent = 'Enregistrer le rendez-vous';
 
@@ -2315,6 +2409,7 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
 
   document.getElementById('newrdv-date').value = r.date || '';
   document.getElementById('newrdv-creneau').value = r.creneau || 'matin';
+  document.getElementById('newrdv-type').value = r.type_rdv || '';
   document.getElementById('newrdv-prenom').value = r.prenom || '';
   document.getElementById('newrdv-nom').value = r.nom || '';
   document.getElementById('newrdv-adresse').value = r.adresse || '';
@@ -2354,9 +2449,20 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     return;
   }
 
+  // Vérifier si le jour est bloqué (vacances / formation)
+  if(isDateBlocked(date)){
+    const ok = confirm(`⚠️ Cette date est marquée comme indisponible (vacances ou formation). Continuer quand même ?`);
+    if(!ok) return;
+  }
+
   // Avertissement (non bloquant) si le quota du créneau est déjà atteint (uniquement à la création)
   if(!editingRdvAppId){
-    const limit = (dow === 6) ? { matin: 2, apresmidi: 2 } : { matin: 2, apresmidi: 4 };
+    const cfg = await getAgendaParams();
+    const isSam = dow === 6;
+    const limit = {
+      matin:     isSam ? cfg.quotaMatinSam : cfg.quotaMatin,
+      apresmidi: isSam ? cfg.quotaAMSam    : cfg.quotaAM
+    };
     try{
       const { data, error } = await sb.from(RDV_TABLE).select('creneau').eq('date', date).neq('statut', 'annule');
       if(!error){
@@ -2385,7 +2491,8 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     email: document.getElementById('newrdv-email').value.trim(),
     appareil: document.getElementById('newrdv-appareil').value,
     panne: document.getElementById('newrdv-panne').value.trim(),
-    note_technicien: document.getElementById('newrdv-note').value.trim()
+    note_technicien: document.getElementById('newrdv-note').value.trim(),
+    type_rdv: document.getElementById('newrdv-type').value.trim() || null
   };
   if(!editingRdvAppId){
     row.app_id = 'rdv_' + Date.now();
@@ -3545,6 +3652,7 @@ function showDetail(r){
 
   // Bouton "Poser la pièce" : visible uniquement si le dossier est en attente de pièce
   document.getElementById('detail-pose-piece-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
+  document.getElementById('detail-rdv-pose-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
 }
 
 document.getElementById('detail-back').addEventListener('click', () => {
@@ -4121,6 +4229,200 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   showToast('Pièce posée enregistrée');
   showDetail(currentDetailReport);
 });
+
+// ==================== PARAMÈTRES AGENDA (Supabase) ====================
+const AGENDA_CONFIG_TABLE = 'agenda_config';
+let _agendaConfigCache = null;
+
+async function getAgendaParams(){
+  if(_agendaConfigCache) return _agendaConfigCache;
+  try{
+    const { data, error } = await sb.from(AGENDA_CONFIG_TABLE).select('*').eq('id',1).single();
+    if(error) throw error;
+    _agendaConfigCache = {
+      matinDebut: data.matin_debut || '08:00',
+      matinFin:   data.matin_fin   || '12:00',
+      amDebut:    data.am_debut    || '12:00',
+      amFin:      data.am_fin      || '18:00',
+      quotaMatin:    data.quota_matin    ?? 2,
+      quotaAM:       data.quota_am       ?? 4,
+      quotaMatinSam: data.quota_matin_sam ?? 2,
+      quotaAMSam:    data.quota_am_sam   ?? 2,
+      joursBlockes: data.jours_bloques || []
+    };
+  }catch(e){
+    console.error('Erreur lecture agenda_config :', e);
+    _agendaConfigCache = {
+      matinDebut:'08:00', matinFin:'12:00',
+      amDebut:'12:00', amFin:'18:00',
+      quotaMatin:2, quotaAM:4, quotaMatinSam:2, quotaAMSam:2,
+      joursBlockes:[]
+    };
+  }
+  return _agendaConfigCache;
+}
+
+async function saveAgendaParams(params){
+  _agendaConfigCache = params;
+  const row = {
+    matin_debut:     params.matinDebut,
+    matin_fin:       params.matinFin,
+    am_debut:        params.amDebut,
+    am_fin:          params.amFin,
+    quota_matin:     params.quotaMatin,
+    quota_am:        params.quotaAM,
+    quota_matin_sam: params.quotaMatinSam,
+    quota_am_sam:    params.quotaAMSam,
+    jours_bloques:   params.joursBlockes
+  };
+  const { error } = await sb.from(AGENDA_CONFIG_TABLE).update(row).eq('id',1);
+  if(error) throw error;
+  updateSlotLabels(params);
+}
+
+function updateSlotLabels(params){
+  if(!params) return;
+  const m  = `Matin · ${params.matinDebut||'08:00'}–${params.matinFin||'12:00'}`;
+  const am = `Après-midi · ${params.amDebut||'12:00'}–${params.amFin||'18:00'}`;
+  RDV_SLOT_LABELS.matin = m;
+  RDV_SLOT_LABELS.apresmidi = am;
+  const sel = document.getElementById('newrdv-creneau');
+  if(sel){ sel.options[0].text = m; sel.options[1].text = am; }
+}
+
+function isDateBlocked(dateISO){
+  const params = _agendaConfigCache;
+  if(!params) return false;
+  return (params.joursBlockes || []).some(b => dateISO >= b.debut && dateISO <= b.fin);
+}
+
+function renderBlocList(){
+  const params = _agendaConfigCache || { joursBlockes:[] };
+  const container = document.getElementById('jours-bloques-list');
+  if(!container) return;
+  const blocs = params.joursBlockes || [];
+  if(!blocs.length){
+    container.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 0.5rem;">Aucun jour bloqué.</p>';
+    return;
+  }
+  container.innerHTML = blocs.map((b,i) => {
+    const label = b.debut === b.fin ? dateFrLong(b.debut) : `${dateFrLong(b.debut)} → ${dateFrLong(b.fin)}`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(224,88,79,0.1);border-radius:8px;padding:0.5rem 0.7rem;margin-bottom:0.4rem;">
+      <span style="font-size:0.85rem;">🔴 ${escapeHtml(label)}</span>
+      <button onclick="removeBloc(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;padding:0 0.3rem;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+window.removeBloc = function(idx){
+  if(!_agendaConfigCache) return;
+  _agendaConfigCache.joursBlockes.splice(idx,1);
+  renderBlocList();
+};
+
+document.getElementById('agenda-settings-btn').addEventListener('click', async () => {
+  const params = await getAgendaParams();
+  document.getElementById('param-matin-debut').value = params.matinDebut;
+  document.getElementById('param-matin-fin').value   = params.matinFin;
+  document.getElementById('param-am-debut').value    = params.amDebut;
+  document.getElementById('param-am-fin').value      = params.amFin;
+  // Quotas
+  if(document.getElementById('param-quota-matin'))    document.getElementById('param-quota-matin').value    = params.quotaMatin;
+  if(document.getElementById('param-quota-am'))       document.getElementById('param-quota-am').value       = params.quotaAM;
+  if(document.getElementById('param-quota-matin-sam'))document.getElementById('param-quota-matin-sam').value= params.quotaMatinSam;
+  if(document.getElementById('param-quota-am-sam'))   document.getElementById('param-quota-am-sam').value   = params.quotaAMSam;
+  const t = todayISO();
+  document.getElementById('param-bloc-debut').value = t;
+  document.getElementById('param-bloc-fin').value   = t;
+  renderBlocList();
+  document.getElementById('agenda-settings-modal').style.display = 'flex';
+});
+
+document.getElementById('agenda-settings-cancel').addEventListener('click', () => {
+  document.getElementById('agenda-settings-modal').style.display = 'none';
+});
+
+document.getElementById('param-bloc-add-btn').addEventListener('click', () => {
+  const debut = document.getElementById('param-bloc-debut').value;
+  const fin   = document.getElementById('param-bloc-fin').value;
+  if(!debut){ showToast('Choisissez une date de début', true); return; }
+  const finOk = fin && fin >= debut ? fin : debut;
+  if(!_agendaConfigCache) return;
+  _agendaConfigCache.joursBlockes = _agendaConfigCache.joursBlockes || [];
+  _agendaConfigCache.joursBlockes.push({ debut, fin: finOk });
+  _agendaConfigCache.joursBlockes.sort((a,b) => a.debut.localeCompare(b.debut));
+  renderBlocList();
+});
+
+document.getElementById('agenda-settings-save').addEventListener('click', async () => {
+  if(!_agendaConfigCache) return;
+  const params = {
+    ..._agendaConfigCache,
+    matinDebut: document.getElementById('param-matin-debut').value || '08:00',
+    matinFin:   document.getElementById('param-matin-fin').value   || '12:00',
+    amDebut:    document.getElementById('param-am-debut').value    || '12:00',
+    amFin:      document.getElementById('param-am-fin').value      || '18:00',
+    quotaMatin:    parseInt(document.getElementById('param-quota-matin')?.value)    || 2,
+    quotaAM:       parseInt(document.getElementById('param-quota-am')?.value)       || 4,
+    quotaMatinSam: parseInt(document.getElementById('param-quota-matin-sam')?.value)|| 2,
+    quotaAMSam:    parseInt(document.getElementById('param-quota-am-sam')?.value)   || 2,
+  };
+  const btn = document.getElementById('agenda-settings-save');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  try{
+    await saveAgendaParams(params);
+    document.getElementById('agenda-settings-modal').style.display = 'none';
+    showToast('Paramètres agenda enregistrés ✓');
+    renderAgenda();
+  }catch(e){
+    showToast('Erreur sauvegarde paramètres', true);
+    console.error(e);
+  }
+  btn.disabled = false; btn.textContent = 'Enregistrer ✓';
+});
+
+// Charger la config au démarrage et appliquer les labels
+getAgendaParams().then(updateSlotLabels);
+
+// ==================== BOUTON RDV POSE PIÈCE ====================
+document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  editingRdvAppId = null;
+  populateNewRdvAppareilOptions();
+
+  // Pré-remplir les champs client depuis le CR
+  ['date','prenom','nom','adresse','cp','ville','tel','email','panne','note'].forEach(id => {
+    const el = document.getElementById('newrdv-' + id);
+    if(el) el.value = '';
+  });
+  document.getElementById('newrdv-date').value = todayISO();
+  document.getElementById('newrdv-creneau').value = 'apresmidi';
+  document.getElementById('newrdv-type').value = 'pose_piece';
+  document.getElementById('newrdv-prenom').value = r.prenom || '';
+  document.getElementById('newrdv-nom').value = r.nom || '';
+  document.getElementById('newrdv-adresse').value = r.adresse || '';
+  document.getElementById('newrdv-cp').value = r.cp || '';
+  document.getElementById('newrdv-ville').value = r.ville || '';
+  document.getElementById('newrdv-tel').value = r.tel || '';
+  document.getElementById('newrdv-email').value = r.email || '';
+  document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
+  document.getElementById('newrdv-panne').value = r.panne || '';
+  document.getElementById('newrdv-note').value = `Référence dossier : ${r.reference||r.app_id||''}. Pose pièce.`;
+
+  document.querySelector('#view-agenda-new h2').textContent = 'RDV Pose pièce';
+  document.getElementById('newrdv-save-btn').textContent = 'Enregistrer le rendez-vous';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda-new').classList.add('active');
+  showToast('Infos client pré-remplies');
+});
+
+// Afficher le bouton RDV pose pièce dans le détail CR
+const _origShowDetail = typeof showDetail !== 'undefined' ? showDetail : null;
+// Patch via l'event du bouton "detail-pose-piece-btn" — on accroche sur showDetail via override
+// On surcharge renderAgendaList pour afficher la séparation matin/AM et les jours bloqués
 
 (function checkDraft(){
   try{
