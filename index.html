@@ -442,16 +442,20 @@
         </div>
       </div>
 
-      <!-- Navigation semaine -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.7rem;">
-        <button id="agenda-prev-week" class="btn btn-outline" style="padding:0.4rem 0.8rem;font-size:1rem;">‹</button>
-        <span id="agenda-week-label" style="font-size:0.88rem;font-weight:600;color:var(--text-muted);"></span>
-        <button id="agenda-next-week" class="btn btn-outline" style="padding:0.4rem 0.8rem;font-size:1rem;">›</button>
+      <!-- Navigation jour -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.7rem;gap:0.5rem;">
+        <button id="agenda-prev-week" class="btn btn-outline" style="padding:0.5rem 1rem;font-size:1.1rem;">‹</button>
+        <div style="text-align:center;flex:1;">
+          <div id="agenda-week-label" style="font-size:1rem;font-weight:700;color:var(--text);"></div>
+          <div id="agenda-day-sublabel" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;"></div>
+        </div>
+        <button id="agenda-next-week" class="btn btn-outline" style="padding:0.5rem 1rem;font-size:1.1rem;">›</button>
       </div>
+      <button id="agenda-today-btn" class="btn btn-outline" style="width:100%;margin-bottom:0.7rem;font-size:0.85rem;padding:0.4rem;">📍 Aujourd'hui</button>
 
-      <!-- Colonnes jours (swipable) -->
+      <!-- Contenu du jour -->
       <div id="agenda-week-container" style="overflow:hidden;position:relative;touch-action:pan-y;">
-        <div id="agenda-week-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:0.4rem;min-height:200px;"></div>
+        <div id="agenda-week-grid" style="min-height:150px;"></div>
       </div>
 
       <div class="empty" id="agenda-empty-msg" style="display:none;margin-top:1rem;">Aucun rendez-vous cette semaine.</div>
@@ -1552,29 +1556,16 @@ function dateFrLong(iso){
   return d.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
 }
 
-// ==================== AGENDA SEMAINE ====================
-let agendaWeekOffset = 0; // 0 = semaine courante, 1 = semaine suivante, etc.
-const WEEK_DAYS = ['Lun','Mar','Mer','Jeu','Ven','Sam'];
+// ==================== AGENDA JOUR PAR JOUR ====================
+let agendaDayOffset = 0; // 0 = aujourd'hui, +1 = demain, etc.
+const DAY_NAMES_LONG = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MONTH_NAMES = ['jan.','fév.','mar.','avr.','mai','jun.','jul.','aoû.','sep.','oct.','nov.','déc.'];
 
-function getWeekDates(offset){
-  const now = new Date();
-  now.setHours(0,0,0,0);
-  // Lundi de la semaine courante
-  const day = now.getDay(); // 0=dim
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diff + offset * 7);
-  const dates = [];
-  for(let i = 0; i < 6; i++){
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    dates.push(d);
-  }
-  return dates;
-}
-
-function dateToLocalISO(d){
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+function getDisplayDate(offset){
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + offset);
+  return d;
 }
 
 async function renderAgenda(){
@@ -1585,62 +1576,64 @@ async function renderAgenda(){
 function renderAgendaList(){
   const grid = document.getElementById('agenda-week-grid');
   const emptyEl = document.getElementById('agenda-empty-msg');
-  const weekLabel = document.getElementById('agenda-week-label');
+  const label = document.getElementById('agenda-week-label');
+  const sublabel = document.getElementById('agenda-day-sublabel');
   if(!grid) return;
 
-  const dates = getWeekDates(agendaWeekOffset);
+  const d = getDisplayDate(agendaDayOffset);
+  const iso = dateToLocalISO(d);
   const todayStr = todayISO();
   const params = _agendaConfigCache || { matinDebut:'08:00', matinFin:'12:00', amDebut:'12:00', amFin:'18:00' };
 
-  // Label semaine
-  const first = dates[0], last = dates[dates.length-1];
-  weekLabel.textContent = `${first.getDate()} ${first.toLocaleDateString('fr-FR',{month:'short'})} – ${last.getDate()} ${last.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}`;
+  // Label du jour
+  const isToday = iso === todayStr;
+  const isTomorrow = agendaDayOffset === 1;
+  let dayPrefix = isToday ? 'Aujourd\'hui' : isTomorrow ? 'Demain' : DAY_NAMES_LONG[d.getDay()];
+  label.textContent = dayPrefix;
+  label.style.color = isToday ? 'var(--orange)' : 'var(--text)';
+  sublabel.textContent = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 
-  // Index des RDV par date
-  const byDate = {};
-  agendaRdvs.filter(r => r.statut !== 'annule').forEach(r => {
-    if(!byDate[r.date]) byDate[r.date] = [];
-    byDate[r.date].push(r);
-  });
+  const isBlocked = isDateBlocked(iso);
+  const dayRdvs = agendaRdvs.filter(r => r.date === iso && r.statut !== 'annule');
+  const matinRdvs = dayRdvs.filter(r => r.creneau === 'matin');
+  const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin');
 
-  let totalRdvs = 0;
-  grid.innerHTML = dates.map(d => {
-    const iso = dateToLocalISO(d);
-    const isToday = iso === todayStr;
-    const isBlocked = isDateBlocked(iso);
-    const rdvs = (byDate[iso] || []).sort((a,b) => (a.creneau==='matin'?0:1)-(b.creneau==='matin'?0:1));
-    totalRdvs += rdvs.length;
-
-    const matinRdvs = rdvs.filter(r => r.creneau === 'matin');
-    const amRdvs    = rdvs.filter(r => r.creneau !== 'matin');
-
-    const makeChip = r => {
-      const typeClass = r.type_rdv || '';
-      const doneClass = r.statut === 'effectue' ? 'effectue' : '';
-      const name = [r.prenom, r.nom].filter(Boolean).join(' ') || '—';
-      return `<div class="agenda-rdv-chip ${typeClass} ${doneClass}" data-rdv-id="${escapeHtml(r.app_id)}">
-        <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(name)}</div>
-        <div style="color:var(--text-muted);font-size:0.65rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.appareil||'')}</div>
-      </div>`;
-    };
-
-    const blockedHtml = isBlocked ? '<div style="font-size:0.6rem;color:#e0584f;text-align:center;padding:0.3rem;">🔴 Fermé</div>' : '';
-
-    return `<div class="agenda-day-col${isToday?' today':''}${isBlocked?' blocked':''}" data-date="${iso}">
-      <div class="agenda-day-header">
-        <div class="agenda-day-dow">${WEEK_DAYS[d.getDay()-1] || 'Sam'}</div>
-        <div class="agenda-day-num">${d.getDate()}</div>
+  const makeCard = r => {
+    const typeLabel = r.type_rdv === 'pose_piece' ? '🔧 Pose pièce' : r.type_rdv === 'diagnostic' ? '🔍 Diagnostic' : '';
+    const doneLabel = r.statut === 'effectue' ? '<span class="badge green" style="font-size:0.7rem;">Effectué</span>' : '';
+    const borderColor = r.type_rdv === 'pose_piece' ? 'var(--orange)' : r.type_rdv === 'diagnostic' ? '#9c27b0' : r.statut === 'effectue' ? '#4caf50' : 'var(--blue)';
+    return `<div class="list-item agenda-rdv-chip" data-rdv-id="${escapeHtml(r.app_id)}"
+      style="cursor:pointer;border-left:4px solid ${borderColor};${r.statut==='effectue'?'opacity:0.6;':''}padding:0.6rem 0.8rem;margin-bottom:0.5rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+        <strong style="font-size:0.95rem;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong>
+        <div style="display:flex;gap:0.3rem;align-items:center;">${doneLabel}</div>
       </div>
-      ${blockedHtml}
-      ${matinRdvs.length ? `<div class="agenda-slot-label">☀️ ${params.matinDebut}–${params.matinFin}</div>${matinRdvs.map(makeChip).join('')}` : ''}
-      ${matinRdvs.length && amRdvs.length ? '<hr class="agenda-slot-sep">' : ''}
-      ${amRdvs.length ? `<div class="agenda-slot-label">🌤 ${params.amDebut}–${params.amFin}</div>${amRdvs.map(makeChip).join('')}` : ''}
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">${escapeHtml(r.appareil||'')}${r.ville?' — '+escapeHtml(r.ville):''}</div>
+      ${typeLabel ? `<div style="font-size:0.75rem;color:var(--orange);margin-top:0.2rem;">${typeLabel}</div>` : ''}
     </div>`;
-  }).join('');
+  };
 
-  emptyEl.style.display = totalRdvs === 0 ? 'block' : 'none';
+  let html = '';
 
-  // Listeners clics RDV
+  if(isBlocked){
+    html = `<div style="text-align:center;padding:2rem 1rem;color:#e0584f;font-size:0.9rem;">🔴 Jour fermé (vacances / formation)</div>`;
+  } else if(!dayRdvs.length){
+    html = `<div style="text-align:center;padding:2rem 1rem;color:var(--text-muted);font-size:0.9rem;">Aucun rendez-vous ce jour.</div>`;
+  } else {
+    if(matinRdvs.length){
+      html += `<div class="agenda-slot-label" style="font-size:0.8rem;margin-bottom:0.4rem;">☀️ Matin · ${params.matinDebut}–${params.matinFin}</div>`;
+      html += matinRdvs.map(makeCard).join('');
+    }
+    if(amRdvs.length){
+      if(matinRdvs.length) html += '<hr class="agenda-slot-sep" style="margin:0.6rem 0;">';
+      html += `<div class="agenda-slot-label" style="font-size:0.8rem;margin-bottom:0.4rem;">🌤 Après-midi · ${params.amDebut}–${params.amFin}</div>`;
+      html += amRdvs.map(makeCard).join('');
+    }
+  }
+
+  grid.innerHTML = html;
+  emptyEl.style.display = 'none';
+
   grid.querySelectorAll('[data-rdv-id]').forEach(chip => {
     chip.addEventListener('click', e => {
       e.stopPropagation();
@@ -1648,17 +1641,20 @@ function renderAgendaList(){
     });
   });
 
-  // Swipe tactile
   initAgendaSwipe();
 }
 
-// --- Navigation semaine ---
+// --- Navigation jour ---
 document.getElementById('agenda-prev-week').addEventListener('click', () => {
-  agendaWeekOffset--;
+  agendaDayOffset--;
   renderAgendaList();
 });
 document.getElementById('agenda-next-week').addEventListener('click', () => {
-  agendaWeekOffset++;
+  agendaDayOffset++;
+  renderAgendaList();
+});
+document.getElementById('agenda-today-btn').addEventListener('click', () => {
+  agendaDayOffset = 0;
   renderAgendaList();
 });
 
@@ -1672,8 +1668,8 @@ function initAgendaSwipe(){
   container.addEventListener('touchend', e => {
     const diff = startX - e.changedTouches[0].clientX;
     if(Math.abs(diff) > 50){
-      if(diff > 0) agendaWeekOffset++;
-      else agendaWeekOffset--;
+      if(diff > 0) agendaDayOffset++;
+      else agendaDayOffset--;
       renderAgendaList();
     }
   }, { passive: true });
