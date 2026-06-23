@@ -1601,15 +1601,16 @@ function renderAgendaList(){
   const makeCard = r => {
     const typeLabel = r.type_rdv === 'pose_piece' ? '🔧 Pose pièce' : r.type_rdv === 'diagnostic' ? '🔍 Diagnostic' : '';
     const doneLabel = r.statut === 'effectue' ? '<span class="badge green" style="font-size:0.7rem;">Effectué</span>' : '';
-    const borderColor = r.type_rdv === 'pose_piece' ? 'var(--orange)' : r.type_rdv === 'diagnostic' ? '#9c27b0' : r.statut === 'effectue' ? '#4caf50' : 'var(--blue)';
+    const borderColor = r.statut === 'effectue' ? '#4caf50' : 'var(--orange)';
+    const bgColor = r.statut === 'effectue' ? 'rgba(76,175,80,0.06)' : 'rgba(245,166,35,0.07)';
     return `<div class="list-item agenda-rdv-chip" data-rdv-id="${escapeHtml(r.app_id)}"
-      style="cursor:pointer;border-left:4px solid ${borderColor};${r.statut==='effectue'?'opacity:0.6;':''}padding:0.6rem 0.8rem;margin-bottom:0.5rem;">
+      style="cursor:pointer;border-left:4px solid ${borderColor};background:${bgColor};${r.statut==='effectue'?'opacity:0.7;':''}padding:0.6rem 0.8rem;margin-bottom:0.5rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
         <strong style="font-size:0.95rem;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong>
         <div style="display:flex;gap:0.3rem;align-items:center;">${doneLabel}</div>
       </div>
       <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">${escapeHtml(r.appareil||'')}${r.ville?' — '+escapeHtml(r.ville):''}</div>
-      ${typeLabel ? `<div style="font-size:0.75rem;color:var(--orange);margin-top:0.2rem;">${typeLabel}</div>` : ''}
+      ${typeLabel ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">${typeLabel}</div>` : ''}
     </div>`;
   };
 
