@@ -524,7 +524,8 @@
       </div>
       <div class="field">
         <label>Adresse</label>
-        <input type="text" id="newrdv-adresse">
+        <input type="text" id="newrdv-adresse" autocomplete="off">
+        <div id="newrdv-adresse-suggestions" style="display:none;margin-top:0.4rem;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;position:relative;z-index:10;"></div>
       </div>
       <div class="field">
         <label>Code postal</label>
@@ -786,7 +787,7 @@
       <div class="field"><label>Nom</label><input type="text" id="cf-nom" placeholder="Nom"></div>
       <div class="field"><label>Téléphone</label><input type="tel" id="cf-tel" placeholder="06 12 34 56 78"></div>
       <div class="field"><label>Email</label><input type="email" id="cf-email" placeholder="client@email.fr"></div>
-      <div class="field"><label>Adresse</label><input type="text" id="cf-adresse" placeholder="N° et rue"></div>
+      <div class="field"><label>Adresse</label><input type="text" id="cf-adresse" placeholder="N° et rue" autocomplete="off"><div id="cf-adresse-suggestions" style="display:none;margin-top:0.4rem;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;position:relative;z-index:10;"></div></div>
       <div class="field"><label>Code postal</label><input type="text" id="cf-cp" placeholder="62300"></div>
       <div class="field"><label>Ville</label><input type="text" id="cf-ville" placeholder="Lens"></div>
       <div class="field"><label>Note</label><textarea id="cf-note" rows="3" placeholder="Note interne…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;resize:vertical;"></textarea></div>
@@ -2836,6 +2837,8 @@ function setupAdresseAutocomplete(adresseId, cpId, villeId, suggestionsId){
 
 setupAdresseAutocomplete('f-adresse', 'f-cp', 'f-ville', 'f-adresse-suggestions');
 setupAdresseAutocomplete('depot-edit-adresse', 'depot-edit-cp', 'depot-edit-ville', 'depot-edit-adresse-suggestions');
+setupAdresseAutocomplete('cf-adresse', 'cf-cp', 'cf-ville', 'cf-adresse-suggestions');
+setupAdresseAutocomplete('newrdv-adresse', 'newrdv-cp', 'newrdv-ville', 'newrdv-adresse-suggestions');
 
 document.getElementById('header-date').textContent = new Date().toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
 document.getElementById('f-date').value = todayISO();
@@ -5084,19 +5087,33 @@ if(_origAgendaNewBtn){
 // --- Création auto client à la validation d'un CR ---
 async function findOrCreateClient(nom, prenom, tel, email, adresse, cp, ville){
   if(!nom && !prenom && !tel && !email) return null;
-  // Chercher par tel ou email
-  let existing = null;
-  if(tel)   existing = allClients.find(c => c.tel && c.tel === tel);
-  if(!existing && email) existing = allClients.find(c => c.email && c.email === email);
-  if(existing) return existing.app_id;
-  // Créer
   try{
-    const row = { app_id: 'cli_'+Date.now(), nom: nom||'', prenom: prenom||'', tel: tel||'', email: email||'', adresse: adresse||'', cp: cp||'', ville: ville||'' };
-    const { error } = await sb.from(CLIENTS_TABLE).insert(row);
+    // Chercher en base directement (pas le cache local qui peut être vieux)
+    let existing = null;
+    if(tel && tel.trim()){
+      const { data } = await sb.from(CLIENTS_TABLE).select('app_id').eq('tel', tel.trim()).maybeSingle();
+      existing = data;
+    }
+    if(!existing && email && email.trim()){
+      const { data } = await sb.from(CLIENTS_TABLE).select('app_id').eq('email', email.trim()).maybeSingle();
+      existing = data;
+    }
+    if(existing) return existing.app_id;
+    // Créer (avec upsert sur app_id pour éviter les doublons en cas de race condition)
+    const row = {
+      app_id: 'cli_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      nom: nom||'', prenom: prenom||'',
+      tel: tel||'', email: email||'',
+      adresse: adresse||'', cp: cp||'', ville: ville||''
+    };
+    const { data: inserted, error } = await sb.from(CLIENTS_TABLE).insert(row).select('app_id').single();
     if(error) throw error;
     allClients.push(row);
-    return row.app_id;
-  }catch(e){ console.error('Erreur création client auto :', e); return null; }
+    return inserted.app_id;
+  }catch(e){
+    console.error('Erreur création client auto :', e);
+    return null;
+  }
 }
 
 // --- showView helper (si pas déjà existant) ---
