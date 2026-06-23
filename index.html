@@ -2517,13 +2517,36 @@ document.getElementById('agenda-detail-sms-arrival-btn').addEventListener('click
 
 document.getElementById('agenda-detail-cancel-btn').addEventListener('click', async () => {
   if(!currentAgendaRdv) return;
-  if(!confirm('Annuler ce rendez-vous ? Le créneau sera de nouveau disponible.')) return;
+  if(!confirm('Annuler ce rendez-vous ? Le client sera informé par email si son adresse est renseignée.')) return;
   try{
     const { error } = await sb.from(RDV_TABLE).update({ statut: 'annule' }).eq('app_id', currentAgendaRdv.app_id);
     if(error) throw error;
     currentAgendaRdv.statut = 'annule';
-    showToast('Rendez-vous annulé');
+
+    // Envoyer email d'annulation si email disponible
+    if(currentAgendaRdv.email){
+      try{
+        await sb.functions.invoke('send-rdv-annulation', {
+          body: {
+            nom:      currentAgendaRdv.nom,
+            prenom:   currentAgendaRdv.prenom,
+            email:    currentAgendaRdv.email,
+            date:     currentAgendaRdv.date,
+            creneau:  currentAgendaRdv.creneau,
+            appareil: currentAgendaRdv.appareil,
+          }
+        });
+        showToast('Rendez-vous annulé — client informé par email');
+      }catch(emailErr){
+        console.error('Erreur envoi email annulation :', emailErr);
+        showToast('Rendez-vous annulé (email non envoyé)');
+      }
+    } else {
+      showToast('Rendez-vous annulé');
+    }
+
     showAgendaDetail(currentAgendaRdv.app_id);
+    renderAgendaList();
   }catch(e){
     console.error('Erreur annulation RDV :', e);
     showToast('Échec de l\'annulation', true);
