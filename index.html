@@ -1618,9 +1618,11 @@ function renderAgendaList(){
   let html = '';
 
   if(isBlocked){
-    html = `<div style="text-align:center;padding:2rem 1rem;color:#e0584f;font-size:0.9rem;">🔴 Jour fermé (vacances / formation)</div>`;
-  } else if(!dayRdvs.length){
-    html = `<div style="text-align:center;padding:2rem 1rem;color:var(--text-muted);font-size:0.9rem;">Aucun rendez-vous ce jour.</div>`;
+    html = `<div style="text-align:center;padding:0.6rem 0.5rem;color:#e0584f;font-size:0.82rem;background:rgba(224,88,79,0.08);border-radius:8px;margin-bottom:0.5rem;">🔴 Jour fermé — vos RDV restent visibles</div>`;
+  }
+
+  if(!dayRdvs.length){
+    html += `<div style="text-align:center;padding:1.5rem 1rem;color:var(--text-muted);font-size:0.9rem;">Aucun rendez-vous ce jour.</div>`;
   } else {
     if(matinRdvs.length){
       html += `<div class="agenda-slot-label" style="font-size:0.8rem;margin-bottom:0.4rem;">☀️ Matin · ${params.matinDebut}–${params.matinFin}</div>`;
