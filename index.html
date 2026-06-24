@@ -3573,7 +3573,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     reports.unshift(data);
     // delete-btn supprimé
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  // localStorage désactivé — données dans Supabase
 
   // Créer ou lier le client automatiquement
   const clientSearchInput = document.getElementById('f-client-search');
@@ -3945,7 +3945,7 @@ function showDetail(r){
       if(reste < 0) reste = 0;
       reports[idx]['reste-encaisser'] = reste.toFixed(2);
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+      // localStorage désactivé — données dans Supabase
       saveReportToSupabase(reports[idx]);
       showToast('Dossier mis à jour');
       showDetail(reports[idx]);
@@ -3984,7 +3984,7 @@ document.getElementById('detail-delete-btn').addEventListener('click', () => {
   if(!confirm(`Supprimer ce ${label} (${name}) ?`)) return;
   if(!confirm('Confirmer ? Action irréversible.')) return;
   reports = reports.filter(r => r.id !== currentDetailReport.id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  // localStorage désactivé — données dans Supabase
   deleteReportFromSupabase(currentDetailReport.id);
   if(currentDetailReport._isDraft){ clearDraft(); }
   if(currentId === currentDetailReport.id){ currentId = null; }
@@ -4083,7 +4083,7 @@ function deleteDetailPhoto(idx){
   const rIdx = reports.findIndex(r => r.id === currentDetailReport.id);
   if(rIdx !== -1){
     reports[rIdx] = currentDetailReport;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+    // localStorage désactivé — données dans Supabase
     saveReportToSupabase(currentDetailReport);
   }
   showToast('Photo supprimée');
@@ -4420,7 +4420,7 @@ function downloadBytes(bytes, filename){
 // ---------- Initialisation ----------
 // Affichage immédiat depuis le cache local (si présent) pendant que Supabase charge
 try{
-  const cached = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const cached = []; // localStorage désactivé — chargement depuis Supabase
   if(Array.isArray(cached) && cached.length) reports = cached;
 }catch(e){}
 
@@ -4432,7 +4432,7 @@ goToStep(1);
 
 // Callback appelé une fois les données Supabase chargées (remplace le cache local)
 function afterReportsLoaded(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  // localStorage désactivé — données dans Supabase
   const agendaView = document.getElementById('view-agenda');
   if(agendaView && agendaView.classList.contains('active')) renderAgenda();
   const listView = document.getElementById('view-list');
@@ -4531,7 +4531,7 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   reports[idx].pieceDeposePhotos = posePiecePhotos.slice();
   reports[idx].statut = document.getElementById('pose-piece-statut').value;
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  // localStorage désactivé — données dans Supabase
   await saveReportToSupabase(reports[idx]);
 
   // Mettre à jour le stock si une pièce a été sélectionnée
