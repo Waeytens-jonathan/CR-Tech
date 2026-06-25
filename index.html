@@ -887,6 +887,7 @@
         <button class="btn btn-secondary" id="detail-sms-arrival-btn">💬 J'arrive</button>
         <button class="btn btn-secondary" id="detail-sms-avis">⭐ Avis</button>
         <button class="btn btn-outline" id="detail-email-btn">📧 Email</button>
+        <button class="btn btn-outline" id="detail-add-appareil-btn" style="border-color:var(--blue);color:var(--blue);">➕ Appareil</button>
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
         <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;">🔧 Poser la pièce</button>
@@ -4228,6 +4229,27 @@ document.getElementById('detail-sms-arrival-btn').addEventListener('click', () =
   if(!tel){ showToast('Numéro manquant', true); return; }
   showSmsArrival(tel);
 });
+document.getElementById('detail-add-appareil-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  showView('form');
+  resetForm();
+  clearDraft();
+  goToStep(1);
+  document.getElementById('f-nom').value     = r.nom     || '';
+  document.getElementById('f-prenom').value  = r.prenom  || '';
+  document.getElementById('f-adresse').value = r.adresse || '';
+  document.getElementById('f-cp').value      = r.cp      || '';
+  document.getElementById('f-ville').value   = r.ville   || '';
+  document.getElementById('f-tel').value     = r.tel     || '';
+  document.getElementById('f-email').value   = r.email   || '';
+  document.getElementById('f-date').value    = r.date    || todayISO();
+  document.getElementById('f-technicien').value = r.technicien || 'Jonathan';
+  window._currentDossierAppId    = r.dossier_id;
+  window._currentDossierClientId = r.client_id;
+  showToast('Infos client pré-remplies — saisissez le nouvel appareil');
+});
+
 document.getElementById('detail-sms-avis').addEventListener('click', () => {
   if(!currentDetailReport) return;
   const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
