@@ -879,20 +879,25 @@
   <!-- ===================== VUE DÉTAIL (RAPPORT COMPLET) ===================== -->
   <div class="view" id="view-detail">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
         <button class="btn btn-outline" id="detail-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
-        <button class="btn btn-danger" id="detail-delete-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">🗑️ Supprimer</button>
+        <button class="btn btn-danger" id="detail-delete-btn" style="padding:0.4rem 0.8rem;font-size:0.8rem;">🗑️</button>
       </div>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
-        <button class="btn btn-primary" id="detail-edit" style="flex:1;min-width:120px;">✏️ Modifier le dossier</button>
-        <button class="btn btn-outline" id="detail-email-btn">📧 Email</button>
-        <button class="btn btn-outline" id="detail-add-appareil-btn" style="border-color:var(--blue);color:var(--blue);">➕ Appareil</button>
+
+      <!-- Actions principales -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
+        <button class="btn btn-primary" id="detail-edit" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✏️ Modifier</button>
+        <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">📧 Email</button>
+        <button class="btn btn-outline" id="detail-add-appareil-btn" style="border-color:var(--blue);color:var(--blue);font-size:0.82rem;padding:0.5rem 0.4rem;">➕ Appareil</button>
       </div>
+
+      <!-- Actions contextuelles -->
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
-        <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;">🔧 Poser la pièce</button>
-        <button class="btn btn-outline" id="detail-rdv-pose-btn" style="display:none;">📅 RDV pose pièce</button>
-        <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;border-color:#e0584f;color:#e0584f;">🛠️ Rouvrir en SAV</button>
+        <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;font-size:0.82rem;">🔧 Poser la pièce</button>
+        <button class="btn btn-outline" id="detail-rdv-pose-btn" style="display:none;font-size:0.82rem;">📅 RDV pose pièce</button>
+        <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">🛠️ Rouvrir en SAV</button>
         <button class="btn btn-outline" id="detail-archiver-btn" style="display:none;font-size:0.82rem;">📦 Archiver</button>
+        <button class="btn btn-outline" id="attestation-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">📋 Attestation</button>
       </div>
       <div id="detail-content"></div>
     </div>
@@ -1243,7 +1248,6 @@
         <button class="btn btn-primary" id="save-btn" style="display:none;">Enregistrer</button>
         <button class="btn btn-secondary" id="pdf-btn">📄 Exporter en PDF</button>
         <button class="btn btn-outline" id="email-btn">📧 Envoyer par email</button>
-        <button class="btn btn-outline" id="attestation-btn" style="border-color:#e0584f;color:#e0584f;">📋 Attestation non-réparabilité</button>
       </div>
     </div>
 
@@ -4185,6 +4189,7 @@ function renderDetailContent(r, container){
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
   document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
   document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
+  document.getElementById('attestation-btn').style.display = r.statut === 'Non_reparable' ? 'inline-flex' : 'none';
 }
 
 function showDetail(r){
@@ -4196,6 +4201,7 @@ function showDetail(r){
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
   document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
   document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
+  document.getElementById('attestation-btn').style.display = r.statut === 'Non_reparable' ? 'inline-flex' : 'none';
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
