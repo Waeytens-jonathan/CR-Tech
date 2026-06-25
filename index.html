@@ -544,6 +544,7 @@
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem;">
         <button class="btn btn-secondary" id="agenda-detail-sms-arrival-btn">💬 J'arrive</button>
+        <button class="btn btn-secondary" id="agenda-detail-sms-avis">⭐ Avis</button>
         <button class="btn btn-outline" id="agenda-detail-edit-btn">✏️ Modifier</button>
         <button class="btn btn-outline" id="agenda-detail-cancel-btn">🚫 Annuler le RDV</button>
         <button class="btn btn-outline" id="agenda-detail-done-btn">✅ Marquer effectué</button>
@@ -884,8 +885,6 @@
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
         <button class="btn btn-primary" id="detail-edit" style="flex:1;min-width:120px;">✏️ Modifier le dossier</button>
-        <button class="btn btn-secondary" id="detail-sms-arrival-btn">💬 J'arrive</button>
-        <button class="btn btn-secondary" id="detail-sms-avis">⭐ Avis</button>
         <button class="btn btn-outline" id="detail-email-btn">📧 Email</button>
         <button class="btn btn-outline" id="detail-add-appareil-btn" style="border-color:var(--blue);color:var(--blue);">➕ Appareil</button>
       </div>
@@ -2646,6 +2645,14 @@ document.getElementById('agenda-detail-sms-arrival-btn').addEventListener('click
   showSmsArrival(tel);
 });
 
+document.getElementById('agenda-detail-sms-avis').addEventListener('click', () => {
+  if(!currentAgendaRdv) return;
+  const tel = (currentAgendaRdv.tel || '').replace(/[^\d+]/g, '');
+  if(!tel){ showToast('Numéro manquant', true); return; }
+  const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
+});
+
 document.getElementById('agenda-detail-cancel-btn').addEventListener('click', async () => {
   if(!currentAgendaRdv) return;
   if(!confirm('Annuler ce rendez-vous ? Le client sera informé par email si son adresse est renseignée.')) return;
@@ -4223,12 +4230,6 @@ document.getElementById('detail-delete-btn').addEventListener('click', () => {
   showToast('Supprimé ✓');
   goToList();
 });
-document.getElementById('detail-sms-arrival-btn').addEventListener('click', () => {
-  if(!currentDetailReport) return;
-  const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
-  if(!tel){ showToast('Numéro manquant', true); return; }
-  showSmsArrival(tel);
-});
 document.getElementById('detail-add-appareil-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
   const r = currentDetailReport;
@@ -4248,14 +4249,6 @@ document.getElementById('detail-add-appareil-btn').addEventListener('click', () 
   window._currentDossierAppId    = r.dossier_id;
   window._currentDossierClientId = r.client_id;
   showToast('Infos client pré-remplies — saisissez le nouvel appareil');
-});
-
-document.getElementById('detail-sms-avis').addEventListener('click', () => {
-  if(!currentDetailReport) return;
-  const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
-  if(!tel){ showToast('Numéro manquant', true); return; }
-  const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
-  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
 });
 
 document.getElementById('detail-email-btn').addEventListener('click', async () => {
