@@ -1274,73 +1274,6 @@
     </div>
   </div>
 
-<!-- ===================== MODAL PARAMÈTRES AGENDA ===================== -->
-<div id="agenda-settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;padding:1.2rem;">
-  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:460px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-    <h3 style="margin:0 0 1rem;color:var(--orange);">⚙️ Paramètres de l'agenda</h3>
-
-    <h4 style="margin:0.8rem 0 0.5rem;font-size:0.9rem;color:var(--text-muted);letter-spacing:0.05em;">TRANCHES HORAIRES</h4>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — heure début</label>
-        <input type="time" id="param-matin-debut" value="08:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — heure fin</label>
-        <input type="time" id="param-matin-fin" value="12:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — heure début</label>
-        <input type="time" id="param-am-debut" value="12:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — heure fin</label>
-        <input type="time" id="param-am-fin" value="18:00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-    </div>
-
-    <h4 style="margin:0.8rem 0 0.5rem;font-size:0.9rem;color:var(--text-muted);letter-spacing:0.05em;">QUOTAS (places max par créneau)</h4>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — Lun-Ven</label>
-        <input type="number" id="param-quota-matin" min="1" max="20" value="2" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — Lun-Ven</label>
-        <input type="number" id="param-quota-am" min="1" max="20" value="4" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin — Samedi</label>
-        <input type="number" id="param-quota-matin-sam" min="1" max="20" value="2" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi — Samedi</label>
-        <input type="number" id="param-quota-am-sam" min="1" max="20" value="2" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-    </div>
-
-    <h4 style="margin:0.8rem 0 0.5rem;font-size:0.9rem;color:var(--text-muted);letter-spacing:0.05em;">JOURS FERMÉS (vacances / formation)</h4>
-    <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.6rem;">Ajoutez des dates ou plages de dates où vous n'êtes pas disponible.</p>
-    <div id="jours-bloques-list" style="margin-bottom:0.7rem;"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;align-items:end;margin-bottom:0.7rem;">
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Du</label>
-        <input type="date" id="param-bloc-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Au</label>
-        <input type="date" id="param-bloc-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-    </div>
-    <button class="btn btn-secondary" id="param-bloc-add-btn" style="width:100%;margin-bottom:1rem;">+ Ajouter ce jour bloqué</button>
-
-    <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
-      <button class="btn btn-outline" id="agenda-settings-cancel">Annuler</button>
-      <button class="btn btn-primary" id="agenda-settings-save">Enregistrer ✓</button>
-    </div>
-  </div>
-</div>
-
 <!-- ===================== MODALE POSE PIÈCE (reprise dossier) ===================== -->
 <div id="pose-piece-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
@@ -4832,29 +4765,6 @@ function isDateBlocked(dateISO){
   return (params.joursBlockes || []).some(b => dateISO >= b.debut && dateISO <= b.fin);
 }
 
-function renderBlocList(){
-  const params = _agendaConfigCache || { joursBlockes:[] };
-  const container = document.getElementById('jours-bloques-list');
-  if(!container) return;
-  const blocs = params.joursBlockes || [];
-  if(!blocs.length){
-    container.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 0.5rem;">Aucun jour bloqué.</p>';
-    return;
-  }
-  container.innerHTML = blocs.map((b,i) => {
-    const label = b.debut === b.fin ? dateFrLong(b.debut) : `${dateFrLong(b.debut)} → ${dateFrLong(b.fin)}`;
-    return `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(224,88,79,0.1);border-radius:8px;padding:0.5rem 0.7rem;margin-bottom:0.4rem;">
-      <span style="font-size:0.85rem;">🔴 ${escapeHtml(label)}</span>
-      <button onclick="removeBloc(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;padding:0 0.3rem;">✕</button>
-    </div>`;
-  }).join('');
-}
-
-window.removeBloc = function(idx){
-  if(!_agendaConfigCache) return;
-  _agendaConfigCache.joursBlockes.splice(idx,1);
-  renderBlocList();
-};
 
 // ==================== STOCK PICKER DANS POSE PIÈCE ====================
 (function initPosePieceStockPicker(){
