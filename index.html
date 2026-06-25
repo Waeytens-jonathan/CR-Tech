@@ -4903,7 +4903,7 @@ document.getElementById('detail-archiver-btn').addEventListener('click', async (
   if(!currentDetailReport) return;
   if(!confirm('Archiver ce dossier ? Il sera masqué de la liste principale et visible dans la fiche client.')) return;
   const dateArchivage = new Date().toISOString().slice(0,10);
-  const updates = { statut: 'archivé', date_archivage: dateArchivage };
+  const updates = { statue: 'archivé', date_archivage: dateArchivage };
   try{
     const { error } = await sb.from(TABLE).update(updates).eq('app_id', currentDetailReport.app_id || currentDetailReport.id);
     if(error) throw error;
@@ -4920,7 +4920,7 @@ document.getElementById('detail-rouvrir-sav-btn').addEventListener('click', asyn
   if(!currentDetailReport) return;
   const r = currentDetailReport;
   if(!confirm(`Rouvrir le dossier de ${r.prenom||''} ${r.nom||''} en SAV ?`)) return;
-  const updates = { statut: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
+  const updates = { statue: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
   try{
     const { error } = await sb.from(TABLE).update(updates).eq('app_id', r.app_id || r.id);
     if(error) throw error;
@@ -4946,7 +4946,7 @@ async function autoArchiveOldReports(){
   const dateArchivage = now.toISOString().slice(0,10);
   for(const r of toArchive){
     try{
-      await sb.from(TABLE).update({ statut: 'archivé', date_archivage: dateArchivage }).eq('app_id', r.app_id || r.id);
+      await sb.from(TABLE).update({ statue: 'archivé', date_archivage: dateArchivage }).eq('app_id', r.app_id || r.id);
       r.statut = 'archivé';
       r.date_archivage = dateArchivage;
     }catch(e){ console.error('Erreur auto-archive :', e); }
@@ -5101,7 +5101,7 @@ async function showClientDetail(appId){
         e.stopPropagation();
         const r = reports.find(x => (x.app_id||x.id) == btn.dataset.id);
         if(!r || !confirm(`Rouvrir le dossier ${r.appareil||''} en SAV ?`)) return;
-        const updates = { statut: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
+        const updates = { statue: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
         try{
           await sb.from(TABLE).update(updates).eq('app_id', r.app_id||r.id);
           Object.assign(r, updates);
