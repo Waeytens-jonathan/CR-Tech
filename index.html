@@ -4856,67 +4856,6 @@ window.removeBloc = function(idx){
   renderBlocList();
 };
 
-document.getElementById('agenda-settings-btn').addEventListener('click', async () => {
-  const params = await getAgendaParams();
-  document.getElementById('param-matin-debut').value = params.matinDebut;
-  document.getElementById('param-matin-fin').value   = params.matinFin;
-  document.getElementById('param-am-debut').value    = params.amDebut;
-  document.getElementById('param-am-fin').value      = params.amFin;
-  // Quotas
-  if(document.getElementById('param-quota-matin'))    document.getElementById('param-quota-matin').value    = params.quotaMatin;
-  if(document.getElementById('param-quota-am'))       document.getElementById('param-quota-am').value       = params.quotaAM;
-  if(document.getElementById('param-quota-matin-sam'))document.getElementById('param-quota-matin-sam').value= params.quotaMatinSam;
-  if(document.getElementById('param-quota-am-sam'))   document.getElementById('param-quota-am-sam').value   = params.quotaAMSam;
-  const t = todayISO();
-  document.getElementById('param-bloc-debut').value = t;
-  document.getElementById('param-bloc-fin').value   = t;
-  renderBlocList();
-  document.getElementById('agenda-settings-modal').style.display = 'flex';
-});
-
-document.getElementById('agenda-settings-cancel').addEventListener('click', () => {
-  document.getElementById('agenda-settings-modal').style.display = 'none';
-});
-
-document.getElementById('param-bloc-add-btn').addEventListener('click', () => {
-  const debut = document.getElementById('param-bloc-debut').value;
-  const fin   = document.getElementById('param-bloc-fin').value;
-  if(!debut){ showToast('Choisissez une date de début', true); return; }
-  const finOk = fin && fin >= debut ? fin : debut;
-  if(!_agendaConfigCache) return;
-  _agendaConfigCache.joursBlockes = _agendaConfigCache.joursBlockes || [];
-  _agendaConfigCache.joursBlockes.push({ debut, fin: finOk });
-  _agendaConfigCache.joursBlockes.sort((a,b) => a.debut.localeCompare(b.debut));
-  renderBlocList();
-});
-
-document.getElementById('agenda-settings-save').addEventListener('click', async () => {
-  if(!_agendaConfigCache) return;
-  const params = {
-    ..._agendaConfigCache,
-    matinDebut: document.getElementById('param-matin-debut').value || '08:00',
-    matinFin:   document.getElementById('param-matin-fin').value   || '12:00',
-    amDebut:    document.getElementById('param-am-debut').value    || '12:00',
-    amFin:      document.getElementById('param-am-fin').value      || '18:00',
-    quotaMatin:    parseInt(document.getElementById('param-quota-matin')?.value)    || 2,
-    quotaAM:       parseInt(document.getElementById('param-quota-am')?.value)       || 4,
-    quotaMatinSam: parseInt(document.getElementById('param-quota-matin-sam')?.value)|| 2,
-    quotaAMSam:    parseInt(document.getElementById('param-quota-am-sam')?.value)   || 2,
-  };
-  const btn = document.getElementById('agenda-settings-save');
-  btn.disabled = true; btn.textContent = 'Enregistrement…';
-  try{
-    await saveAgendaParams(params);
-    document.getElementById('agenda-settings-modal').style.display = 'none';
-    showToast('Paramètres agenda enregistrés ✓');
-    renderAgenda();
-  }catch(e){
-    showToast('Erreur sauvegarde paramètres', true);
-    console.error(e);
-  }
-  btn.disabled = false; btn.textContent = 'Enregistrer ✓';
-});
-
 // ==================== STOCK PICKER DANS POSE PIÈCE ====================
 (function initPosePieceStockPicker(){
   let _ppSearchTimer = null;
@@ -5196,7 +5135,7 @@ async function deleteClient(appId){
 
 // --- Navigation onglet Clients ---
 document.getElementById('tab-clients') && document.getElementById('tab-clients').addEventListener('click', async () => {
-  if(!allClients.length) await loadClients();
+  await loadClients();
   renderClientsList('');
 });
 
@@ -5257,12 +5196,12 @@ document.getElementById('client-search') && document.getElementById('client-sear
     clearTimeout(timer);
     const q = input.value.trim().toLowerCase();
     timer = setTimeout(async () => {
-      if(!allClients.length) await loadClients();
+      await loadClients();
       renderResults(q);
     }, 200);
   });
   input.addEventListener('focus', async () => {
-    if(!allClients.length) await loadClients();
+    await loadClients();
     renderResults(input.value.trim().toLowerCase());
   });
   document.addEventListener('click', e => {
@@ -5316,12 +5255,12 @@ document.getElementById('client-search') && document.getElementById('client-sear
     clearTimeout(timer);
     const q = input.value.trim().toLowerCase();
     timer = setTimeout(async () => {
-      if(!allClients.length) await loadClients();
+      await loadClients();
       renderResults(q);
     }, 200);
   });
   input.addEventListener('focus', async () => {
-    if(!allClients.length) await loadClients();
+    await loadClients();
     renderResults(input.value.trim().toLowerCase());
   });
   document.addEventListener('click', e => {
