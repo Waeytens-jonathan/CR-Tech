@@ -816,6 +816,8 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
         <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;">🔧 Poser la pièce</button>
         <button class="btn btn-outline" id="detail-rdv-pose-btn" style="display:none;">📅 RDV pose pièce</button>
+        <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;border-color:#e0584f;color:#e0584f;">🛠️ Rouvrir en SAV</button>
+        <button class="btn btn-outline" id="detail-archiver-btn" style="display:none;font-size:0.82rem;">📦 Archiver</button>
       </div>
       <div id="detail-content"></div>
     </div>
@@ -3691,19 +3693,24 @@ function buildListItem(r){
     statutBadge = '<span class="badge" style="background:rgba(245,166,35,0.18);color:#f5a623;border:1px solid #f5a623;">✏️ Brouillon</span>';
   } else {
     switch(r.statut){
-      case 'Terminée': statutBadge = '<span class="badge green">✅ Terminé</span>'; break;
-      case 'Non_reparable': statutBadge = '<span class="badge red">❌ Irréparable</span>'; break;
-      case 'Attente_piece': statutBadge = '<span class="badge orange">⏳ Attente pièce</span>'; break;
+      case 'Terminée':     statutBadge = '<span class="badge green">✅ Terminé</span>'; break;
+      case 'Non_reparable':statutBadge = '<span class="badge red">❌ Irréparable</span>'; break;
+      case 'Attente_piece':statutBadge = '<span class="badge orange">⏳ Attente pièce</span>'; break;
+      case 'archivé':      statutBadge = '<span class="badge" style="background:rgba(100,100,100,0.15);color:#888;border:1px solid #888;">📦 Archivé</span>'; break;
       default: statutBadge = '<span class="badge orange">🔄 En cours</span>';
     }
   }
+  const savBadge = r.is_sav ? '<span class="badge red" style="font-size:0.7rem;">🛠️ SAV</span>' : '';
+  const archiveDateFmt = r.statut === 'archivé' && r.date_archivage
+    ? `<span style="font-size:0.75rem;color:var(--text-muted);"> · Archivé le ${new Date(r.date_archivage).toLocaleDateString('fr-FR')}</span>`
+    : '';
   item.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;width:100%;">
       <div style="flex:1;min-width:0;">
         <div class="name">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')} — ${escapeHtml(r.appareil||'Appareil non précisé')}</div>
-        <div class="meta">${dateFmt}${r.ville ? ' · '+escapeHtml(r.ville) : ''}</div>
+        <div class="meta">${dateFmt}${r.ville ? ' · '+escapeHtml(r.ville) : ''}${archiveDateFmt}</div>
         <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">
-          ${statutBadge}${pieceBadge ? ' '+pieceBadge : ''}
+          ${statutBadge}${savBadge}${pieceBadge ? ' '+pieceBadge : ''}
         </div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
@@ -3718,10 +3725,19 @@ function buildListItem(r){
   return item;
 }
 
-function renderSectionTitle(text, color){
+function renderSectionTitle(text, color, toggleArchive){
   const div = document.createElement('div');
-  div.style.cssText = `font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${color};padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;`;
-  div.textContent = text;
+  div.style.cssText = `font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${color};padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;display:flex;justify-content:space-between;align-items:center;${toggleArchive?'cursor:pointer;':''}`;
+  div.innerHTML = `<span>${text}</span>${toggleArchive ? '<span style="font-size:0.75rem;font-weight:400;opacity:0.7;">Afficher ▾</span>' : ''}`;
+  if(toggleArchive){
+    div.addEventListener('click', () => {
+      const ac = document.getElementById('archive-container');
+      if(!ac) return;
+      const open = ac.style.display !== 'none';
+      ac.style.display = open ? 'none' : 'block';
+      div.querySelector('span:last-child').textContent = open ? 'Afficher ▾' : 'Masquer ▴';
+    });
+  }
   return div;
 }
 
@@ -3749,16 +3765,18 @@ function renderList(){
   emptyMsg.style.display = 'none';
 
   const drafts   = filtered.filter(r => r._isDraft === true);
-  // En cours = dossiers validés (étape 10) mais pas encore clôturés
   const EN_COURS_STATUTS = ['Attente_piece'];
   const TERMINES_STATUTS = ['Terminée', 'Non_reparable'];
-  const encours  = filtered.filter(r => !r._isDraft && (EN_COURS_STATUTS.includes(r.statut) || (!TERMINES_STATUTS.includes(r.statut) && r.statut)));
+  const encours  = filtered.filter(r => !r._isDraft && (EN_COURS_STATUTS.includes(r.statut) || (!TERMINES_STATUTS.includes(r.statut) && r.statut !== 'archivé' && r.statut)));
   encours.sort((a, b) => {
     const dateA = (a.date || '') + ' ' + (a.heure || '');
     const dateB = (b.date || '') + ' ' + (b.heure || '');
     return dateB.localeCompare(dateA);
   });
   const termines = filtered.filter(r => !r._isDraft && TERMINES_STATUTS.includes(r.statut));
+  const archives = filtered.filter(r => !r._isDraft && r.statut === 'archivé');
+  archives.sort((a,b) => (b.date_archivage||b.date||'').localeCompare(a.date_archivage||a.date||''));
+
   if(drafts.length > 0){
     container.appendChild(renderSectionTitle('✏️ Brouillons (' + drafts.length + ')', '#f5a623'));
     drafts.forEach(r => container.appendChild(buildListItem(r)));
@@ -3770,6 +3788,15 @@ function renderList(){
   if(termines.length > 0){
     container.appendChild(renderSectionTitle('✅ Terminés (' + termines.length + ')', '#3fbf6f'));
     termines.forEach(r => container.appendChild(buildListItem(r)));
+  }
+  if(archives.length > 0){
+    const archiveTitle = renderSectionTitle(`📦 Archivés (${archives.length})`, '#888', true);
+    container.appendChild(archiveTitle);
+    const archiveContainer = document.createElement('div');
+    archiveContainer.id = 'archive-container';
+    archiveContainer.style.display = 'none';
+    archives.forEach(r => archiveContainer.appendChild(buildListItem(r)));
+    container.appendChild(archiveContainer);
   }
 }
 
@@ -3974,6 +4001,9 @@ function showDetail(r){
   // Bouton "Poser la pièce" : visible uniquement si le dossier est en attente de pièce
   document.getElementById('detail-pose-piece-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
   document.getElementById('detail-rdv-pose-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
+  const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
+  document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
+  document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
 }
 
 document.getElementById('detail-back').addEventListener('click', () => {
@@ -4451,6 +4481,7 @@ function afterReportsLoaded(){
   if(agendaView && agendaView.classList.contains('active')) renderAgenda();
   const listView = document.getElementById('view-list');
   if(listView && listView.classList.contains('active')) renderList();
+  autoArchiveOldReports();
 }
 initAuth();
 // Pré-charger la config agenda dès le démarrage
@@ -4865,6 +4896,64 @@ function isDateBlocked(dateISO){
   }
 })();
 
+// ==================== ARCHIVAGE & SAV ====================
+
+// Archivage manuel depuis le détail
+document.getElementById('detail-archiver-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  if(!confirm('Archiver ce dossier ? Il sera masqué de la liste principale et visible dans la fiche client.')) return;
+  const dateArchivage = new Date().toISOString().slice(0,10);
+  const updates = { statut: 'archivé', date_archivage: dateArchivage };
+  try{
+    const { error } = await sb.from(TABLE).update(updates).eq('app_id', currentDetailReport.app_id || currentDetailReport.id);
+    if(error) throw error;
+    const idx = reports.findIndex(r => (r.app_id||r.id) === (currentDetailReport.app_id||currentDetailReport.id));
+    if(idx !== -1){ reports[idx].statut = 'archivé'; reports[idx].date_archivage = dateArchivage; }
+    showToast('Dossier archivé ✓');
+    showView('list');
+    renderList();
+  }catch(e){ console.error('Erreur archivage :', e); showToast('Erreur archivage', true); }
+});
+
+// Rouvrir en SAV
+document.getElementById('detail-rouvrir-sav-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  if(!confirm(`Rouvrir le dossier de ${r.prenom||''} ${r.nom||''} en SAV ?`)) return;
+  const updates = { statut: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
+  try{
+    const { error } = await sb.from(TABLE).update(updates).eq('app_id', r.app_id || r.id);
+    if(error) throw error;
+    const idx = reports.findIndex(x => (x.app_id||x.id) === (r.app_id||r.id));
+    if(idx !== -1){ Object.assign(reports[idx], updates); }
+    showToast('Dossier rouvert en SAV 🛠️');
+    showView('list');
+    renderList();
+  }catch(e){ console.error('Erreur réouverture SAV :', e); showToast('Erreur réouverture', true); }
+});
+
+// Archivage automatique au chargement : CR Terminé ou Non_reparable depuis +24h
+async function autoArchiveOldReports(){
+  const now = new Date();
+  const toArchive = reports.filter(r => {
+    if(!['Terminée','Non_reparable'].includes(r.statut)) return false;
+    if(!r.date) return false;
+    const crDate = new Date(r.date + 'T23:59:59');
+    const diffH = (now - crDate) / (1000 * 60 * 60);
+    return diffH >= 24;
+  });
+  if(!toArchive.length) return;
+  const dateArchivage = now.toISOString().slice(0,10);
+  for(const r of toArchive){
+    try{
+      await sb.from(TABLE).update({ statut: 'archivé', date_archivage: dateArchivage }).eq('app_id', r.app_id || r.id);
+      r.statut = 'archivé';
+      r.date_archivage = dateArchivage;
+    }catch(e){ console.error('Erreur auto-archive :', e); }
+  }
+  if(toArchive.length) renderList();
+}
+
 // ==================== BOUTON RDV POSE PIÈCE ====================
 document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
@@ -4973,21 +5062,53 @@ async function showClientDetail(appId){
   // Interventions liées
   const interList = document.getElementById('client-interventions-list');
   const linked = reports.filter(r => r.client_id === appId || r.tel === c.tel || r.email === c.email);
+  linked.sort((a,b) => (b.date||'').localeCompare(a.date||''));
   if(!linked.length){
     interList.innerHTML = '<div class="empty">Aucune intervention</div>';
   } else {
-    interList.innerHTML = linked.map(r => `
-      <div class="list-item" data-report-id="${escapeHtml(r.app_id||r.id)}" style="cursor:pointer;">
-        <div style="display:flex;justify-content:space-between;">
+    interList.innerHTML = linked.map(r => {
+      const dateFmt = r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '';
+      const archiveDateFmt = r.statut === 'archivé' && r.date_archivage
+        ? ` · archivé le ${new Date(r.date_archivage).toLocaleDateString('fr-FR')}` : '';
+      let badgeColor = '', badgeLabel = r.statut || '';
+      if(r.statut === 'Terminée')     { badgeColor = 'green'; badgeLabel = '✅ Terminé'; }
+      if(r.statut === 'Non_reparable'){ badgeColor = 'red';   badgeLabel = '❌ Irréparable'; }
+      if(r.statut === 'archivé')      { badgeLabel = '📦 Archivé'; }
+      if(r.statut === 'En cours')     { badgeColor = 'orange'; badgeLabel = '🔄 En cours'; }
+      const savBadge = r.is_sav ? '<span class="badge red" style="font-size:0.7rem;margin-left:4px;">🛠️ SAV</span>' : '';
+      const rouvrirBtn = r.statut === 'archivé'
+        ? `<button class="btn btn-outline rouvrir-sav-btn" data-id="${escapeHtml(r.app_id||r.id)}" style="font-size:0.75rem;padding:0.2rem 0.5rem;border-color:#e0584f;color:#e0584f;margin-top:0.3rem;">🛠️ Rouvrir en SAV</button>`
+        : '';
+      return `<div class="list-item" data-report-id="${escapeHtml(r.app_id||r.id)}" style="cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <strong>${escapeHtml(r.appareil||'Appareil')}</strong>
-          <span class="badge ${r.statut==='Terminée'?'green':r.statut==='Non_reparable'?'red':''}">${escapeHtml(r.statut||'')}</span>
+          <div style="display:flex;gap:4px;align-items:center;"><span class="badge ${badgeColor}">${badgeLabel}</span>${savBadge}</div>
         </div>
-        <div style="font-size:0.85rem;color:var(--text-muted);">${escapeHtml(r.panne||'')}</div>
-      </div>`).join('');
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.15rem;">${dateFmt}${archiveDateFmt}</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(r.panne||'')}</div>
+        ${rouvrirBtn}
+      </div>`;
+    }).join('');
     interList.querySelectorAll('.list-item').forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        if(e.target.closest('.rouvrir-sav-btn')) return;
         const r = reports.find(x => (x.app_id||x.id) == item.dataset.reportId);
         if(r){ showView('detail'); showDetail(r); }
+      });
+    });
+    interList.querySelectorAll('.rouvrir-sav-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const r = reports.find(x => (x.app_id||x.id) == btn.dataset.id);
+        if(!r || !confirm(`Rouvrir le dossier ${r.appareil||''} en SAV ?`)) return;
+        const updates = { statut: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
+        try{
+          await sb.from(TABLE).update(updates).eq('app_id', r.app_id||r.id);
+          Object.assign(r, updates);
+          showToast('Dossier rouvert en SAV 🛠️');
+          showClientDetail(appId);
+          renderList();
+        }catch(e){ showToast('Erreur réouverture', true); }
       });
     });
   }
