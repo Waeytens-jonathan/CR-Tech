@@ -421,13 +421,88 @@
   <!-- ===================== VUE LISTE ===================== -->
   <div class="view" id="view-list">
     <div class="card">
-      <h2>Comptes-rendus enregistrés</h2>
-      <button class="btn btn-primary" id="tab-new" style="width:100%;margin-bottom:0.9rem;">➕ Nouveau CR</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+        <h2 style="margin:0;">Comptes-rendus</h2>
+        <button class="btn btn-primary" id="tab-new" style="padding:0.5rem 1rem;">➕ Nouveau dossier</button>
+      </div>
       <div class="search-bar">
         <input type="text" id="search-input" placeholder="Rechercher (nom, ville, référence...)">
       </div>
       <div id="report-list"></div>
       <div class="empty" id="empty-msg">Aucun compte-rendu enregistré pour le moment.</div>
+    </div>
+  </div>
+
+  <!-- ===================== VUE NOUVEAU DOSSIER ===================== -->
+  <div class="view" id="view-nouveau-dossier">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <button class="btn btn-outline" id="nouveau-dossier-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <h2 style="margin:0;font-size:1.1rem;">Nouveau dossier</h2>
+      </div>
+
+      <!-- Recherche client existant -->
+      <div class="field" style="position:relative;">
+        <label>🔍 Client existant <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;">(optionnel)</span></label>
+        <input type="text" id="nd-client-search" placeholder="Rechercher par nom, tél ou email…" autocomplete="off">
+        <div id="nd-client-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label>Nom</label>
+          <input type="text" id="nd-nom" placeholder="Nom">
+        </div>
+        <div class="field">
+          <label>Prénom</label>
+          <input type="text" id="nd-prenom" placeholder="Prénom">
+        </div>
+        <div class="field full">
+          <label>Adresse</label>
+          <input type="text" id="nd-adresse" placeholder="N° et rue" autocomplete="off">
+          <div id="nd-adresse-suggestions" style="display:none;margin-top:0.4rem;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;position:relative;z-index:10;"></div>
+        </div>
+        <div class="field">
+          <label>Code postal</label>
+          <input type="text" id="nd-cp" placeholder="62300">
+        </div>
+        <div class="field">
+          <label>Ville</label>
+          <input type="text" id="nd-ville" placeholder="Lens">
+        </div>
+        <div class="field">
+          <label>Téléphone</label>
+          <input type="tel" id="nd-tel" placeholder="06 12 34 56 78">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="nd-email" placeholder="client@email.fr">
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="nd-date">
+        </div>
+        <div class="field">
+          <label>Technicien</label>
+          <input type="text" id="nd-technicien" placeholder="Jonathan" value="Jonathan">
+        </div>
+      </div>
+      <button class="btn btn-primary" id="nd-save-btn" style="width:100%;margin-top:0.5rem;">Créer le dossier & ajouter un appareil →</button>
+    </div>
+  </div>
+
+  <!-- ===================== VUE DÉTAIL DOSSIER ===================== -->
+  <div class="view" id="view-dossier">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+        <button class="btn btn-outline" id="dossier-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <button class="btn btn-primary" id="dossier-add-appareil-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">+ Appareil</button>
+      </div>
+      <div id="dossier-header" style="margin-bottom:0.8rem;"></div>
+      <!-- Onglets appareils -->
+      <div id="dossier-tabs" style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid var(--border);margin-bottom:0.8rem;"></div>
+      <!-- Contenu appareil actif -->
+      <div id="dossier-appareil-content"></div>
     </div>
   </div>
 
@@ -1439,6 +1514,7 @@ function reportToRow(r){
     piece_depose_ref: r.pieceDeposeRef || '',
     piece_depose_photos: r.pieceDeposePhotos ? JSON.stringify(r.pieceDeposePhotos) : '',
     client_id: r.client_id || null,
+    dossier_id: r.dossier_id || null,
     _is_draft: false
   };
   // Champs sans colonne dédiée -> regroupés dans "notes" pour ne rien perdre
@@ -1521,6 +1597,7 @@ function rowToReport(row){
     pieceDeposeRef: row.piece_depose_ref || '',
     pieceDeposePhotos: row.piece_depose_photos ? (() => { try{ return JSON.parse(row.piece_depose_photos); }catch(e){ return []; } })() : [],
     client_id: row.client_id || null,
+    dossier_id: row.dossier_id || null,
     _isDraft: !!row._is_draft,
     _draftStep: extra._draftStep
   };
@@ -2935,12 +3012,7 @@ document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
 });
 
 document.getElementById('tab-new').addEventListener('click', () => {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-form').classList.add('active');
-  resetForm();
-  clearDraft();
-  goToStep(1);
+  openNouveauDossier();
 });
 
 // ---------- Mode étapes ----------
@@ -3601,6 +3673,26 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   }
   if(clientSearchInput){ clientSearchInput.value = ''; delete clientSearchInput.dataset.selectedClientId; }
 
+  // Lier au dossier si créé via nouveau dossier
+  if(window._currentDossierAppId){
+    data.dossier_id = window._currentDossierAppId;
+    if(!data.client_id && window._currentDossierClientId) data.client_id = window._currentDossierClientId;
+    window._currentDossierAppId = null;
+    window._currentDossierClientId = null;
+  } else {
+    // CR créé directement → créer un dossier automatiquement
+    const autoDosId = 'dos_' + Date.now();
+    try{
+      await sb.from(DOSSIERS_TABLE).insert({
+        app_id: autoDosId,
+        client_id: data.client_id || null,
+        date: data.date || todayISO(),
+        technicien: data.technicien || 'Jonathan'
+      });
+      data.dossier_id = autoDosId;
+    }catch(e){ console.error('Erreur création dossier auto :', e); }
+  }
+
   saveReportToSupabase(data);
   await consumeStockPiecesIfAny(data.stockPieces);
   clearDraft();
@@ -3764,40 +3856,122 @@ function renderList(){
   }
   emptyMsg.style.display = 'none';
 
-  const drafts   = filtered.filter(r => r._isDraft === true);
-  const EN_COURS_STATUTS = ['Attente_piece'];
-  const TERMINES_STATUTS = ['Terminée', 'Non_reparable'];
-  const encours  = filtered.filter(r => !r._isDraft && (EN_COURS_STATUTS.includes(r.statut) || (!TERMINES_STATUTS.includes(r.statut) && r.statut !== 'archivé' && r.statut)));
-  encours.sort((a, b) => {
-    const dateA = (a.date || '') + ' ' + (a.heure || '');
-    const dateB = (b.date || '') + ' ' + (b.heure || '');
-    return dateB.localeCompare(dateA);
+  // Grouper par dossier_id
+  const dossierMap = {};
+  filtered.forEach(r => {
+    const did = r.dossier_id || ('solo_' + (r.app_id||r.id));
+    if(!dossierMap[did]) dossierMap[did] = [];
+    dossierMap[did].push(r);
   });
-  const termines = filtered.filter(r => !r._isDraft && TERMINES_STATUTS.includes(r.statut));
-  const archives = filtered.filter(r => !r._isDraft && r.statut === 'archivé');
-  archives.sort((a,b) => (b.date_archivage||b.date||'').localeCompare(a.date_archivage||a.date||''));
+
+  const drafts = filtered.filter(r => r._isDraft === true);
+  const EN_COURS_STATUTS = ['Attente_piece','En cours'];
+  const TERMINES_STATUTS = ['Terminée','Non_reparable'];
+
+  // Construire des "groupes dossiers"
+  const dossierItems = Object.values(dossierMap).map(rapports => {
+    const first = rapports[0];
+    // Statut global = le plus "en cours" parmi tous les appareils
+    const hasArchive = rapports.every(r => r.statut === 'archivé');
+    const hasSAV = rapports.some(r => r.is_sav);
+    const hasTermine = rapports.every(r => TERMINES_STATUTS.includes(r.statut) || r.statut === 'archivé');
+    const globalStatut = hasArchive ? 'archivé' : hasSAV ? 'sav' : hasTermine ? 'terminé' : 'encours';
+    return { rapports, first, globalStatut, hasSAV };
+  });
+
+  const dossiersEncours  = dossierItems.filter(d => d.globalStatut === 'encours' || d.globalStatut === 'sav');
+  const dossiersTermines = dossierItems.filter(d => d.globalStatut === 'terminé');
+  const dossiersArchives = dossierItems.filter(d => d.globalStatut === 'archivé');
+
+  dossiersEncours.sort((a,b) => (b.first.date||'').localeCompare(a.first.date||''));
+  dossiersTermines.sort((a,b) => (b.first.date||'').localeCompare(a.first.date||''));
+  dossiersArchives.sort((a,b) => (b.first.date_archivage||b.first.date||'').localeCompare(a.first.date_archivage||a.first.date||''));
 
   if(drafts.length > 0){
     container.appendChild(renderSectionTitle('✏️ Brouillons (' + drafts.length + ')', '#f5a623'));
-    drafts.forEach(r => container.appendChild(buildListItem(r)));
+    drafts.forEach(r => container.appendChild(buildDossierItem([r])));
   }
-  if(encours.length > 0){
-    container.appendChild(renderSectionTitle('🔄 En cours (' + encours.length + ')', '#1a73c8'));
-    encours.forEach(r => container.appendChild(buildListItem(r)));
+  if(dossiersEncours.length > 0){
+    container.appendChild(renderSectionTitle('🔄 En cours (' + dossiersEncours.length + ')', '#1a73c8'));
+    dossiersEncours.forEach(d => container.appendChild(buildDossierItem(d.rapports)));
   }
-  if(termines.length > 0){
-    container.appendChild(renderSectionTitle('✅ Terminés (' + termines.length + ')', '#3fbf6f'));
-    termines.forEach(r => container.appendChild(buildListItem(r)));
+  if(dossiersTermines.length > 0){
+    container.appendChild(renderSectionTitle('✅ Terminés (' + dossiersTermines.length + ')', '#3fbf6f'));
+    dossiersTermines.forEach(d => container.appendChild(buildDossierItem(d.rapports)));
   }
-  if(archives.length > 0){
-    const archiveTitle = renderSectionTitle(`📦 Archivés (${archives.length})`, '#888', true);
+  if(dossiersArchives.length > 0){
+    const archiveTitle = renderSectionTitle(`📦 Archivés (${dossiersArchives.length})`, '#888', true);
     container.appendChild(archiveTitle);
     const archiveContainer = document.createElement('div');
     archiveContainer.id = 'archive-container';
     archiveContainer.style.display = 'none';
-    archives.forEach(r => archiveContainer.appendChild(buildListItem(r)));
+    dossiersArchives.forEach(d => archiveContainer.appendChild(buildDossierItem(d.rapports)));
     container.appendChild(archiveContainer);
   }
+}
+
+function buildDossierItem(rapports){
+  const first = rapports[0];
+  const item = document.createElement('div');
+  item.className = 'list-item';
+  item.style.cursor = 'pointer';
+
+  const dateFmt = first.date ? new Date(first.date).toLocaleDateString('fr-FR') : '';
+  const nbAppareils = rapports.length;
+  const hasSAV = rapports.some(r => r.is_sav);
+
+  // Statut global
+  const TERMINES = ['Terminée','Non_reparable'];
+  let statutBadge = '';
+  if(first._isDraft){
+    statutBadge = '<span class="badge" style="background:rgba(245,166,35,0.18);color:#f5a623;border:1px solid #f5a623;">✏️ Brouillon</span>';
+  } else if(rapports.every(r => r.statut === 'archivé')){
+    statutBadge = '<span class="badge" style="background:rgba(100,100,100,0.15);color:#888;border:1px solid #888;">📦 Archivé</span>';
+    if(first.date_archivage){
+      statutBadge += `<span style="font-size:0.72rem;color:var(--text-muted);margin-left:4px;">le ${new Date(first.date_archivage).toLocaleDateString('fr-FR')}</span>`;
+    }
+  } else if(rapports.some(r => r.statut === 'Attente_piece')){
+    statutBadge = '<span class="badge orange">⏳ Attente pièce</span>';
+  } else if(rapports.every(r => TERMINES.includes(r.statut))){
+    statutBadge = '<span class="badge green">✅ Terminé</span>';
+  } else if(rapports.some(r => r.statut === 'Non_reparable')){
+    statutBadge = '<span class="badge red">❌ Irréparable</span>';
+  } else {
+    statutBadge = '<span class="badge orange">🔄 En cours</span>';
+  }
+  if(hasSAV) statutBadge += '<span class="badge red" style="font-size:0.7rem;margin-left:4px;">🛠️ SAV</span>';
+
+  // Badges appareils
+  const appareilBadges = rapports.map(r =>
+    `<span style="font-size:0.72rem;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;padding:0.1rem 0.4rem;">${escapeHtml(r.appareil||'Appareil')}</span>`
+  ).join('');
+
+  // Total global
+  const totalGlobal = rapports.reduce((s,r) => s + (parseFloat(r['cout-total'])||0), 0);
+  const totalFmt = totalGlobal > 0 ? totalGlobal.toFixed(2) + ' €' : '—';
+
+  item.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;width:100%;">
+      <div style="flex:1;min-width:0;">
+        <div class="name">${escapeHtml(first.prenom||'')} ${escapeHtml(first.nom||'')}${nbAppareils > 1 ? ` <span style="font-size:0.8rem;color:var(--text-muted);">(${nbAppareils} appareils)</span>` : ''}</div>
+        <div class="meta">${dateFmt}${first.ville ? ' · '+escapeHtml(first.ville) : ''}</div>
+        <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">${appareilBadges}</div>
+        <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">${statutBadge}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-weight:700;color:var(--orange);font-size:1rem;">${totalFmt}</div>
+      </div>
+    </div>
+  `;
+
+  item.addEventListener('click', () => {
+    if(rapports.length === 1){
+      showDetail(rapports[0]);
+    } else {
+      showDossier(rapports);
+    }
+  });
+  return item;
 }
 
 document.getElementById('search-input').addEventListener('input', renderList);
@@ -3813,9 +3987,8 @@ function dRow(label, value, leftAlign){
   return `<div class="detail-row"><span class="dlabel">${escapeHtml(label)}</span><span class="dvalue${leftAlign ? ' left' : ''}">${value}</span></div>`;
 }
 
-function showDetail(r){
-  currentDetailReport = r;
-  const c = document.getElementById('detail-content');
+function renderDetailContent(r, container){
+  const c = container || document.getElementById('detail-content');
   const dateFmt = r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '—';
 
   let html = '';
@@ -4004,6 +4177,18 @@ function showDetail(r){
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
   document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
   document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
+}
+
+function showDetail(r){
+  currentDetailReport = r;
+  renderDetailContent(r);
+  showView('detail');
+  document.getElementById('detail-pose-piece-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
+  document.getElementById('detail-rdv-pose-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
+  const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
+  document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
+  document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 document.getElementById('detail-back').addEventListener('click', () => {
@@ -4895,6 +5080,279 @@ function isDateBlocked(dateISO){
     observer.observe(modal, { attributes: true, attributeFilter: ['style'] });
   }
 })();
+
+// ==================== MODULE DOSSIERS ====================
+const DOSSIERS_TABLE = 'dossiers';
+let dossiers = []; // cache local
+let currentDossier = null; // dossier en cours de visualisation
+let currentDossierRapports = []; // appareils du dossier actif
+let activeDossierTabIdx = 0;
+
+async function loadDossiers(){
+  try{
+    const { data, error } = await sb.from(DOSSIERS_TABLE).select('*').order('created_at', { ascending: false });
+    if(error) throw error;
+    dossiers = data || [];
+  }catch(e){ console.error('Erreur chargement dossiers :', e); }
+}
+
+// --- Ouvrir le formulaire nouveau dossier ---
+function openNouveauDossier(){
+  showView('nouveau-dossier');
+  document.getElementById('nd-nom').value = '';
+  document.getElementById('nd-prenom').value = '';
+  document.getElementById('nd-adresse').value = '';
+  document.getElementById('nd-cp').value = '';
+  document.getElementById('nd-ville').value = '';
+  document.getElementById('nd-tel').value = '';
+  document.getElementById('nd-email').value = '';
+  document.getElementById('nd-date').value = todayISO();
+  document.getElementById('nd-technicien').value = 'Jonathan';
+  document.getElementById('nd-client-search').value = '';
+  delete document.getElementById('nd-client-search').dataset.selectedClientId;
+}
+
+// --- Autocomplete client dans nouveau dossier ---
+(function initNDClientSearch(){
+  const input = document.getElementById('nd-client-search');
+  const box   = document.getElementById('nd-client-results');
+  if(!input || !box) return;
+  let timer = null;
+  function renderResults(q){
+    const list = q ? allClients.filter(c =>
+      (c.nom||'').toLowerCase().includes(q) ||
+      (c.prenom||'').toLowerCase().includes(q) ||
+      (c.tel||'').includes(q) ||
+      (c.email||'').toLowerCase().includes(q)) : [];
+    if(!list.length){ box.style.display = 'none'; return; }
+    box.innerHTML = list.map(c => `
+      <div class="nd-client-item" data-app-id="${escapeHtml(c.app_id)}"
+        style="padding:0.55rem 0.8rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.88rem;">
+        <strong>${escapeHtml(clientDisplayName(c))}</strong>
+        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.4rem;">${escapeHtml(c.tel||'')} ${escapeHtml(c.ville||'')}</span>
+      </div>`).join('');
+    box.style.display = 'block';
+    box.querySelectorAll('.nd-client-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const c = allClients.find(x => x.app_id === el.dataset.appId);
+        if(!c) return;
+        document.getElementById('nd-prenom').value  = c.prenom  || '';
+        document.getElementById('nd-nom').value     = c.nom     || '';
+        document.getElementById('nd-tel').value     = c.tel     || '';
+        document.getElementById('nd-email').value   = c.email   || '';
+        document.getElementById('nd-adresse').value = c.adresse || '';
+        document.getElementById('nd-cp').value      = c.cp      || '';
+        document.getElementById('nd-ville').value   = c.ville   || '';
+        input.value = clientDisplayName(c);
+        input.dataset.selectedClientId = c.app_id;
+        box.style.display = 'none';
+        showToast('Infos client pré-remplies ✓');
+      });
+    });
+  }
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => { await loadClients(); renderResults(input.value.trim().toLowerCase()); }, 200);
+  });
+  input.addEventListener('focus', async () => { await loadClients(); renderResults(input.value.trim().toLowerCase()); });
+  document.addEventListener('click', e => { if(!box.contains(e.target) && e.target !== input) box.style.display = 'none'; });
+})();
+
+// Autocomplete adresse dans nouveau dossier
+setupAdresseAutocomplete('nd-adresse', 'nd-cp', 'nd-ville', 'nd-adresse-suggestions');
+
+// Retour depuis nouveau dossier
+document.getElementById('nouveau-dossier-back').addEventListener('click', () => {
+  showView('list'); renderList();
+});
+
+// Sauvegarder le dossier et ouvrir le formulaire CR
+document.getElementById('nd-save-btn').addEventListener('click', async () => {
+  const nom    = document.getElementById('nd-nom').value.trim();
+  const prenom = document.getElementById('nd-prenom').value.trim();
+  if(!nom && !prenom){ showToast('Renseignez au moins le nom ou le prénom', true); return; }
+
+  const btn = document.getElementById('nd-save-btn');
+  btn.disabled = true; btn.textContent = 'Création…';
+
+  // Créer ou retrouver le client
+  const preselectedClientId = document.getElementById('nd-client-search').dataset.selectedClientId;
+  const tel   = document.getElementById('nd-tel').value.trim();
+  const email = document.getElementById('nd-email').value.trim();
+  const adresse = document.getElementById('nd-adresse').value.trim();
+  const cp    = document.getElementById('nd-cp').value.trim();
+  const ville = document.getElementById('nd-ville').value.trim();
+
+  let clientId = preselectedClientId || await findOrCreateClient(nom, prenom, tel, email, adresse, cp, ville);
+
+  // Créer le dossier dans Supabase
+  const dossierAppId = 'dos_' + Date.now();
+  try{
+    const { error } = await sb.from(DOSSIERS_TABLE).insert({
+      app_id: dossierAppId,
+      client_id: clientId || null,
+      date: document.getElementById('nd-date').value || todayISO(),
+      technicien: document.getElementById('nd-technicien').value.trim() || 'Jonathan'
+    });
+    if(error) throw error;
+  }catch(e){
+    showToast('Erreur création dossier', true);
+    console.error(e);
+    btn.disabled = false; btn.textContent = 'Créer le dossier & ajouter un appareil →';
+    return;
+  }
+
+  // Pré-remplir le formulaire CR avec les infos client et le dossier_id
+  showView('form');
+  resetForm();
+  clearDraft();
+  goToStep(1);
+  // Pré-remplir les champs client
+  document.getElementById('f-nom').value     = nom;
+  document.getElementById('f-prenom').value  = prenom;
+  document.getElementById('f-adresse').value = adresse;
+  document.getElementById('f-cp').value      = cp;
+  document.getElementById('f-ville').value   = ville;
+  document.getElementById('f-tel').value     = tel;
+  document.getElementById('f-email').value   = email;
+  document.getElementById('f-date').value    = document.getElementById('nd-date').value || todayISO();
+  document.getElementById('f-technicien').value = document.getElementById('nd-technicien').value.trim() || 'Jonathan';
+  // Stocker le dossier_id pour le lier au CR à la sauvegarde
+  window._currentDossierAppId = dossierAppId;
+  window._currentDossierClientId = clientId;
+
+  btn.disabled = false; btn.textContent = 'Créer le dossier & ajouter un appareil →';
+  showToast('Dossier créé — renseignez l\'appareil');
+});
+
+// --- Vue dossier (multi-appareils) ---
+function showDossier(rapportsList){
+  currentDossierRapports = rapportsList;
+  activeDossierTabIdx = 0;
+  showView('dossier');
+  renderDossierView();
+}
+
+function renderDossierView(){
+  const first = currentDossierRapports[0];
+  // Header
+  const header = document.getElementById('dossier-header');
+  const dateFmt = first.date ? new Date(first.date).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : '';
+  header.innerHTML = `
+    <div style="font-size:1.05rem;font-weight:700;">${escapeHtml(first.prenom||'')} ${escapeHtml(first.nom||'')}</div>
+    <div style="font-size:0.85rem;color:var(--text-muted);">${dateFmt}${first.ville ? ' · '+escapeHtml(first.ville) : ''}${first.tel ? ' · '+escapeHtml(first.tel) : ''}</div>
+  `;
+  // Onglets
+  const tabs = document.getElementById('dossier-tabs');
+  tabs.innerHTML = currentDossierRapports.map((r, i) => `
+    <div class="dossier-tab${i === activeDossierTabIdx ? ' active' : ''}" data-idx="${i}"
+      style="padding:0.5rem 0.9rem;font-size:0.85rem;font-weight:${i===activeDossierTabIdx?'700':'400'};border-bottom:${i===activeDossierTabIdx?'2px solid var(--orange)':'2px solid transparent'};cursor:pointer;white-space:nowrap;color:${i===activeDossierTabIdx?'var(--orange)':'var(--text-muted)'};">
+      ${escapeHtml(r.appareil||'Appareil '+(i+1))}
+    </div>`).join('');
+  tabs.querySelectorAll('.dossier-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeDossierTabIdx = parseInt(tab.dataset.idx);
+      renderDossierView();
+    });
+  });
+  // Contenu de l'onglet actif
+  renderDossierAppareilContent(currentDossierRapports[activeDossierTabIdx]);
+}
+
+function renderDossierAppareilContent(r){
+  const el = document.getElementById('dossier-appareil-content');
+  // Réutiliser showDetail mais dans ce conteneur
+  el.innerHTML = '';
+  // Boutons actions
+  const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
+  const actionsDiv = document.createElement('div');
+  actionsDiv.style.cssText = 'display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.8rem;';
+  actionsDiv.innerHTML = `
+    <button class="btn btn-primary doss-edit-btn" style="flex:1;min-width:120px;">✏️ Modifier</button>
+    <button class="btn btn-secondary doss-sms-btn">💬 J'arrive</button>
+    ${r.statut === 'Attente_piece' ? '<button class="btn btn-secondary doss-pose-btn">🔧 Poser la pièce</button>' : ''}
+    ${isTermine ? '<button class="btn btn-outline doss-archiver-btn" style="font-size:0.82rem;">📦 Archiver</button>' : ''}
+    ${r.statut === 'archivé' ? '<button class="btn btn-outline doss-sav-btn" style="border-color:#e0584f;color:#e0584f;">🛠️ Rouvrir SAV</button>' : ''}
+  `;
+  el.appendChild(actionsDiv);
+
+  // Attacher les events
+  actionsDiv.querySelector('.doss-edit-btn')?.addEventListener('click', () => {
+    currentDetailReport = r;
+    showView('form');
+    loadReportIntoForm(r);
+  });
+  actionsDiv.querySelector('.doss-sms-btn')?.addEventListener('click', () => {
+    currentDetailReport = r; sendSMSArrivee(r);
+  });
+  actionsDiv.querySelector('.doss-archiver-btn')?.addEventListener('click', async () => {
+    currentDetailReport = r;
+    await archiverCR(r);
+    renderDossierAppareilContent(r);
+  });
+  actionsDiv.querySelector('.doss-sav-btn')?.addEventListener('click', async () => {
+    currentDetailReport = r;
+    await rouvrirSAV(r);
+    renderDossierAppareilContent(r);
+  });
+
+  // Détail
+  const detailDiv = document.createElement('div');
+  detailDiv.id = 'detail-content-dossier';
+  el.appendChild(detailDiv);
+  // Utiliser la fonction existante de rendu de détail
+  renderDetailContent(r, detailDiv);
+}
+
+// Fonctions helpers pour archiver/rouvrir depuis la vue dossier
+async function archiverCR(r){
+  if(!confirm('Archiver cet appareil ?')) return;
+  const dateArchivage = todayISO();
+  try{
+    await sb.from(TABLE).update({ statue: 'archivé', date_archivage: dateArchivage }).eq('app_id', r.app_id||r.id);
+    r.statut = 'archivé'; r.date_archivage = dateArchivage;
+    showToast('Archivé ✓');
+    renderList();
+  }catch(e){ showToast('Erreur archivage', true); }
+}
+
+async function rouvrirSAV(r){
+  if(!confirm('Rouvrir en SAV ?')) return;
+  const updates = { statue: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
+  try{
+    await sb.from(TABLE).update(updates).eq('app_id', r.app_id||r.id);
+    Object.assign(r, { statut: 'En cours', is_sav: true });
+    showToast('Rouvert en SAV 🛠️');
+    renderList();
+  }catch(e){ showToast('Erreur', true); }
+}
+
+// Bouton retour depuis vue dossier
+document.getElementById('dossier-back').addEventListener('click', () => {
+  showView('list'); renderList();
+});
+
+// Bouton + Appareil dans vue dossier
+document.getElementById('dossier-add-appareil-btn').addEventListener('click', () => {
+  if(!currentDossierRapports.length) return;
+  const first = currentDossierRapports[0];
+  // Pré-remplir le formulaire avec les infos client du dossier
+  showView('form');
+  resetForm();
+  clearDraft();
+  goToStep(1);
+  document.getElementById('f-nom').value     = first.nom     || '';
+  document.getElementById('f-prenom').value  = first.prenom  || '';
+  document.getElementById('f-adresse').value = first.adresse || '';
+  document.getElementById('f-cp').value      = first.cp      || '';
+  document.getElementById('f-ville').value   = first.ville   || '';
+  document.getElementById('f-tel').value     = first.tel     || '';
+  document.getElementById('f-email').value   = first.email   || '';
+  document.getElementById('f-date').value    = first.date    || todayISO();
+  window._currentDossierAppId    = first.dossier_id;
+  window._currentDossierClientId = first.client_id;
+  showToast('Infos client pré-remplies — saisissez le nouvel appareil');
+});
 
 // ==================== ARCHIVAGE & SAV ====================
 
