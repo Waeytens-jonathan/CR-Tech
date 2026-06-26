@@ -5254,6 +5254,7 @@ function renderDossierAppareilContent(r){
   actionsDiv.innerHTML = `
     <button class="btn btn-primary doss-edit-btn" style="flex:1;min-width:120px;">✏️ Modifier</button>
     <button class="btn btn-secondary doss-sms-btn">💬 J'arrive</button>
+    <button class="btn btn-secondary doss-avis-btn">⭐ Avis</button>
     ${r.statut === 'Attente_piece' ? '<button class="btn btn-secondary doss-pose-btn">🔧 Poser la pièce</button>' : ''}
     ${isTermine ? '<button class="btn btn-outline doss-archiver-btn" style="font-size:0.82rem;">📦 Archiver</button>' : ''}
     ${r.statut === 'archivé' ? '<button class="btn btn-outline doss-sav-btn" style="border-color:#e0584f;color:#e0584f;">🛠️ Rouvrir SAV</button>' : ''}
@@ -5271,6 +5272,12 @@ function renderDossierAppareilContent(r){
   });
   actionsDiv.querySelector('.doss-sms-btn')?.addEventListener('click', () => {
     currentDetailReport = r; sendSMSArrivee(r);
+  });
+  actionsDiv.querySelector('.doss-avis-btn')?.addEventListener('click', () => {
+    const tel = (r.tel || '').replace(/[^\d+]/g, '');
+    if(!tel){ showToast('Numéro manquant', true); return; }
+    const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+    window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
   });
   actionsDiv.querySelector('.doss-pose-btn')?.addEventListener('click', () => {
     currentDetailReport = r;
