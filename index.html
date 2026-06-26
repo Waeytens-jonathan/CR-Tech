@@ -5264,10 +5264,20 @@ function renderDossierAppareilContent(r){
   actionsDiv.querySelector('.doss-edit-btn')?.addEventListener('click', () => {
     currentDetailReport = r;
     showView('form');
-    loadReportIntoForm(r);
+    resetForm();
+    clearDraft();
+    loadIntoForm(r);
+    goToStep(1);
   });
   actionsDiv.querySelector('.doss-sms-btn')?.addEventListener('click', () => {
     currentDetailReport = r; sendSMSArrivee(r);
+  });
+  actionsDiv.querySelector('.doss-pose-btn')?.addEventListener('click', () => {
+    currentDetailReport = r;
+    document.getElementById('pose-piece-nom').value = r.pieceDeposeNom || '';
+    document.getElementById('pose-piece-ref').value = r.pieceDeposeRef || '';
+    posePiecePhotos = [];
+    document.getElementById('pose-piece-modal').style.display = 'flex';
   });
   actionsDiv.querySelector('.doss-archiver-btn')?.addEventListener('click', async () => {
     currentDetailReport = r;
