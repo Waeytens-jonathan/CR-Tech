@@ -499,8 +499,8 @@
         <button class="btn btn-primary" id="dossier-add-appareil-btn" style="padding:0.45rem 0.9rem;font-size:0.88rem;">+ Appareil</button>
       </div>
       <div id="dossier-header" style="margin-bottom:0.8rem;"></div>
-      <!-- Onglets appareils -->
-      <div id="dossier-tabs" style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid var(--border);margin-bottom:0.8rem;"></div>
+      <!-- Onglets appareils style Google -->
+      <div id="dossier-tabs" style="display:flex;gap:0;overflow-x:auto;border-bottom:2px solid var(--border);margin-bottom:1rem;-webkit-overflow-scrolling:touch;scrollbar-width:none;"></div>
       <!-- Contenu appareil actif -->
       <div id="dossier-appareil-content"></div>
     </div>
@@ -911,6 +911,17 @@
         <div class="step-progress-bar" id="step-progress-bar"></div>
       </div>
       <div class="step-counter" id="step-counter">Étape 1 / 9</div>
+    </div>
+
+    <!-- Champs client cachés — pré-remplis depuis le dossier -->
+    <div style="display:none;">
+      <input type="text" id="f-nom">
+      <input type="text" id="f-prenom">
+      <input type="text" id="f-adresse">
+      <input type="text" id="f-cp">
+      <input type="text" id="f-ville">
+      <input type="tel" id="f-tel">
+      <input type="email" id="f-email">
     </div>
 
     <div class="card step" data-step="1">
@@ -3930,7 +3941,8 @@ function buildDossierItem(rapports){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;width:100%;">
       <div style="flex:1;min-width:0;">
         <div class="name">${escapeHtml(first.prenom||'')} ${escapeHtml(first.nom||'')}</div>
-        <div class="meta">${dateFmt}${first.ville ? ' · '+escapeHtml(first.ville) : ''}${nbAppareils > 1 ? ` · <strong>${nbAppareils} appareils</strong>` : ''}</div>
+        <div class="meta">${dateFmt}${first.ville ? ' · '+escapeHtml(first.ville) : ''}</div>
+        ${nbAppareils > 1 ? `<div style="font-size:0.8rem;color:var(--blue);margin-top:0.1rem;">📦 ${nbAppareils} appareils</div>` : ''}
         <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">${appareilBadges}</div>
         <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">${statutBadge}</div>
       </div>
@@ -5212,7 +5224,13 @@ function renderDossierView(){
   const tabs = document.getElementById('dossier-tabs');
   tabs.innerHTML = currentDossierRapports.map((r, i) => `
     <div class="dossier-tab${i === activeDossierTabIdx ? ' active' : ''}" data-idx="${i}"
-      style="padding:0.5rem 0.9rem;font-size:0.85rem;font-weight:${i===activeDossierTabIdx?'700':'400'};border-bottom:${i===activeDossierTabIdx?'2px solid var(--orange)':'2px solid transparent'};cursor:pointer;white-space:nowrap;color:${i===activeDossierTabIdx?'var(--orange)':'var(--text-muted)'};">
+      style="padding:0.7rem 1.2rem;font-size:0.88rem;font-weight:${i===activeDossierTabIdx?'600':'400'};
+             border-bottom:${i===activeDossierTabIdx?'3px solid var(--orange)':'3px solid transparent'};
+             cursor:pointer;white-space:nowrap;
+             color:${i===activeDossierTabIdx?'var(--orange)':'var(--text-muted)'};
+             transition:all .15s;margin-bottom:-2px;
+             background:${i===activeDossierTabIdx?'rgba(245,166,35,0.06)':'transparent'};
+             border-radius:4px 4px 0 0;">
       ${escapeHtml(r.appareil||'Appareil '+(i+1))}
     </div>`).join('');
   tabs.querySelectorAll('.dossier-tab').forEach(tab => {
@@ -5295,7 +5313,9 @@ async function rouvrirSAV(r){
 
 // Bouton retour depuis vue dossier
 document.getElementById('dossier-back').addEventListener('click', () => {
-  showView('list'); renderList();
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === 'list'));
+  showView('list');
+  renderList();
 });
 
 // Bouton + Appareil dans vue dossier
