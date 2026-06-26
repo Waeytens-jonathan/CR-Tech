@@ -888,6 +888,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
         <button class="btn btn-primary" id="detail-edit" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✏️ Modifier</button>
         <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">📧 Email</button>
+        <button class="btn btn-secondary" id="detail-avis-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">⭐ Avis</button>
         <button class="btn btn-outline" id="detail-add-appareil-btn" style="border-color:var(--blue);color:var(--blue);font-size:0.82rem;padding:0.5rem 0.4rem;">➕ Appareil</button>
       </div>
 
@@ -4216,6 +4217,14 @@ document.getElementById('detail-add-appareil-btn').addEventListener('click', () 
   window._currentDossierAppId    = r.dossier_id;
   window._currentDossierClientId = r.client_id;
   showToast('Infos client pré-remplies — saisissez le nouvel appareil');
+});
+
+document.getElementById('detail-avis-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
+  if(!tel){ showToast('Numéro manquant', true); return; }
+  const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
 });
 
 document.getElementById('detail-email-btn').addEventListener('click', async () => {
