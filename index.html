@@ -5980,18 +5980,19 @@ document.getElementById('attestation-generate').addEventListener('click', async 
   const btn = document.getElementById('attestation-generate');
   btn.disabled = true; btn.textContent = '⏳ Génération…';
 
-  // Récupérer les données du formulaire courant
-  const nom       = (document.getElementById('f-nom')?.value||'').trim();
-  const prenom    = (document.getElementById('f-prenom')?.value||'').trim();
-  const adresse   = (document.getElementById('f-adresse')?.value||'').trim();
-  const cp        = (document.getElementById('f-cp')?.value||'').trim();
-  const ville     = (document.getElementById('f-ville')?.value||'').trim();
-  const email     = (document.getElementById('f-email')?.value||'').trim();
-  const appareil  = (document.getElementById('f-appareil')?.value||'').trim();
-  const marque    = (document.getElementById('f-marque')?.value||'').trim();
-  const modele    = (document.getElementById('f-modele')?.value||'').trim();
-  const serie     = (document.getElementById('f-serie')?.value||'').trim();
-  const panne     = (document.getElementById('f-panne')?.value||document.getElementById('f-symptomes')?.value||'').trim();
+  // Récupérer les données depuis currentDetailReport (plus depuis les champs du formulaire)
+  const r = currentDetailReport || {};
+  const nom       = (r.nom     || '').trim();
+  const prenom    = (r.prenom  || '').trim();
+  const adresse   = (r.adresse || '').trim();
+  const cp        = (r.cp      || '').trim();
+  const ville     = (r.ville   || '').trim();
+  const email     = (r.email   || '').trim();
+  const appareil  = (r.appareil|| '').trim();
+  const marque    = (r.marque  || '').trim();
+  const modele    = (r.modele  || '').trim();
+  const serie     = (r.serie   || r.numSerie || '').trim();
+  const panne     = (r.panne   || r.symptomes || '').trim();
   const dateStr   = new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
 
   const raisonVal = document.querySelector('input[name="attest-raison"]:checked')?.value || 'economique';
