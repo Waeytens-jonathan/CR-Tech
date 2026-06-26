@@ -1569,6 +1569,10 @@ function rowToReport(row){
 
 let reports = [];
 let reportsLoaded = false;
+let dossiers = [];
+let currentDossier = null;
+let currentDossierRapports = [];
+let activeDossierTabIdx = 0;
 
 async function loadReportsFromSupabase(){
   try{
@@ -5049,10 +5053,6 @@ function isDateBlocked(dateISO){
 
 // ==================== MODULE DOSSIERS ====================
 const DOSSIERS_TABLE = 'dossiers';
-let dossiers = []; // cache local
-let currentDossier = null; // dossier en cours de visualisation
-let currentDossierRapports = []; // appareils du dossier actif
-let activeDossierTabIdx = 0;
 
 async function loadDossiers(){
   try{
