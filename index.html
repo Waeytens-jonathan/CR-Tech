@@ -4161,7 +4161,6 @@ function renderDetailContent(r, container){
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
 
-      // Recalcul du reste à encaisser selon le nouveau statut de paiement
       const total = parseFloat(reports[idx]['cout-total']) || 0;
       let reste = 0;
       if(paiementEl.value === 'Acompte'){
@@ -4173,25 +4172,11 @@ function renderDetailContent(r, container){
       if(reste < 0) reste = 0;
       reports[idx]['reste-encaisser'] = reste.toFixed(2);
 
-      // localStorage désactivé — données dans Supabase
       saveReportToSupabase(reports[idx]);
       showToast('Dossier mis à jour');
       showDetail(reports[idx]);
     });
   }
-
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-detail').classList.add('active');
-  window.scrollTo({top:0, behavior:'smooth'});
-
-  // Bouton "Poser la pièce" : visible uniquement si le dossier est en attente de pièce
-  document.getElementById('detail-pose-piece-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
-  document.getElementById('detail-rdv-pose-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
-  const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
-  document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
-  document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
-  document.getElementById('attestation-btn').style.display = r.statut === 'Non_reparable' ? 'inline-flex' : 'none';
 }
 
 function showDetail(r){
