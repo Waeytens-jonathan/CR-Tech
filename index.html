@@ -409,7 +409,7 @@
   <div class="tabs" style="justify-content:space-between;">
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <button class="tab-btn active" data-view="agenda" id="tab-agenda">📅 Agenda</button>
-      <button class="tab-btn" data-view="list">Compte-rendu</button>
+      <button class="tab-btn" data-view="list">📁 Dossiers-clients</button>
       <button class="tab-btn" data-view="stock" id="tab-stock">📦 Stock</button>
       <button class="tab-btn" data-view="depot" id="tab-depot">📥 Dépôt</button>
       <button class="tab-btn" data-view="clients" id="tab-clients">👤 Clients</button>
@@ -422,7 +422,7 @@
   <div class="view" id="view-list">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
-        <h2 style="margin:0;">Comptes-rendus</h2>
+        <h2 style="margin:0;">Dossiers-clients</h2>
         <button class="btn btn-primary" id="tab-new" style="padding:0.5rem 1rem;">➕ Nouveau dossier</button>
       </div>
       <div class="search-bar">
@@ -1488,6 +1488,7 @@ function reportToRow(r){
     serie: r.serie || '',
     age: r.age || '',
     panne: r.panne || '',
+    diagnostic: r.diagnostic || '',
     travaux: r.travaux || '',
     statue: r.statut || '',
     duree: r.duree || '',
@@ -1564,6 +1565,7 @@ function rowToReport(row){
     serie: row.serie,
     age: row.age,
     panne: row.panne,
+    diagnostic: row.diagnostic || '',
     travaux: row.travaux,
     statut: row.statue,
     duree: row.duree,
