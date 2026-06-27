@@ -5633,6 +5633,25 @@ document.getElementById('client-form-save').addEventListener('click', async () =
     if(editingClientId){
       const { error } = await sb.from(CLIENTS_TABLE).update(row).eq('app_id', editingClientId);
       if(error) throw error;
+
+      // Synchroniser les CR et RDV liés à ce client
+      const clientFields = {
+        nom: row.nom, prenom: row.prenom,
+        tel: row.tel, email: row.email,
+        adresse: row.adresse, cp: row.cp, ville: row.ville
+      };
+      try{
+        await sb.from(TABLE).update(clientFields).eq('client_id', editingClientId);
+        await sb.from(RDV_TABLE).update(clientFields).eq('client_id', editingClientId);
+        // Mettre à jour le cache local
+        reports.forEach(r => {
+          if(r.client_id === editingClientId){
+            Object.assign(r, clientFields);
+          }
+        });
+      }catch(syncErr){
+        console.error('Erreur synchro CR/RDV :', syncErr);
+      }
     } else {
       row.app_id = 'cli_' + Date.now();
       const { error } = await sb.from(CLIENTS_TABLE).insert(row);
