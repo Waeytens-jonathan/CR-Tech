@@ -5649,6 +5649,8 @@ document.getElementById('client-form-save').addEventListener('click', async () =
             Object.assign(r, clientFields);
           }
         });
+        // Recharger depuis Supabase pour avoir les données à jour dans les dossiers
+        await loadReportsFromSupabase();
       }catch(syncErr){
         console.error('Erreur synchro CR/RDV :', syncErr);
       }
