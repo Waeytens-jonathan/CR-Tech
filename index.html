@@ -1490,6 +1490,7 @@ function reportToRow(r){
     piece_depose_photos: r.pieceDeposePhotos ? JSON.stringify(r.pieceDeposePhotos) : '',
     client_id: r.client_id || null,
     dossier_id: r.dossier_id || null,
+    date_termine: r.date_termine || null,
     _is_draft: false
   };
   // Champs sans colonne dédiée -> regroupés dans "notes" pour ne rien perdre
@@ -1574,6 +1575,7 @@ function rowToReport(row){
     pieceDeposePhotos: row.piece_depose_photos ? (() => { try{ return JSON.parse(row.piece_depose_photos); }catch(e){ return []; } })() : [],
     client_id: row.client_id || null,
     dossier_id: row.dossier_id || null,
+    date_termine: row.date_termine || null,
     _isDraft: !!row._is_draft,
     _draftStep: extra._draftStep
   };
@@ -1695,6 +1697,15 @@ function renderAgendaList(){
   const matinRdvs = dayRdvs.filter(r => r.creneau === 'matin');
   const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin');
 
+  // RDV annulés des dernières 24h pour ce jour
+  const now = new Date();
+  const annulesRecents = agendaRdvs.filter(r => {
+    if(r.date !== iso || r.statut !== 'annule') return false;
+    if(!r.updated_at) return true; // si pas de date, afficher quand même
+    const diffH = (now - new Date(r.updated_at)) / (1000 * 60 * 60);
+    return diffH <= 24;
+  });
+
   const makeCard = r => {
     const typeLabel = r.type_rdv === 'pose_piece' ? '🔧 Pose pièce' : r.type_rdv === 'diagnostic' ? '🔍 Diagnostic' : r.type_rdv === 'sav' ? '🛠️ SAV' : '';
     const doneLabel = r.statut === 'effectue' ? '<span class="badge green" style="font-size:0.7rem;">Effectué</span>' : '';
@@ -1732,6 +1743,27 @@ function renderAgendaList(){
   }
 
   grid.innerHTML = html;
+
+  // Section RDV annulés récents
+  if(annulesRecents.length){
+    const annuleSection = document.createElement('div');
+    annuleSection.style.cssText = 'margin-top:1rem;border-top:1px dashed rgba(224,88,79,0.3);padding-top:0.8rem;';
+    annuleSection.innerHTML = `
+      <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.07em;color:#e0584f;margin-bottom:0.5rem;text-transform:uppercase;">🚫 Annulés récemment</div>
+      ${annulesRecents.map(r => `
+        <div class="list-item" data-rdv-id="${escapeHtml(r.app_id)}" style="cursor:pointer;border-left:4px solid #e0584f;background:rgba(224,88,79,0.06);opacity:0.85;padding:0.6rem 0.8rem;margin-bottom:0.4rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:0.9rem;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong>
+            <span style="font-size:0.72rem;color:#e0584f;">🚫 Annulé</span>
+          </div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.15rem;">${escapeHtml(r.appareil||'')}${r.tel ? ' · '+escapeHtml(r.tel) : ''}</div>
+        </div>`).join('')}`;
+    annuleSection.querySelectorAll('[data-rdv-id]').forEach(chip => {
+      chip.addEventListener('click', e => { e.stopPropagation(); showAgendaDetail(chip.dataset.rdvId); });
+    });
+    grid.appendChild(annuleSection);
+  }
+
   emptyEl.style.display = 'none';
 
   grid.querySelectorAll('[data-rdv-id]').forEach(chip => {
@@ -4146,6 +4178,16 @@ function renderDetailContent(r, container){
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
 
+      // Enregistrer la date/heure de fin si on passe en Terminé ou Non_reparable
+      const TERMINES = ['Terminée', 'Non_reparable'];
+      const wasTermine = TERMINES.includes(r.statut);
+      const isNowTermine = TERMINES.includes(statutEl.value);
+      if(isNowTermine && !wasTermine){
+        reports[idx].date_termine = new Date().toISOString();
+      } else if(!isNowTermine){
+        reports[idx].date_termine = null;
+      }
+
       const total = parseFloat(reports[idx]['cout-total']) || 0;
       let reste = 0;
       if(paiementEl.value === 'Acompte'){
@@ -5417,9 +5459,10 @@ async function autoArchiveOldReports(){
   const now = new Date();
   const toArchive = reports.filter(r => {
     if(!['Terminée','Non_reparable'].includes(r.statut)) return false;
-    if(!r.date) return false;
-    const crDate = new Date(r.date + 'T23:59:59');
-    const diffH = (now - crDate) / (1000 * 60 * 60);
+    // Utiliser date_termine si disponible, sinon ne pas archiver automatiquement
+    if(!r.date_termine) return false;
+    const termineDate = new Date(r.date_termine);
+    const diffH = (now - termineDate) / (1000 * 60 * 60);
     return diffH >= 24;
   });
   if(!toArchive.length) return;
