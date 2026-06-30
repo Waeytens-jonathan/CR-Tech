@@ -1235,6 +1235,30 @@
 <div class="footer-note">Technik-Home — 165 rue Emile Zola, App. 1, Bât. A, 62300 Lens — 07 59 70 54 97</div>
 
 <!-- ===================== MODAL ATTESTATION NON-RÉPARABILITÉ ===================== -->
+<!-- ===================== MODAL RENDRE L'APPAREIL ===================== -->
+<div id="rendre-appareil-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:480px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 1rem;color:var(--orange);">📤 Rendre l'appareil</h3>
+
+    <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
+      <div class="field"><label>Date</label><input type="date" id="rendre-date"></div>
+      <div class="field"><label>Heure</label><input type="time" id="rendre-heure"></div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.8rem;margin-bottom:1rem;font-size:0.88rem;line-height:1.5;color:var(--text);" id="rendre-mention"></div>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;font-weight:600;">Signature du client</label>
+    <canvas id="rendre-signature-canvas" width="420" height="120"
+      style="width:100%;height:120px;background:#fff;border-radius:8px;border:1px solid var(--border);cursor:crosshair;touch-action:none;display:block;margin-bottom:0.4rem;"></canvas>
+    <button id="rendre-signature-clear" class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-bottom:1rem;">🗑 Effacer la signature</button>
+
+    <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
+      <button class="btn btn-outline" id="rendre-appareil-cancel">Annuler</button>
+      <button class="btn btn-primary" id="rendre-appareil-confirm">Confirmer la remise ✓</button>
+    </div>
+  </div>
+</div>
+
 <div id="attestation-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:480px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
     <h3 style="margin:0 0 1rem;color:#e0584f;">📋 Attestation de non-réparabilité</h3>
@@ -2303,7 +2327,7 @@ function showDepotDetail(appId){
   document.getElementById('depot-detail-content').innerHTML = html;
 
   const statutBtn = document.getElementById('depot-detail-statut-btn');
-  statutBtn.textContent = d.statut === 'recupere' ? '↩️ Remettre en "Déposé"' : '✅ Marquer comme récupéré';
+  statutBtn.textContent = d.statut === 'recupere' ? '↩️ Remettre en "Déposé"' : '📤 Rendre l\'appareil';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -2335,17 +2359,116 @@ document.getElementById('depot-detail-delete-btn').addEventListener('click', asy
 
 document.getElementById('depot-detail-statut-btn').addEventListener('click', async () => {
   if(!currentDepot) return;
-  const nouveauStatut = currentDepot.statut === 'recupere' ? 'depose' : 'recupere';
+  if(currentDepot.statut === 'recupere'){
+    // Remettre en "Déposé"
+    try{
+      const { error } = await sb.from(DEPOT_TABLE).update({ statut: 'depose' }).eq('app_id', currentDepot.app_id);
+      if(error) throw error;
+      currentDepot.statut = 'depose';
+      showToast('Statut remis à "Déposé"');
+      showDepotDetail(currentDepot.app_id);
+    }catch(e){
+      console.error('Erreur mise à jour statut dépôt :', e);
+      showToast('Échec de la mise à jour', true);
+    }
+  } else {
+    // Ouvrir la modale de remise avec signature
+    openRendreAppareilModal();
+  }
+});
+
+// --- Modale Rendre l'appareil ---
+function openRendreAppareilModal(){
+  if(!currentDepot) return;
+  const d = currentDepot;
+  const now = new Date();
+  document.getElementById('rendre-date').value = now.toISOString().slice(0,10);
+  document.getElementById('rendre-heure').value = now.toTimeString().slice(0,5);
+  const clientName = `${d.prenom||''} ${d.nom||''}`.trim() || 'Client';
+  document.getElementById('rendre-mention').textContent =
+    `Je soussigné(e) ${clientName} reconnaît avoir récupéré l'appareil "${d.appareil||'appareil'}" en date du ${now.toLocaleDateString('fr-FR')} à ${now.toTimeString().slice(0,5)}.`;
+  document.getElementById('rendre-appareil-modal').style.display = 'flex';
+  initRendreSignatureCanvas();
+}
+
+document.getElementById('rendre-date')?.addEventListener('input', updateRendreMention);
+document.getElementById('rendre-heure')?.addEventListener('input', updateRendreMention);
+function updateRendreMention(){
+  if(!currentDepot) return;
+  const d = currentDepot;
+  const dateVal = document.getElementById('rendre-date').value;
+  const heureVal = document.getElementById('rendre-heure').value;
+  const dateFmt = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR') : '';
+  const clientName = `${d.prenom||''} ${d.nom||''}`.trim() || 'Client';
+  document.getElementById('rendre-mention').textContent =
+    `Je soussigné(e) ${clientName} reconnaît avoir récupéré l'appareil "${d.appareil||'appareil'}" en date du ${dateFmt} à ${heureVal}.`;
+}
+
+function initRendreSignatureCanvas(){
+  const canvas = document.getElementById('rendre-signature-canvas');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = 120 * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  let drawing = false;
+  function getPos(e){ const r = canvas.getBoundingClientRect(); const src = e.touches ? e.touches[0] : e; return { x: src.clientX - r.left, y: src.clientY - r.top }; }
+  function start(e){ e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+  function move(e){ e.preventDefault(); if(!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  function end(){ drawing = false; }
+  canvas.onmousedown = start; canvas.onmousemove = move; canvas.onmouseup = end;
+  canvas.ontouchstart = start; canvas.ontouchmove = move; canvas.ontouchend = end;
+}
+
+document.getElementById('rendre-signature-clear')?.addEventListener('click', () => {
+  const canvas = document.getElementById('rendre-signature-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+document.getElementById('rendre-appareil-cancel')?.addEventListener('click', () => {
+  document.getElementById('rendre-appareil-modal').style.display = 'none';
+});
+
+document.getElementById('rendre-appareil-confirm')?.addEventListener('click', async () => {
+  if(!currentDepot) return;
+  const canvas = document.getElementById('rendre-signature-canvas');
+  const signatureDataUrl = canvas.toDataURL('image/png');
+  const btn = document.getElementById('rendre-appareil-confirm');
+  btn.disabled = true; btn.textContent = 'Validation…';
   try{
-    const { error } = await sb.from(DEPOT_TABLE).update({ statut: nouveauStatut }).eq('app_id', currentDepot.app_id);
+    const { error } = await sb.from(DEPOT_TABLE).update({
+      statut: 'recupere',
+      date_recuperation: document.getElementById('rendre-date').value,
+      heure_recuperation: document.getElementById('rendre-heure').value,
+      signature_recuperation: signatureDataUrl
+    }).eq('app_id', currentDepot.app_id);
     if(error) throw error;
-    currentDepot.statut = nouveauStatut;
-    showToast(nouveauStatut === 'recupere' ? 'Appareil marqué comme récupéré' : 'Statut remis à "Déposé"');
+    currentDepot.statut = 'recupere';
+    document.getElementById('rendre-appareil-modal').style.display = 'none';
+    showToast('Appareil rendu ✓');
+
+    // Envoyer SMS de confirmation au client
+    const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
+    if(tel){
+      const dateVal = document.getElementById('rendre-date').value;
+      const heureVal = document.getElementById('rendre-heure').value;
+      const dateFmt = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR') : '';
+      const clientName = `${currentDepot.prenom||''} ${currentDepot.nom||''}`.trim() || 'Client';
+      const smsMessage = `Bonjour ${clientName}, nous confirmons la récupération de votre appareil "${currentDepot.appareil||''}" le ${dateFmt} à ${heureVal}. Merci de votre confiance ! Jonathan - Technik-Home - 07 59 70 54 97`;
+      window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(smsMessage);
+    }
+
     showDepotDetail(currentDepot.app_id);
   }catch(e){
-    console.error('Erreur mise à jour statut dépôt :', e);
-    showToast('Échec de la mise à jour', true);
+    console.error('Erreur remise appareil :', e);
+    showToast('Échec de l\'enregistrement', true);
   }
+  btn.disabled = false; btn.textContent = 'Confirmer la remise ✓';
 });
 
 document.getElementById('depot-detail-sms-btn').addEventListener('click', () => {
@@ -2536,13 +2659,14 @@ function showAgendaDetail(appId){
   else statutLabel = '<span class="badge orange">En attente</span>';
 
   const TYPE_RDV_LABELS = { pose_piece: '🔧 Pose pièce', diagnostic: '🔍 Diagnostic', sav: '🛠️ SAV' };
+  const telValue = r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;margin-left:0.4rem;display:inline-flex;">📞 Appeler</a>` : '';
   const rows = [
     ['Statut', statutLabel],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
     ['Type', r.type_rdv ? (TYPE_RDV_LABELS[r.type_rdv] || r.type_rdv) : null],
     ['Client', `${r.prenom || ''} ${r.nom || ''}`.trim()],
-    ['Téléphone', r.tel],
+    ['Téléphone', r.tel ? '__HTML__' + telValue : null],
     ['Email', r.email],
     ['Adresse', `${r.adresse || ''}, ${r.cp || ''} ${r.ville || ''}`],
     ['Appareil', r.appareil],
@@ -2553,7 +2677,8 @@ function showAgendaDetail(appId){
   rows.forEach(([label, value]) => {
     if(!value) return;
     const isStatut = label === 'Statut';
-    const displayValue = isStatut ? value : escapeHtml(String(value));
+    const isHtml = typeof value === 'string' && value.startsWith('__HTML__');
+    const displayValue = (isStatut || isHtml) ? (isHtml ? value.replace('__HTML__','') : value) : escapeHtml(String(value));
     html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${displayValue}</div></div>`;
   });
 
@@ -4064,7 +4189,7 @@ function renderDetailContent(r, container){
 
     html += '</div>';
   }
-  html += dRow('Téléphone', escapeHtml(r.tel));
+  html += dRow('Téléphone', r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;margin-left:0.4rem;display:inline-flex;">📞 Appeler</a>` : '');
   html += dRow('Email', escapeHtml(r.email));
   html += dRow('Technicien', escapeHtml(r.technicien));
   html += '</div>';
@@ -4178,13 +4303,13 @@ function renderDetailContent(r, container){
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
 
-      // Enregistrer la date/heure de fin si on passe en Terminé ou Non_reparable
+      // Le délai d'archivage démarre uniquement quand le dossier est Terminé ET la facture créée
       const TERMINES = ['Terminée', 'Non_reparable'];
-      const wasTermine = TERMINES.includes(r.statut);
-      const isNowTermine = TERMINES.includes(statutEl.value);
-      if(isNowTermine && !wasTermine){
+      const isReadyForArchive = TERMINES.includes(statutEl.value) && factureEl.checked;
+      const wasReadyForArchive = !!reports[idx].date_termine;
+      if(isReadyForArchive && !wasReadyForArchive){
         reports[idx].date_termine = new Date().toISOString();
-      } else if(!isNowTermine){
+      } else if(!isReadyForArchive){
         reports[idx].date_termine = null;
       }
 
@@ -5459,6 +5584,7 @@ async function autoArchiveOldReports(){
   const now = new Date();
   const toArchive = reports.filter(r => {
     if(!['Terminée','Non_reparable'].includes(r.statut)) return false;
+    if(!r['facture-creee']) return false;
     // Utiliser date_termine si disponible, sinon ne pas archiver automatiquement
     if(!r.date_termine) return false;
     const termineDate = new Date(r.date_termine);
@@ -5576,7 +5702,7 @@ async function showClientDetail(appId){
   content.innerHTML = `
     <h2 style="margin:0 0 0.8rem;">${escapeHtml(clientDisplayName(c))}</h2>
     <div class="detail-rows">
-      ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--blue);">${escapeHtml(c.tel)}</a></span></div>` : ''}
+      ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--blue);">${escapeHtml(c.tel)}</a> <a href="tel:${escapeHtml(c.tel)}" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;margin-left:0.4rem;display:inline-flex;">📞 Appeler</a></span></div>` : ''}
       ${c.email  ? `<div class="detail-row"><span>Email</span><span><a href="mailto:${escapeHtml(c.email)}" style="color:var(--blue);">${escapeHtml(c.email)}</a></span></div>` : ''}
       ${c.adresse? `<div class="detail-row"><span>Adresse</span><span>${escapeHtml(c.adresse)}, ${escapeHtml(c.cp||'')} ${escapeHtml(c.ville||'')}</span></div>` : ''}
       ${c.note   ? `<div class="detail-row"><span>Note</span><span>${escapeHtml(c.note)}</span></div>` : ''}
