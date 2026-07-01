@@ -2664,7 +2664,7 @@ function showAgendaDetail(appId){
   else statutLabel = '<span class="badge orange">En attente</span>';
 
   const TYPE_RDV_LABELS = { pose_piece: '🔧 Pose pièce', diagnostic: '🔍 Diagnostic', sav: '🛠️ SAV' };
-  const telValue = r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;margin-left:0.4rem;display:inline-flex;">📞 Appeler</a>` : '';
+  const telValue = r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(r.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a>` : '';
   const rows = [
     ['Statut', statutLabel],
     ['Date', dateFrLong(r.date)],
@@ -4194,7 +4194,7 @@ function renderDetailContent(r, container){
 
     html += '</div>';
   }
-  html += dRow('Téléphone', r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;margin-left:0.4rem;display:inline-flex;">📞 Appeler</a>` : '');
+  html += dRow('Téléphone', r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(r.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a>` : '');
   html += dRow('Email', escapeHtml(r.email));
   html += dRow('Technicien', escapeHtml(r.technicien));
   html += '</div>';
@@ -5707,7 +5707,7 @@ async function showClientDetail(appId){
   content.innerHTML = `
     <h2 style="margin:0 0 0.8rem;">${escapeHtml(clientDisplayName(c))}</h2>
     <div class="detail-rows">
-      ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--blue);">${escapeHtml(c.tel)}</a> <a href="tel:${escapeHtml(c.tel)}" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;margin-left:0.4rem;display:inline-flex;">📞 Appeler</a></span></div>` : ''}
+      ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(c.tel)}</a> <a href="tel:${escapeHtml(c.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(c.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a></span></div>` : ''}
       ${c.email  ? `<div class="detail-row"><span>Email</span><span><a href="mailto:${escapeHtml(c.email)}" style="color:var(--blue);">${escapeHtml(c.email)}</a></span></div>` : ''}
       ${c.adresse? `<div class="detail-row"><span>Adresse</span><span>${escapeHtml(c.adresse)}, ${escapeHtml(c.cp||'')} ${escapeHtml(c.ville||'')}</span></div>` : ''}
       ${c.note   ? `<div class="detail-row"><span>Note</span><span>${escapeHtml(c.note)}</span></div>` : ''}
