@@ -462,6 +462,10 @@
           <input type="text" id="nd-adresse" placeholder="N° et rue" autocomplete="off">
           <div id="nd-adresse-suggestions" style="display:none;margin-top:0.4rem;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;position:relative;z-index:10;"></div>
         </div>
+        <div class="field full">
+          <label>Complément d'adresse <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;">(optionnel)</span></label>
+          <input type="text" id="nd-adresse2" placeholder="Appartement, bâtiment, étage…">
+        </div>
         <div class="field">
           <label>Code postal</label>
           <input type="text" id="nd-cp" placeholder="62300">
@@ -919,6 +923,7 @@
       <input type="text" id="f-nom">
       <input type="text" id="f-prenom">
       <input type="text" id="f-adresse">
+      <input type="text" id="f-adresse2">
       <input type="text" id="f-cp">
       <input type="text" id="f-ville">
       <input type="tel" id="f-tel">
@@ -3695,7 +3700,7 @@ document.getElementById('plaque-analyze-btn').addEventListener('click', async ()
 
 
 const fieldIds = [
-  'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-cp','f-ville','f-tel','f-email',
+  'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-adresse2','f-cp','f-ville','f-tel','f-email',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
   'f-piece-desc','f-prix-fournisseur','f-livraison','f-piece-cout',
