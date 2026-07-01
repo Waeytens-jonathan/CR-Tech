@@ -2880,7 +2880,7 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
   for(const r of dayRdvs){
     if(!r.distance_km && r.cp && r.ville){
       try{
-        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(r.cp+' '+r.ville)}&type=Municipality&maximumResponses=1`);
+        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(r.cp+' '+r.ville)}&maximumResponses=1`);
         const data = await res.json();
         const point = data.results && data.results[0];
         if(point && point.x && point.y){
@@ -3264,7 +3264,7 @@ async function fetchDistanceRDV(lat, lon){
       const ville = document.getElementById('newrdv-ville').value;
       if(cp && ville){
         try{
-          const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&type=Municipality&maximumResponses=1`);
+          const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&maximumResponses=1`);
           const data = await res.json();
           const r = data.results && data.results[0];
           if(r && r.x && r.y) fetchDistanceRDV(parseFloat(r.y), parseFloat(r.x));
@@ -3278,7 +3278,7 @@ async function fetchDistanceRDV(lat, lon){
     const ville = document.getElementById('newrdv-ville').value;
     if(cp.length === 5 && ville){
       try{
-        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&type=Municipality&maximumResponses=1`);
+        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&maximumResponses=1`);
         const data = await res.json();
         const r = data.results && data.results[0];
         if(r && r.x && r.y) fetchDistanceRDV(parseFloat(r.y), parseFloat(r.x));
