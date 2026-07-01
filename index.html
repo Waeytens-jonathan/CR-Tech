@@ -2896,22 +2896,37 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
 
   btn.disabled = false; btn.textContent = '🗺️ Tournée';
 
-  // Trier : plus loin → plus près (finir près de Lens)
-  const withDist = dayRdvs.filter(r => r.distance_km);
-  const withoutDist = dayRdvs.filter(r => !r.distance_km);
-  withDist.sort((a,b) => b.distance_km - a.distance_km);
-  const sorted = [...withDist, ...withoutDist];
+  // Trier par créneau puis par distance (plus loin → plus près)
+  const matinRdvs = dayRdvs.filter(r => r.creneau === 'matin');
+  const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin');
 
-  // Afficher l'ordre optimisé dans une modale
-  const orderHtml = sorted.map((r,i) => `
-    <div style="display:flex;align-items:center;gap:0.7rem;padding:0.6rem 0;border-bottom:1px solid var(--border);">
-      <div style="font-size:1.2rem;font-weight:700;color:var(--orange);min-width:24px;">${i+1}</div>
-      <div style="flex:1;">
-        <div style="font-weight:600;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</div>
-        <div style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(r.adresse||'')}${r.ville?' · '+escapeHtml(r.ville):''}</div>
-      </div>
-      <div style="font-size:0.82rem;color:var(--blue);font-weight:600;">${r.distance_km ? r.distance_km+' km' : '?'}</div>
-    </div>`).join('');
+  function sortByDistance(list){
+    const withDist    = list.filter(r => r.distance_km).sort((a,b) => b.distance_km - a.distance_km);
+    const withoutDist = list.filter(r => !r.distance_km);
+    return [...withDist, ...withoutDist];
+  }
+
+  const sortedMatin = sortByDistance(matinRdvs);
+  const sortedAM    = sortByDistance(amRdvs);
+
+  function renderSection(label, list){
+    if(!list.length) return '';
+    const rows = list.map((r,i) => `
+      <div style="display:flex;align-items:center;gap:0.7rem;padding:0.6rem 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:1.2rem;font-weight:700;color:var(--orange);min-width:24px;">${i+1}</div>
+        <div style="flex:1;">
+          <div style="font-weight:600;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(r.adresse||'')}${r.ville?' · '+escapeHtml(r.ville):''}</div>
+        </div>
+        <div style="font-size:0.82rem;color:var(--blue);font-weight:600;">${r.distance_km ? r.distance_km+' km' : '?'}</div>
+      </div>`).join('');
+    return `<div style="font-size:0.78rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--blue);margin:0.8rem 0 0.3rem;">${label}</div>${rows}`;
+  }
+
+  const params = _agendaConfigCache || { matinDebut:'08:00', matinFin:'12:00', amDebut:'12:00', amFin:'18:00' };
+  const orderHtml =
+    renderSection(`☀️ Matin · ${params.matinDebut}–${params.matinFin}`, sortedMatin) +
+    renderSection(`🌤 Après-midi · ${params.amDebut}–${params.amFin}`, sortedAM);
 
   // Afficher dans une modale simple
   let modal = document.getElementById('tournee-modal');
