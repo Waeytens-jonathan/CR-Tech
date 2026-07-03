@@ -1338,10 +1338,11 @@
         <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Message</label>
         <input type="text" id="p-banniere-message" placeholder="Nous sommes actuellement fermés" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
       </div>
-      <div style="margin-bottom:0.6rem;">
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Date de retour (optionnel)</label>
-        <input type="date" id="p-banniere-date-retour" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
+        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Fermé du</label><input type="date" id="p-banniere-date-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Au</label><input type="date" id="p-banniere-date-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
       </div>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin:0 0 0.6rem;">Laissez vide pour une fermeture sans date de fin connue.</p>
 
       <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
 
@@ -5169,7 +5170,8 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   // Banniere fermeture
   document.getElementById('p-banniere-active').checked    = params.banniereActive || false;
   document.getElementById('p-banniere-message').value     = params.banniereMessage || '';
-  document.getElementById('p-banniere-date-retour').value = params.banniereDateRetour || '';
+  document.getElementById('p-banniere-date-debut').value  = params.banniereDateDebut || '';
+  document.getElementById('p-banniere-date-fin').value    = params.banniereDateFin || '';
   // Jours bloqués
   renderPJoursBloques(params);
   // Tarifs électroménager
@@ -5242,7 +5244,8 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     quotaAMSam:     parseInt(document.getElementById('p-quota-am-sam').value)    || 2,
     banniereActive:     document.getElementById('p-banniere-active').checked,
     banniereMessage:    document.getElementById('p-banniere-message').value.trim(),
-    banniereDateRetour: document.getElementById('p-banniere-date-retour').value || null,
+    banniereDateDebut:  document.getElementById('p-banniere-date-debut').value || null,
+    banniereDateFin:    document.getElementById('p-banniere-date-fin').value   || null,
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
     tarifLavage:       parseInt(document.getElementById('p-tarif-lavage').value)       || 65,
     tarifFroid:        parseInt(document.getElementById('p-tarif-froid').value)        || 70,
@@ -5285,7 +5288,8 @@ async function getAgendaParams(){
       quotaAMSam:    data.quota_am_sam   ?? 2,
       banniereActive:     data.banniere_active     ?? false,
       banniereMessage:    data.banniere_message    ?? '',
-      banniereDateRetour: data.banniere_date_retour ?? '',
+      banniereDateDebut:  data.banniere_date_debut ?? '',
+      banniereDateFin:    data.banniere_date_fin   ?? '',
       joursBlockes:  data.jours_bloques  || [],
       tarifCuisson:      data.tarif_cuisson      ?? 60,
       tarifLavage:       data.tarif_lavage       ?? 65,
@@ -5327,7 +5331,8 @@ async function saveAgendaParams(params){
     quota_am_sam:      params.quotaAMSam,
     banniere_active:      params.banniereActive     ?? false,
     banniere_message:     params.banniereMessage    || null,
-    banniere_date_retour: params.banniereDateRetour || null,
+    banniere_date_debut:  params.banniereDateDebut  || null,
+    banniere_date_fin:    params.banniereDateFin    || null,
     jours_bloques:     params.joursBlockes,
     tarif_cuisson:      params.tarifCuisson      ?? 60,
     tarif_lavage:       params.tarifLavage       ?? 65,
