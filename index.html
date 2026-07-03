@@ -1745,8 +1745,15 @@ function renderAgendaList(){
 
   const isBlocked = isDateBlocked(iso);
   const dayRdvs = agendaRdvs.filter(r => r.date === iso && r.statut !== 'annule');
-  const matinRdvs = dayRdvs.filter(r => r.creneau === 'matin');
-  const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin');
+  const sortByTournee = (a,b) => {
+    const oa = a.ordre_tournee, ob = b.ordre_tournee;
+    if(oa == null && ob == null) return 0;
+    if(oa == null) return 1;
+    if(ob == null) return -1;
+    return oa - ob;
+  };
+  const matinRdvs = dayRdvs.filter(r => r.creneau === 'matin').sort(sortByTournee);
+  const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin').sort(sortByTournee);
 
   // RDV annulés des dernières 24h pour ce jour
   const now = new Date();
@@ -3006,6 +3013,41 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
   }
   document.getElementById('tournee-modal-content').innerHTML = orderHtml;
   modal.style.display = 'flex';
+
+  // Bouton "Appliquer cet ordre à l'agenda"
+  window._tourneeApplyData = { sortedMatin, sortedAM };
+  let applyBtn = document.getElementById('tournee-apply-btn');
+  if(!applyBtn){
+    applyBtn = document.createElement('button');
+    applyBtn.id = 'tournee-apply-btn';
+    applyBtn.className = 'btn btn-primary';
+    applyBtn.style.cssText = 'width:100%;margin-top:1rem;';
+    document.getElementById('tournee-modal-content').insertAdjacentElement('afterend', applyBtn);
+  }
+  applyBtn.textContent = 'Appliquer cet ordre à l\'agenda';
+  applyBtn.disabled = false;
+  applyBtn.onclick = async () => {
+    applyBtn.disabled = true;
+    applyBtn.textContent = '⏳ Application…';
+    const { sortedMatin, sortedAM } = window._tourneeApplyData;
+    try{
+      const updates = [];
+      sortedMatin.forEach((r,i) => updates.push({ app_id: r.app_id, ordre_tournee: i+1 }));
+      sortedAM.forEach((r,i) => updates.push({ app_id: r.app_id, ordre_tournee: i+1 }));
+      for(const u of updates){
+        await sb.from(RDV_TABLE).update({ ordre_tournee: u.ordre_tournee }).eq('app_id', u.app_id);
+        const local = agendaRdvs.find(r => r.app_id === u.app_id);
+        if(local) local.ordre_tournee = u.ordre_tournee;
+      }
+      renderAgendaList();
+      modal.style.display = 'none';
+      showToast('Ordre appliqué à l\'agenda ✓');
+    }catch(e){
+      showToast('Erreur lors de l\'application', true);
+    }
+    applyBtn.disabled = false;
+    applyBtn.textContent = 'Appliquer cet ordre à l\'agenda';
+  };
 });
 
 document.getElementById('agenda-new-btn').addEventListener('click', () => {
