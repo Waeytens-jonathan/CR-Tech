@@ -1328,6 +1328,23 @@
 
       <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
 
+      <!-- BANNIERE FERMETURE -->
+      <h3 style="font-size:0.85rem;color:var(--orange);letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.8rem;">📢 Bannière de fermeture (site public)</h3>
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem;">
+        <input type="checkbox" id="p-banniere-active" style="width:1.1rem;height:1.1rem;">
+        <label for="p-banniere-active" style="font-size:0.85rem;">Afficher la bannière sur technikhome.fr</label>
+      </div>
+      <div style="margin-bottom:0.6rem;">
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Message</label>
+        <input type="text" id="p-banniere-message" placeholder="Nous sommes actuellement fermés" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:0.6rem;">
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Date de retour (optionnel)</label>
+        <input type="date" id="p-banniere-date-retour" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
+
       <!-- TARIFS ÉLECTROMÉNAGER -->
       <h3 style="font-size:0.85rem;color:var(--orange);letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.8rem;">🔧 Tarifs électroménager</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1.2rem;">
@@ -5149,6 +5166,10 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-quota-am').value        = params.quotaAM       ?? 4;
   document.getElementById('p-quota-matin-sam').value = params.quotaMatinSam ?? 2;
   document.getElementById('p-quota-am-sam').value    = params.quotaAMSam   ?? 2;
+  // Banniere fermeture
+  document.getElementById('p-banniere-active').checked    = params.banniereActive || false;
+  document.getElementById('p-banniere-message').value     = params.banniereMessage || '';
+  document.getElementById('p-banniere-date-retour').value = params.banniereDateRetour || '';
   // Jours bloqués
   renderPJoursBloques(params);
   // Tarifs électroménager
@@ -5219,6 +5240,9 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     quotaAM:        parseInt(document.getElementById('p-quota-am').value)        || 4,
     quotaMatinSam:  parseInt(document.getElementById('p-quota-matin-sam').value) || 2,
     quotaAMSam:     parseInt(document.getElementById('p-quota-am-sam').value)    || 2,
+    banniereActive:     document.getElementById('p-banniere-active').checked,
+    banniereMessage:    document.getElementById('p-banniere-message').value.trim(),
+    banniereDateRetour: document.getElementById('p-banniere-date-retour').value || null,
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
     tarifLavage:       parseInt(document.getElementById('p-tarif-lavage').value)       || 65,
     tarifFroid:        parseInt(document.getElementById('p-tarif-froid').value)        || 70,
@@ -5259,6 +5283,9 @@ async function getAgendaParams(){
       quotaAM:       data.quota_am       ?? 4,
       quotaMatinSam: data.quota_matin_sam ?? 2,
       quotaAMSam:    data.quota_am_sam   ?? 2,
+      banniereActive:     data.banniere_active     ?? false,
+      banniereMessage:    data.banniere_message    ?? '',
+      banniereDateRetour: data.banniere_date_retour ?? '',
       joursBlockes:  data.jours_bloques  || [],
       tarifCuisson:      data.tarif_cuisson      ?? 60,
       tarifLavage:       data.tarif_lavage       ?? 65,
@@ -5298,6 +5325,9 @@ async function saveAgendaParams(params){
     quota_am:        params.quotaAM,
     quota_matin_sam: params.quotaMatinSam,
     quota_am_sam:      params.quotaAMSam,
+    banniere_active:      params.banniereActive     ?? false,
+    banniere_message:     params.banniereMessage    || null,
+    banniere_date_retour: params.banniereDateRetour || null,
     jours_bloques:     params.joursBlockes,
     tarif_cuisson:      params.tarifCuisson      ?? 60,
     tarif_lavage:       params.tarifLavage       ?? 65,
