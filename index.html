@@ -2882,6 +2882,46 @@ function populateNewRdvAppareilOptions(){
 
 let editingRdvAppId = null;
 
+// Distance à vol d'oiseau (Haversine) entre deux points quelconques
+function haversineKm(lat1, lon1, lat2, lon2){
+  const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Récupère la position GPS actuelle, avec repli sur l'adresse de Lens si refusée/indisponible
+function getStartPosition(){
+  return new Promise((resolve) => {
+    if(!navigator.geolocation){ resolve({ ...LENS_COORDS, source: 'lens' }); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, source: 'gps' }),
+      () => resolve({ ...LENS_COORDS, source: 'lens' }),
+      { timeout: 6000, maximumAge: 60000 }
+    );
+  });
+}
+
+// Construit un ordre "plus proche voisin" : à chaque étape, on prend le RDV restant
+// le plus proche du dernier point atteint (position de départ, puis RDV précédent, etc.)
+function nearestNeighborOrder(list, startLat, startLon){
+  const remaining = [...list];
+  const ordered = [];
+  let curLat = startLat, curLon = startLon;
+  while(remaining.length){
+    let bestIdx = 0, bestDist = Infinity;
+    remaining.forEach((r, i) => {
+      if(r.lat_rdv == null || r.lon_rdv == null) return;
+      const d = haversineKm(curLat, curLon, r.lat_rdv, r.lon_rdv);
+      if(d < bestDist){ bestDist = d; bestIdx = i; }
+    });
+    const next = remaining.splice(bestIdx, 1)[0];
+    next._legDistanceKm = isFinite(bestDist) ? parseFloat(bestDist.toFixed(1)) : null;
+    ordered.push(next);
+    if(next.lat_rdv != null && next.lon_rdv != null){ curLat = next.lat_rdv; curLon = next.lon_rdv; }
+  }
+  return ordered;
+}
+
 document.getElementById('agenda-optimize-btn').addEventListener('click', async () => {
   const iso = dateToLocalISO(getDisplayDate(agendaDayOffset));
   const dayRdvs = agendaRdvs.filter(r => r.date === iso && r.statut !== 'annule' && r.statut !== 'effectue');
@@ -2891,60 +2931,65 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
     return;
   }
 
-  // Calculer la distance pour les RDV qui n'en ont pas encore
   const btn = document.getElementById('agenda-optimize-btn');
   btn.disabled = true; btn.textContent = '⏳ Calcul…';
 
+  // Géocoder les RDV qui n'ont pas encore de coordonnées enregistrées
   for(const r of dayRdvs){
-    if(!r.distance_km && r.cp && r.ville){
+    if((r.lat_rdv == null || r.lon_rdv == null) && r.cp && r.ville){
       try{
-        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(r.cp+' '+r.ville)}&maximumResponses=1`);
+        const q = [r.adresse, r.cp, r.ville].filter(Boolean).join(' ');
+        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1`);
         const data = await res.json();
         const point = data.results && data.results[0];
         if(point && point.x && point.y){
-          const dist = await fetchDistanceRDV(parseFloat(point.y), parseFloat(point.x));
-          if(dist){
-            r.distance_km = dist;
-            await sb.from(RDV_TABLE).update({ distance_km: dist }).eq('app_id', r.app_id);
-          }
+          r.lat_rdv = parseFloat(point.y);
+          r.lon_rdv = parseFloat(point.x);
+          await sb.from(RDV_TABLE).update({ lat_rdv: r.lat_rdv, lon_rdv: r.lon_rdv }).eq('app_id', r.app_id);
         }
       }catch(e){}
     }
   }
 
+  // Position de départ : GPS actuel, ou Lens si refusé/indisponible
+  const start = await getStartPosition();
+
   btn.disabled = false; btn.textContent = '🗺️ Tournée';
 
-  // Trier par créneau puis par distance (plus loin → plus près)
   const matinRdvs = dayRdvs.filter(r => r.creneau === 'matin');
   const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin');
 
-  function sortByDistance(list){
-    const withDist    = list.filter(r => r.distance_km).sort((a,b) => b.distance_km - a.distance_km);
-    const withoutDist = list.filter(r => !r.distance_km);
-    return [...withDist, ...withoutDist];
-  }
+  const sortedMatin = nearestNeighborOrder(matinRdvs, start.lat, start.lon);
+  // L'après-midi enchaîne depuis le dernier point du matin, sinon depuis la position de départ
+  const amStart = sortedMatin.length
+    ? { lat: sortedMatin[sortedMatin.length-1].lat_rdv ?? start.lat, lon: sortedMatin[sortedMatin.length-1].lon_rdv ?? start.lon }
+    : start;
+  const sortedAM = nearestNeighborOrder(amRdvs, amStart.lat, amStart.lon);
 
-  const sortedMatin = sortByDistance(matinRdvs);
-  const sortedAM    = sortByDistance(amRdvs);
-
-  function renderSection(label, list){
+  function renderSection(label, list, isFirstOfDay){
     if(!list.length) return '';
-    const rows = list.map((r,i) => `
+    const rows = list.map((r,i) => {
+      const legLabel = (i === 0 && isFirstOfDay)
+        ? (start.source === 'gps' ? 'Depuis votre position' : 'Depuis Lens')
+        : (i === 0 ? 'Depuis la fin du matin' : 'Depuis l\'étape précédente');
+      return `
       <div style="display:flex;align-items:center;gap:0.7rem;padding:0.6rem 0;border-bottom:1px solid var(--border);">
         <div style="font-size:1.2rem;font-weight:700;color:var(--orange);min-width:24px;">${i+1}</div>
         <div style="flex:1;">
           <div style="font-weight:600;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</div>
           <div style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(r.adresse||'')}${r.ville?' · '+escapeHtml(r.ville):''}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">${legLabel}</div>
         </div>
-        <div style="font-size:0.82rem;color:var(--blue);font-weight:600;">${r.distance_km ? r.distance_km+' km' : '?'}</div>
-      </div>`).join('');
+        <div style="font-size:0.82rem;color:var(--blue);font-weight:600;">${r._legDistanceKm != null ? r._legDistanceKm+' km' : '?'}</div>
+      </div>`;
+    }).join('');
     return `<div style="font-size:0.78rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--blue);margin:0.8rem 0 0.3rem;">${label}</div>${rows}`;
   }
 
   const params = _agendaConfigCache || { matinDebut:'08:00', matinFin:'12:00', amDebut:'12:00', amFin:'18:00' };
   const orderHtml =
-    renderSection(`☀️ Matin · ${params.matinDebut}–${params.matinFin}`, sortedMatin) +
-    renderSection(`🌤 Après-midi · ${params.amDebut}–${params.amFin}`, sortedAM);
+    renderSection(`☀️ Matin · ${params.matinDebut}–${params.matinFin}`, sortedMatin, true) +
+    renderSection(`🌤 Après-midi · ${params.amDebut}–${params.amFin}`, sortedAM, false);
 
   // Afficher dans une modale simple
   let modal = document.getElementById('tournee-modal');
@@ -2957,7 +3002,7 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
         <h3 style="margin:0;color:var(--orange);">🗺️ Ordre de tournée</h3>
         <button id="tournee-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
       </div>
-      <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 0.8rem;">Du plus loin au plus proche de Lens.</p>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 0.8rem;">Chaque étape enchaîne sur la plus proche de la précédente.</p>
       <div id="tournee-modal-content"></div>
     </div>`;
     document.body.appendChild(modal);
