@@ -2960,18 +2960,14 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
   const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin');
 
   const sortedMatin = nearestNeighborOrder(matinRdvs, start.lat, start.lon);
-  // L'après-midi enchaîne depuis le dernier point du matin, sinon depuis la position de départ
-  const amStart = sortedMatin.length
-    ? { lat: sortedMatin[sortedMatin.length-1].lat_rdv ?? start.lat, lon: sortedMatin[sortedMatin.length-1].lon_rdv ?? start.lon }
-    : start;
-  const sortedAM = nearestNeighborOrder(amRdvs, amStart.lat, amStart.lon);
+  const sortedAM = nearestNeighborOrder(amRdvs, start.lat, start.lon);
 
-  function renderSection(label, list, isFirstOfDay){
+  function renderSection(label, list){
     if(!list.length) return '';
     const rows = list.map((r,i) => {
-      const legLabel = (i === 0 && isFirstOfDay)
+      const legLabel = i === 0
         ? (start.source === 'gps' ? 'Depuis votre position' : 'Depuis Lens')
-        : (i === 0 ? 'Depuis la fin du matin' : 'Depuis l\'étape précédente');
+        : 'Depuis l\'étape précédente';
       return `
       <div style="display:flex;align-items:center;gap:0.7rem;padding:0.6rem 0;border-bottom:1px solid var(--border);">
         <div style="font-size:1.2rem;font-weight:700;color:var(--orange);min-width:24px;">${i+1}</div>
@@ -2988,8 +2984,8 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
 
   const params = _agendaConfigCache || { matinDebut:'08:00', matinFin:'12:00', amDebut:'12:00', amFin:'18:00' };
   const orderHtml =
-    renderSection(`☀️ Matin · ${params.matinDebut}–${params.matinFin}`, sortedMatin, true) +
-    renderSection(`🌤 Après-midi · ${params.amDebut}–${params.amFin}`, sortedAM, false);
+    renderSection(`☀️ Matin · ${params.matinDebut}–${params.matinFin}`, sortedMatin) +
+    renderSection(`🌤 Après-midi · ${params.amDebut}–${params.amFin}`, sortedAM);
 
   // Afficher dans une modale simple
   let modal = document.getElementById('tournee-modal');
