@@ -1853,7 +1853,7 @@ function renderAgendaList(){
   });
 
   const makeCard = r => {
-    const typeLabel = r.type_rdv === 'pose_piece' ? '🔧 Pose pièce' : r.type_rdv === 'diagnostic' ? '🔍 Diagnostic' : r.type_rdv === 'sav' ? '🛠️ SAV' : '';
+    const typeLabel = r.type_rdv === 'pose_piece' ? '🔧 Pose pièce' : r.type_rdv === 'sav' ? '🛠️ SAV' : '🔍 Diagnostic';
     const doneLabel = r.statut === 'effectue' ? '<span class="badge green" style="font-size:0.7rem;">Effectué</span>' : '';
     const borderColor = r.statut === 'effectue' ? '#4caf50' : 'var(--orange)';
     const bgColor = r.statut === 'effectue' ? 'rgba(76,175,80,0.06)' : 'rgba(245,166,35,0.07)';
@@ -2786,7 +2786,7 @@ function showAgendaDetail(appId){
     ['Statut', statutLabel],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
-    ['Type', r.type_rdv ? (TYPE_RDV_LABELS[r.type_rdv] || r.type_rdv) : null],
+    ['Type', TYPE_RDV_LABELS[r.type_rdv] || TYPE_RDV_LABELS['diagnostic']],
     ['Client', `${r.prenom || ''} ${r.nom || ''}`.trim()],
     ['Téléphone', r.tel ? '__HTML__' + telValue : null],
     ['Email', r.email],
