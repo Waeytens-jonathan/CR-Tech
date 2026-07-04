@@ -1488,13 +1488,9 @@
       </div>
     </div>
 
-    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Nom de la pièce</label>
-    <input id="pose-piece-nom" type="text" placeholder="ex : Courroie lave-linge"
-      style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
-
-    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Référence</label>
-    <input id="pose-piece-ref" type="text" placeholder="ex : REF-1234"
-      style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Pièce(s) posée(s)</label>
+    <div id="pose-piece-rows" style="margin-bottom:0.6rem;"></div>
+    <button class="btn btn-outline" id="pose-piece-add-row-btn" type="button" style="width:100%;margin-bottom:1rem;">+ Ajouter une autre pièce</button>
 
     <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Photo(s) de la pièce posée (2 max)</label>
     <div class="grid" id="pose-piece-photo-grid" style="grid-template-columns:repeat(auto-fill, minmax(90px,1fr)); gap:0.5rem;margin-bottom:0.6rem;"></div>
@@ -1629,6 +1625,7 @@ function reportToRow(r){
     piece_depose_nom: r.pieceDeposeNom || '',
     piece_depose_ref: r.pieceDeposeRef || '',
     piece_depose_photos: r.pieceDeposePhotos ? JSON.stringify(r.pieceDeposePhotos) : '',
+    pieces_posees: (Array.isArray(r.piecesPosees) && r.piecesPosees.length) ? JSON.stringify(r.piecesPosees) : '',
     client_id: r.client_id || null,
     dossier_id: r.dossier_id || null,
     date_termine: r.date_termine || null,
@@ -1714,6 +1711,7 @@ function rowToReport(row){
     pieceDeposeNom: row.piece_depose_nom || '',
     pieceDeposeRef: row.piece_depose_ref || '',
     pieceDeposePhotos: row.piece_depose_photos ? (() => { try{ return JSON.parse(row.piece_depose_photos); }catch(e){ return []; } })() : [],
+    piecesPosees: row.pieces_posees ? (() => { try{ return JSON.parse(row.pieces_posees); }catch(e){ return []; } })() : [],
     client_id: row.client_id || null,
     dossier_id: row.dossier_id || null,
     date_termine: row.date_termine || null,
@@ -4265,7 +4263,7 @@ function buildListItem(r){
   }
 
   let pieceBadge = '';
-  if(r.pieceDeposeNom){
+  if((Array.isArray(r.piecesPosees) && r.piecesPosees.length) || r.pieceDeposeNom){
     pieceBadge = '<span class="badge green">Pièce posée</span>';
   } else if(r['commande-piece']){
     pieceBadge = '<span class="badge orange">Commande pièce</span>';
@@ -4591,10 +4589,16 @@ function renderDetailContent(r, container){
     html += '</div>';
   }
 
-  if(r.pieceDeposeNom){
-    html += '<div class="detail-section"><h3>Pièce posée</h3>';
-    html += dRow('Nom', escapeHtml(r.pieceDeposeNom));
-    html += dRow('Référence', escapeHtml(r.pieceDeposeRef));
+  const piecesAffichees = (Array.isArray(r.piecesPosees) && r.piecesPosees.length)
+    ? r.piecesPosees
+    : (r.pieceDeposeNom ? [{ nom: r.pieceDeposeNom, ref: r.pieceDeposeRef }] : []);
+  if(piecesAffichees.length){
+    html += `<div class="detail-section"><h3>Pièce${piecesAffichees.length > 1 ? 's posées' : ' posée'}</h3>`;
+    piecesAffichees.forEach((p, i) => {
+      if(piecesAffichees.length > 1) html += `<p style="margin:0.3rem 0 0.1rem;font-weight:600;color:var(--text-muted);font-size:0.8rem;">Pièce ${i+1}</p>`;
+      html += dRow('Nom', escapeHtml(p.nom || ''));
+      html += dRow('Référence', escapeHtml(p.ref || ''));
+    });
     if(Array.isArray(r.pieceDeposePhotos) && r.pieceDeposePhotos.length){
       html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.4rem;">';
       r.pieceDeposePhotos.forEach(src => {
@@ -5021,10 +5025,15 @@ async function generatePdfFor(data){
     line('Prix facturé', data['piece-cout'] ? data['piece-cout'] + ' €' : '—');
     y += 2;
   }
-  if(data.pieceDeposeNom){
-    section('Pièce posée');
-    line('Nom', data.pieceDeposeNom);
-    line('Référence', data.pieceDeposeRef || '');
+  const pdfPiecesPosees = (Array.isArray(data.piecesPosees) && data.piecesPosees.length)
+    ? data.piecesPosees
+    : (data.pieceDeposeNom ? [{ nom: data.pieceDeposeNom, ref: data.pieceDeposeRef }] : []);
+  if(pdfPiecesPosees.length){
+    section(pdfPiecesPosees.length > 1 ? 'Pièces posées' : 'Pièce posée');
+    pdfPiecesPosees.forEach(p => {
+      line('Nom', p.nom || '');
+      if(p.ref) line('Référence', p.ref);
+    });
     y += 2;
   }
 
@@ -5256,10 +5265,52 @@ document.getElementById('pose-piece-photo-input').addEventListener('change', asy
   e.target.value = '';
 });
 
+// ==================== POSE PIÈCE — LIGNES MULTIPLES ====================
+let posePieceRows = [];
+
+function newPosePieceRow(prefill){
+  return Object.assign({ id: 'r' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', ref: '', stockAppId: null, stockType: null }, prefill || {});
+}
+
+function renderPosePieceRows(){
+  const container = document.getElementById('pose-piece-rows');
+  if(!container) return;
+  container.innerHTML = posePieceRows.map((row, i) => `
+    <div class="pp-row" data-row-id="${row.id}" style="display:flex;gap:0.5rem;margin-bottom:0.5rem;align-items:flex-start;">
+      <div style="flex:1;">
+        <input type="text" class="pp-row-nom" placeholder="Nom de la pièce" value="${escapeHtml(row.nom)}"
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
+        <input type="text" class="pp-row-ref" placeholder="Référence (optionnel)" value="${escapeHtml(row.ref)}"
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+      </div>
+      ${posePieceRows.length > 1 ? `<button type="button" class="pp-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
+    </div>`).join('');
+
+  container.querySelectorAll('.pp-row').forEach(rowEl => {
+    const id = rowEl.dataset.rowId;
+    const row = posePieceRows.find(r => r.id === id);
+    rowEl.querySelector('.pp-row-nom').addEventListener('input', (e) => { row.nom = e.target.value; });
+    rowEl.querySelector('.pp-row-ref').addEventListener('input', (e) => { row.ref = e.target.value; });
+    rowEl.querySelector('.pp-row-remove')?.addEventListener('click', () => {
+      posePieceRows = posePieceRows.filter(r => r.id !== id);
+      renderPosePieceRows();
+    });
+  });
+}
+
+document.getElementById('pose-piece-add-row-btn').addEventListener('click', () => {
+  posePieceRows.push(newPosePieceRow());
+  renderPosePieceRows();
+});
+
 document.getElementById('detail-pose-piece-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
-  document.getElementById('pose-piece-nom').value = '';
-  document.getElementById('pose-piece-ref').value = '';
+  posePieceRows = (Array.isArray(currentDetailReport.piecesPosees) && currentDetailReport.piecesPosees.length)
+    ? currentDetailReport.piecesPosees.map(p => newPosePieceRow(p))
+    : (currentDetailReport.pieceDeposeNom
+        ? [newPosePieceRow({ nom: currentDetailReport.pieceDeposeNom, ref: currentDetailReport.pieceDeposeRef || '' })]
+        : [newPosePieceRow()]);
+  renderPosePieceRows();
   document.getElementById('pose-piece-statut').value = 'Terminée';
   posePiecePhotos = [];
   renderPosePiecePhotoGrid();
@@ -5272,8 +5323,8 @@ document.getElementById('pose-piece-cancel-btn').addEventListener('click', () =>
 
 document.getElementById('pose-piece-save-btn').addEventListener('click', async () => {
   if(!currentDetailReport) return;
-  const nom = document.getElementById('pose-piece-nom').value.trim();
-  if(!nom){ showToast('Merci de renseigner le nom de la pièce', true); return; }
+  const validRows = posePieceRows.filter(r => r.nom.trim());
+  if(!validRows.length){ showToast('Merci de renseigner au moins une pièce', true); return; }
 
   const idx = reports.findIndex(rep => rep.id === currentDetailReport.id);
   if(idx === -1){ showToast('Compte-rendu introuvable', true); return; }
@@ -5282,47 +5333,45 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   btn.disabled = true;
   btn.textContent = 'Enregistrement…';
 
-  reports[idx].pieceDeposeNom = nom;
-  reports[idx].pieceDeposeRef = document.getElementById('pose-piece-ref').value.trim();
+  const piecesPosees = validRows.map(r => ({ nom: r.nom.trim(), ref: r.ref.trim() }));
+  reports[idx].piecesPosees = piecesPosees;
+  // Champs legacy conservés pour compatibilité (1ère pièce de la liste)
+  reports[idx].pieceDeposeNom = piecesPosees[0].nom;
+  reports[idx].pieceDeposeRef = piecesPosees[0].ref;
   reports[idx].pieceDeposePhotos = posePiecePhotos.slice();
   reports[idx].statut = document.getElementById('pose-piece-statut').value;
 
   // localStorage désactivé — données dans Supabase
   await saveReportToSupabase(reports[idx]);
 
-  // Mettre à jour le stock si une pièce a été sélectionnée
-  const stockInput = document.getElementById('pose-piece-stock-search');
-  const selectedAppId = stockInput && stockInput.dataset.selectedAppId;
-  const selectedType  = stockInput && stockInput.dataset.selectedType;
-  if(selectedAppId && selectedType){
+  // Mettre à jour le stock pour chaque pièce sélectionnée depuis le stock
+  for(const row of validRows){
+    if(!row.stockAppId || !row.stockType) continue;
     try{
-      if(selectedType === 'embarque'){
-        // Stock van → passer hors_stock
-        await sb.from('stock_embarque').update({ statut: 'hors_stock' }).eq('app_id', selectedAppId);
-        showToast('Pièce du van marquée hors stock ✓');
+      if(row.stockType === 'embarque'){
+        await sb.from('stock_embarque').update({ statut: 'hors_stock' }).eq('app_id', row.stockAppId);
       } else {
-        // Stock pièces → supprimer
-        await sb.from('stock_pieces').delete().eq('app_id', selectedAppId);
-        showToast('Pièce retirée du stock ✓');
+        await sb.from('stock_pieces').delete().eq('app_id', row.stockAppId);
       }
-      // Vider le cache stock local pour forcer rechargement
-      stockEmbarque = [];
-      stockPieces = [];
     }catch(e){
       console.error('Erreur mise à jour stock :', e);
-      showToast('Pièce posée, mais erreur MAJ stock', true);
     }
-    // Réinitialiser la sélection
-    delete stockInput.dataset.selectedAppId;
-    delete stockInput.dataset.selectedType;
-    stockInput.value = '';
   }
+  if(validRows.some(r => r.stockAppId)){
+    stockEmbarque = [];
+    stockPieces = [];
+    showToast('Pièce(s) posée(s) et stock mis à jour ✓');
+  } else {
+    showToast('Pièce(s) posée(s) enregistrée(s)');
+  }
+
+  const stockInput = document.getElementById('pose-piece-stock-search');
+  if(stockInput){ delete stockInput.dataset.selectedAppId; delete stockInput.dataset.selectedType; stockInput.value = ''; }
 
   currentDetailReport = reports[idx];
   document.getElementById('pose-piece-modal').style.display = 'none';
   btn.disabled = false;
   btn.textContent = 'Valider ✓';
-  showToast('Pièce posée enregistrée');
   showDetail(currentDetailReport);
 });
 
@@ -5600,9 +5649,14 @@ function isDateBlocked(dateISO){
         const source = type === 'embarque' ? stockEmbarque : stockPieces;
         const item   = source.find(p => p.app_id === el.dataset.appId);
         if(!item) return;
-        document.getElementById('pose-piece-nom').value = item.nom || '';
-        document.getElementById('pose-piece-ref').value = item.ref || '';
-        if(input){ input.value = item.nom || ''; input.dataset.selectedAppId = item.app_id; input.dataset.selectedType = type; }
+        let target = posePieceRows.find(r => !r.nom.trim());
+        if(!target){ target = newPosePieceRow(); posePieceRows.push(target); }
+        target.nom = item.nom || '';
+        target.ref = item.ref || '';
+        target.stockAppId = item.app_id;
+        target.stockType = type;
+        renderPosePieceRows();
+        if(input){ input.value = ''; }
         box.style.display = 'none';
       });
     });
@@ -5849,9 +5903,12 @@ function renderDossierAppareilContent(r){
   });
   actionsDiv.querySelector('.doss-pose-btn')?.addEventListener('click', () => {
     currentDetailReport = r;
-    document.getElementById('pose-piece-nom').value = r.pieceDeposeNom || '';
-    document.getElementById('pose-piece-ref').value = r.pieceDeposeRef || '';
+    posePieceRows = (Array.isArray(r.piecesPosees) && r.piecesPosees.length)
+      ? r.piecesPosees.map(p => newPosePieceRow(p))
+      : (r.pieceDeposeNom ? [newPosePieceRow({ nom: r.pieceDeposeNom, ref: r.pieceDeposeRef || '' })] : [newPosePieceRow()]);
+    renderPosePieceRows();
     posePiecePhotos = [];
+    renderPosePiecePhotoGrid();
     document.getElementById('pose-piece-modal').style.display = 'flex';
   });
   actionsDiv.querySelector('.doss-archiver-btn')?.addEventListener('click', async () => {
