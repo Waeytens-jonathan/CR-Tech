@@ -113,6 +113,30 @@
     padding:1.5rem;
     margin-bottom:1.2rem;
   }
+  .settings-section{
+    border:1px solid var(--border);
+    border-radius:12px;
+    margin-bottom:0.7rem;
+    overflow:hidden;
+  }
+  .settings-section-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0.9rem 1rem;
+    cursor:pointer;
+    background:rgba(255,255,255,0.02);
+    user-select:none;
+  }
+  .settings-section-header:hover{ background:rgba(255,255,255,0.05); }
+  .settings-section-header h3{
+    margin:0; font-size:0.85rem; color:var(--orange);
+    letter-spacing:0.06em; text-transform:uppercase; font-weight:700;
+  }
+  .settings-section-chevron{
+    color:var(--text-muted); transition:transform .2s; font-size:0.8rem;
+  }
+  .settings-section.open .settings-section-chevron{ transform:rotate(180deg); }
+  .settings-section-body{ display:none; padding:0.2rem 1rem 1.1rem; }
+  .settings-section.open .settings-section-body{ display:block; }
   .card h2{
     font-family:'Bebas Neue', sans-serif;
     font-size:1.3rem;
@@ -1361,79 +1385,91 @@
       <h2 style="margin:0 0 1.2rem;">⚙️ Paramètres</h2>
 
       <!-- AGENDA -->
-      <h3 style="font-size:0.85rem;color:var(--orange);letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.8rem;">📅 Agenda</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin début</label><input type="time" id="p-matin-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin fin</label><input type="time" id="p-matin-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi début</label><input type="time" id="p-am-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi fin</label><input type="time" id="p-am-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota matin Lun-Ven</label><input type="number" id="p-quota-matin" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota AM Lun-Ven</label><input type="number" id="p-quota-am" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota matin Samedi</label><input type="number" id="p-quota-matin-sam" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota AM Samedi</label><input type="number" id="p-quota-am-sam" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+      <div class="settings-section open" data-section="agenda">
+        <div class="settings-section-header"><h3>📅 Agenda</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin début</label><input type="time" id="p-matin-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Matin fin</label><input type="time" id="p-matin-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi début</label><input type="time" id="p-am-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Après-midi fin</label><input type="time" id="p-am-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota matin Lun-Ven</label><input type="number" id="p-quota-matin" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota AM Lun-Ven</label><input type="number" id="p-quota-am" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota matin Samedi</label><input type="number" id="p-quota-matin-sam" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Quota AM Samedi</label><input type="number" id="p-quota-am-sam" min="1" max="20" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+          </div>
+          <h4 style="font-size:0.82rem;color:var(--text-muted);margin:0.8rem 0 0.4rem;">Jours fermés</h4>
+          <div id="p-jours-bloques-list" style="margin-bottom:0.5rem;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Du</label><input type="date" id="p-bloc-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Au</label><input type="date" id="p-bloc-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+          </div>
+          <button class="btn btn-secondary" id="p-bloc-add-btn" style="width:100%;padding:0.6rem 0.7rem;margin-top:0.5rem;">+ Ajouter</button>
+        </div>
       </div>
-      <h4 style="font-size:0.82rem;color:var(--text-muted);margin:0.8rem 0 0.4rem;">Jours fermés</h4>
-      <div id="p-jours-bloques-list" style="margin-bottom:0.5rem;"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.5rem;align-items:end;margin-bottom:1.2rem;">
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Du</label><input type="date" id="p-bloc-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Au</label><input type="date" id="p-bloc-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <button class="btn btn-secondary" id="p-bloc-add-btn" style="padding:0.5rem 0.7rem;">+ Ajouter</button>
-      </div>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
 
       <!-- BANNIERE FERMETURE -->
-      <h3 style="font-size:0.85rem;color:var(--orange);letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.8rem;">📢 Bannière de fermeture (site public)</h3>
-      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem;">
-        <input type="checkbox" id="p-banniere-active" style="width:1.1rem;height:1.1rem;">
-        <label for="p-banniere-active" style="font-size:0.85rem;">Afficher la bannière sur technikhome.fr</label>
+      <div class="settings-section" data-section="banniere">
+        <div class="settings-section-header"><h3>📢 Bannière de fermeture</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem;">
+            <input type="checkbox" id="p-banniere-active" style="width:1.1rem;height:1.1rem;">
+            <label for="p-banniere-active" style="font-size:0.85rem;">Afficher la bannière sur technikhome.fr</label>
+          </div>
+          <div style="margin-bottom:0.6rem;">
+            <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Message</label>
+            <input type="text" id="p-banniere-message" placeholder="Nous sommes actuellement fermés" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Fermé du</label><input type="date" id="p-banniere-date-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Au</label><input type="date" id="p-banniere-date-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+          </div>
+          <p style="font-size:0.75rem;color:var(--text-muted);margin:0;">Laissez vide pour une fermeture sans date de fin connue.</p>
+        </div>
       </div>
-      <div style="margin-bottom:0.6rem;">
-        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Message</label>
-        <input type="text" id="p-banniere-message" placeholder="Nous sommes actuellement fermés" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Fermé du</label><input type="date" id="p-banniere-date-debut" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Au</label><input type="date" id="p-banniere-date-fin" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-      </div>
-      <p style="font-size:0.75rem;color:var(--text-muted);margin:0 0 0.6rem;">Laissez vide pour une fermeture sans date de fin connue.</p>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
 
       <!-- TARIFS ÉLECTROMÉNAGER -->
-      <h3 style="font-size:0.85rem;color:var(--orange);letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.8rem;">🔧 Tarifs électroménager</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1.2rem;">
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Cuisson / Audiovisuel (€)</label><input type="number" id="p-tarif-cuisson" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Lavage / Séchage (€)</label><input type="number" id="p-tarif-lavage" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Froid (€)</label><input type="number" id="p-tarif-froid" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Second déplacement (€)</label><input type="number" id="p-tarif-deplacement2" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Réparation composant à partir de (€)</label><input type="number" id="p-tarif-composant" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Diagnostic irréparable (€)</label><input type="number" id="p-tarif-irreparable" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+      <div class="settings-section" data-section="tarifs-em">
+        <div class="settings-section-header"><h3>🔧 Tarifs électroménager</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Cuisson / Audiovisuel (€)</label><input type="number" id="p-tarif-cuisson" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Lavage / Séchage (€)</label><input type="number" id="p-tarif-lavage" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Froid (€)</label><input type="number" id="p-tarif-froid" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Second déplacement (€)</label><input type="number" id="p-tarif-deplacement2" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Réparation composant à partir de (€)</label><input type="number" id="p-tarif-composant" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Diagnostic irréparable (€)</label><input type="number" id="p-tarif-irreparable" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+          </div>
+        </div>
       </div>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
 
       <!-- TARIFS GAMING -->
-      <h3 style="font-size:0.85rem;color:var(--orange);letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.8rem;">🎮 Tarifs gaming</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1.2rem;">
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Manette à partir de (€)</label><input type="number" id="p-tarif-manette" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Console à partir de (€)</label><input type="number" id="p-tarif-console" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Micro-soudure à partir de (€)</label><input type="number" id="p-tarif-microsoudure" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Récupération domicile (€)</label><input type="number" id="p-tarif-recup-gaming" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+      <div class="settings-section" data-section="tarifs-gaming">
+        <div class="settings-section-header"><h3>🎮 Tarifs gaming</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Manette à partir de (€)</label><input type="number" id="p-tarif-manette" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Console à partir de (€)</label><input type="number" id="p-tarif-console" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Micro-soudure à partir de (€)</label><input type="number" id="p-tarif-microsoudure" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Récupération domicile (€)</label><input type="number" id="p-tarif-recup-gaming" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+          </div>
+        </div>
       </div>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
 
       <!-- TARIFS INFORMATIQUE -->
-      <h3 style="font-size:0.85rem;color:var(--orange);letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.8rem;">💻 Tarifs informatique</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1.2rem;">
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Téléphone / Tablette à partir de (€)</label><input type="number" id="p-tarif-tel" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">PC Portable à partir de (€)</label><input type="number" id="p-tarif-pc-portable" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">PC Fixe / Mac à partir de (€)</label><input type="number" id="p-tarif-pc-fixe" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Récupération domicile (€)</label><input type="number" id="p-tarif-recup-info" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+      <div class="settings-section" data-section="tarifs-info">
+        <div class="settings-section-header"><h3>💻 Tarifs informatique</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Téléphone / Tablette à partir de (€)</label><input type="number" id="p-tarif-tel" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">PC Portable à partir de (€)</label><input type="number" id="p-tarif-pc-portable" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">PC Fixe / Mac à partir de (€)</label><input type="number" id="p-tarif-pc-fixe" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+            <div><label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Récupération domicile (€)</label><input type="number" id="p-tarif-recup-info" min="0" step="1" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+          </div>
+        </div>
       </div>
 
-      <button class="btn btn-primary" id="p-save-btn" style="width:100%;margin-top:0.5rem;">Enregistrer tous les paramètres ✓</button>
+      <button class="btn btn-primary" id="p-save-btn" style="width:100%;margin-top:0.8rem;">Enregistrer tous les paramètres ✓</button>
     </div>
   </div>
 
@@ -5291,6 +5327,13 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
 });
 
 // ==================== PARAMÈTRES AGENDA (Supabase) ====================
+
+// Accordéon des sections de Paramètres
+document.querySelectorAll('.settings-section-header').forEach(header => {
+  header.addEventListener('click', () => {
+    header.closest('.settings-section').classList.toggle('open');
+  });
+});
 
 // Chargement de l'onglet Paramètres
 document.getElementById('tab-parametres') && document.getElementById('tab-parametres').addEventListener('click', async () => {
