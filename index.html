@@ -1428,6 +1428,20 @@
         </div>
       </div>
 
+      <!-- AVIS CLIENTS -->
+      <div class="settings-section" data-section="avis">
+        <div class="settings-section-header"><h3>⭐ Avis clients (site public)</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <div style="margin-bottom:0.8rem;">
+            <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Note globale affichée (ex : 4.9)</label>
+            <input type="number" id="p-avis-note" min="1" max="5" step="0.1" style="width:120px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          </div>
+          <label style="font-size:0.8rem;display:block;margin-bottom:0.4rem;">Vignettes avis (8 maximum)</label>
+          <div id="p-avis-rows" style="margin-bottom:0.6rem;"></div>
+          <button class="btn btn-outline" id="p-avis-add-btn" type="button" style="width:100%;">+ Ajouter un avis</button>
+        </div>
+      </div>
+
       <!-- TARIFS ÉLECTROMÉNAGER -->
       <div class="settings-section" data-section="tarifs-em">
         <div class="settings-section-header"><h3>🔧 Tarifs électroménager</h3><span class="settings-section-chevron">▼</span></div>
@@ -5375,6 +5389,66 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   showDetail(currentDetailReport);
 });
 
+// ==================== AVIS CLIENTS — LIGNES MULTIPLES ====================
+let avisRows = [];
+
+function newAvisRow(prefill){
+  return Object.assign({ id: 'a' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', note: 5, date: '', texte: '' }, prefill || {});
+}
+
+function renderAvisRows(){
+  const container = document.getElementById('p-avis-rows');
+  if(!container) return;
+  container.innerHTML = avisRows.map(row => `
+    <div class="avis-row" data-row-id="${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:0.7rem;margin-bottom:0.6rem;">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
+        <input type="text" class="avis-row-nom" placeholder="Nom (ex : Florence N.)" value="${escapeHtml(row.nom)}"
+          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <select class="avis-row-note" style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+          ${[5,4,3,2,1].map(n => `<option value="${n}" ${row.note==n?'selected':''}>${'★'.repeat(n)}</option>`).join('')}
+        </select>
+        <input type="text" class="avis-row-date" placeholder="Il y a 3 jours" value="${escapeHtml(row.date)}"
+          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+      </div>
+      <textarea class="avis-row-texte" placeholder="Texte de l'avis" rows="2"
+        style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;resize:vertical;">${escapeHtml(row.texte)}</textarea>
+      <button type="button" class="avis-row-remove btn btn-outline" style="margin-top:0.5rem;padding:0.35rem 0.7rem;font-size:0.8rem;color:var(--red,#e05252);">✕ Supprimer cet avis</button>
+    </div>`).join('');
+
+  container.querySelectorAll('.avis-row').forEach(rowEl => {
+    const id = rowEl.dataset.rowId;
+    const row = avisRows.find(r => r.id === id);
+    rowEl.querySelector('.avis-row-nom').addEventListener('input', e => { row.nom = e.target.value; });
+    rowEl.querySelector('.avis-row-note').addEventListener('change', e => { row.note = parseInt(e.target.value); });
+    rowEl.querySelector('.avis-row-date').addEventListener('input', e => { row.date = e.target.value; });
+    rowEl.querySelector('.avis-row-texte').addEventListener('input', e => { row.texte = e.target.value; });
+    rowEl.querySelector('.avis-row-remove').addEventListener('click', () => {
+      avisRows = avisRows.filter(r => r.id !== id);
+      renderAvisRows();
+      updateAvisAddBtnState();
+    });
+  });
+}
+
+function updateAvisAddBtnState(){
+  const btn = document.getElementById('p-avis-add-btn');
+  if(!btn) return;
+  if(avisRows.length >= 8){
+    btn.disabled = true;
+    btn.textContent = 'Maximum 8 avis atteint';
+  } else {
+    btn.disabled = false;
+    btn.textContent = '+ Ajouter un avis';
+  }
+}
+
+document.getElementById('p-avis-add-btn').addEventListener('click', () => {
+  if(avisRows.length >= 8) return;
+  avisRows.push(newAvisRow());
+  renderAvisRows();
+  updateAvisAddBtnState();
+});
+
 // ==================== PARAMÈTRES AGENDA (Supabase) ====================
 
 // Accordéon des sections de Paramètres
@@ -5401,6 +5475,13 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-banniere-message').value     = params.banniereMessage || '';
   document.getElementById('p-banniere-date-debut').value  = params.banniereDateDebut || '';
   document.getElementById('p-banniere-date-fin').value    = params.banniereDateFin || '';
+  // Avis clients
+  document.getElementById('p-avis-note').value = params.avisNoteGlobale ?? 5.0;
+  avisRows = (Array.isArray(params.avisListe) && params.avisListe.length)
+    ? params.avisListe.map(a => newAvisRow(a))
+    : [newAvisRow()];
+  renderAvisRows();
+  updateAvisAddBtnState();
   // Jours bloqués
   renderPJoursBloques(params);
   // Tarifs électroménager
@@ -5475,6 +5556,8 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     banniereMessage:    document.getElementById('p-banniere-message').value.trim(),
     banniereDateDebut:  document.getElementById('p-banniere-date-debut').value || null,
     banniereDateFin:    document.getElementById('p-banniere-date-fin').value   || null,
+    avisNoteGlobale:    parseFloat(document.getElementById('p-avis-note').value) || 5.0,
+    avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, date: r.date.trim(), texte: r.texte.trim() })),
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
     tarifLavage:       parseInt(document.getElementById('p-tarif-lavage').value)       || 65,
     tarifFroid:        parseInt(document.getElementById('p-tarif-froid').value)        || 70,
@@ -5519,6 +5602,8 @@ async function getAgendaParams(){
       banniereMessage:    data.banniere_message    ?? '',
       banniereDateDebut:  data.banniere_date_debut ?? '',
       banniereDateFin:    data.banniere_date_fin   ?? '',
+      avisNoteGlobale:    data.avis_note_globale ?? 5.0,
+      avisListe:          (() => { try{ return data.avis_liste ? JSON.parse(data.avis_liste) : []; }catch(e){ return []; } })(),
       joursBlockes:  data.jours_bloques  || [],
       tarifCuisson:      data.tarif_cuisson      ?? 60,
       tarifLavage:       data.tarif_lavage       ?? 65,
@@ -5562,6 +5647,8 @@ async function saveAgendaParams(params){
     banniere_message:     params.banniereMessage    || null,
     banniere_date_debut:  params.banniereDateDebut  || null,
     banniere_date_fin:    params.banniereDateFin    || null,
+    avis_note_globale:    params.avisNoteGlobale ?? 5.0,
+    avis_liste:           (Array.isArray(params.avisListe) && params.avisListe.length) ? JSON.stringify(params.avisListe) : null,
     jours_bloques:     params.joursBlockes,
     tarif_cuisson:      params.tarifCuisson      ?? 60,
     tarif_lavage:       params.tarifLavage       ?? 65,
