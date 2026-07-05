@@ -4403,10 +4403,9 @@ function buildListItem(r){
   }
 
   const reste = parseFloat(r['reste-encaisser']) || 0;
-  let resteBadge = '';
-  if(reste > 0){
-    resteBadge = `<span class="badge red">Reste ${reste.toFixed(2)} €</span>`;
-  }
+  const resteBadge = reste > 0
+    ? `<span class="badge red">Reste ${reste.toFixed(2)} €</span>`
+    : '<span class="badge green">Payé</span>';
 
   let factureBadge = r['facture-creee']
     ? '<span class="badge green">Facture créée</span>'
@@ -4440,7 +4439,7 @@ function buildListItem(r){
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-weight:700;color:var(--orange);font-size:1rem;">${total}</div>
         <div style="margin-top:0.15rem;">${payBadge}</div>
-        ${resteBadge ? '<div style="margin-top:0.1rem;">'+resteBadge+'</div>' : ''}
+        <div style="margin-top:0.1rem;">${resteBadge}</div>
         <div style="margin-top:0.1rem;">${factureBadge}</div>
       </div>
     </div>
@@ -4591,6 +4590,12 @@ function buildDossierItem(rapports){
       ? '<span class="badge orange" style="font-size:0.7rem;">⚡ Partiel</span>'
       : '<span class="badge" style="font-size:0.7rem;background:rgba(224,88,79,0.12);color:#e0584f;border:1px solid rgba(224,88,79,0.3);">📄 Non facturé</span>';
 
+  // Reste à payer (somme sur tous les rapports du dossier)
+  const totalReste = rapports.reduce((s,r) => s + (parseFloat(r['reste-encaisser'])||0), 0);
+  const resteBadge = totalReste > 0
+    ? `<span class="badge red" style="font-size:0.7rem;">Reste ${totalReste.toFixed(2)} €</span>`
+    : '';
+
   item.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;width:100%;">
       <div style="flex:1;min-width:0;">
@@ -4603,6 +4608,7 @@ function buildDossierItem(rapports){
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-weight:700;color:var(--orange);font-size:1rem;">${totalFmt}</div>
         <div style="margin-top:0.3rem;">${factureBadge}</div>
+        ${resteBadge ? '<div style="margin-top:0.25rem;">'+resteBadge+'</div>' : ''}
       </div>
     </div>
   `;
@@ -6282,6 +6288,8 @@ async function autoArchiveOldReports(){
   const toArchive = reports.filter(r => {
     if(!['Terminée','Non_reparable'].includes(r.statut)) return false;
     if(!r['facture-creee']) return false;
+    // Ne jamais archiver automatiquement tant qu'il reste de l'argent à encaisser
+    if((parseFloat(r['reste-encaisser']) || 0) > 0) return false;
     // Utiliser date_termine si disponible, sinon ne pas archiver automatiquement
     if(!r.date_termine) return false;
     const termineDate = new Date(r.date_termine);
