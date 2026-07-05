@@ -5401,8 +5401,34 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
 // ==================== AVIS CLIENTS — LIGNES MULTIPLES ====================
 let avisRows = [];
 
+function pluralUnite(n, unite){
+  if(unite === 'mois') return 'mois'; // invariable en français
+  if(unite === 'an') return n > 1 ? 'ans' : 'an';
+  return n > 1 ? 'jours' : 'jour'; // jour par défaut
+}
+
+function formatAvisDate(nombre, unite){
+  const n = parseInt(nombre) || 1;
+  return `Il y a ${n} ${pluralUnite(n, unite)}`;
+}
+
+// Retrouve nombre/unité à partir d'une ancienne valeur texte libre (rétrocompatibilité)
+function parseAvisDate(str){
+  if(!str) return { nombre: 1, unite: 'jour' };
+  const m = String(str).match(/(\d+)\s*(jour|mois|an)/i);
+  if(m) return { nombre: parseInt(m[1]), unite: m[2].toLowerCase() };
+  return { nombre: 1, unite: 'jour' };
+}
+
 function newAvisRow(prefill){
-  return Object.assign({ id: 'a' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', note: 5, date: '', texte: '' }, prefill || {});
+  const base = { id: 'a' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', note: 5, dateNombre: 1, dateUnite: 'jour', texte: '' };
+  const p = prefill || {};
+  if(p.date && p.dateNombre === undefined){
+    const parsed = parseAvisDate(p.date);
+    p.dateNombre = parsed.nombre;
+    p.dateUnite = parsed.unite;
+  }
+  return Object.assign(base, p);
 }
 
 function renderAvisRows(){
@@ -5410,15 +5436,21 @@ function renderAvisRows(){
   if(!container) return;
   container.innerHTML = avisRows.map(row => `
     <div class="avis-row" data-row-id="${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:0.7rem;margin-bottom:0.6rem;">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
+      <div style="display:grid;grid-template-columns:2fr 1fr 0.7fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
         <input type="text" class="avis-row-nom" placeholder="Nom (ex : Florence N.)" value="${escapeHtml(row.nom)}"
           style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
         <select class="avis-row-note" style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
           ${[5,4,3,2,1].map(n => `<option value="${n}" ${row.note==n?'selected':''}>${'★'.repeat(n)}</option>`).join('')}
         </select>
-        <input type="text" class="avis-row-date" placeholder="Il y a 3 jours" value="${escapeHtml(row.date)}"
+        <input type="number" class="avis-row-date-nombre" min="1" step="1" value="${row.dateNombre}"
           style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <select class="avis-row-date-unite" style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+          <option value="jour" ${row.dateUnite==='jour'?'selected':''}>jour(s)</option>
+          <option value="mois" ${row.dateUnite==='mois'?'selected':''}>mois</option>
+          <option value="an" ${row.dateUnite==='an'?'selected':''}>an(s)</option>
+        </select>
       </div>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin:0 0 0.5rem;">Affiché sur le site : « ${formatAvisDate(row.dateNombre, row.dateUnite)} »</p>
       <textarea class="avis-row-texte" placeholder="Texte de l'avis" rows="2"
         style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;resize:vertical;">${escapeHtml(row.texte)}</textarea>
       <button type="button" class="avis-row-remove btn btn-outline" style="margin-top:0.5rem;padding:0.35rem 0.7rem;font-size:0.8rem;color:var(--red,#e05252);">✕ Supprimer cet avis</button>
@@ -5427,9 +5459,17 @@ function renderAvisRows(){
   container.querySelectorAll('.avis-row').forEach(rowEl => {
     const id = rowEl.dataset.rowId;
     const row = avisRows.find(r => r.id === id);
+    const dateApercu = rowEl.querySelector('p');
     rowEl.querySelector('.avis-row-nom').addEventListener('input', e => { row.nom = e.target.value; });
     rowEl.querySelector('.avis-row-note').addEventListener('change', e => { row.note = parseInt(e.target.value); });
-    rowEl.querySelector('.avis-row-date').addEventListener('input', e => { row.date = e.target.value; });
+    rowEl.querySelector('.avis-row-date-nombre').addEventListener('input', e => {
+      row.dateNombre = parseInt(e.target.value) || 1;
+      dateApercu.textContent = `Affiché sur le site : « ${formatAvisDate(row.dateNombre, row.dateUnite)} »`;
+    });
+    rowEl.querySelector('.avis-row-date-unite').addEventListener('change', e => {
+      row.dateUnite = e.target.value;
+      dateApercu.textContent = `Affiché sur le site : « ${formatAvisDate(row.dateNombre, row.dateUnite)} »`;
+    });
     rowEl.querySelector('.avis-row-texte').addEventListener('input', e => { row.texte = e.target.value; });
     rowEl.querySelector('.avis-row-remove').addEventListener('click', () => {
       avisRows = avisRows.filter(r => r.id !== id);
@@ -5568,7 +5608,7 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     banniereDateDebut:  document.getElementById('p-banniere-date-debut').value || null,
     banniereDateFin:    document.getElementById('p-banniere-date-fin').value   || null,
     avisNoteGlobale:    parseFloat(document.getElementById('p-avis-note').value) || 5.0,
-    avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, date: r.date.trim(), texte: r.texte.trim() })),
+    avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, date: formatAvisDate(r.dateNombre, r.dateUnite), texte: r.texte.trim() })),
     alerteFauxAvisActive: document.getElementById('p-alerte-avis-active').checked,
     alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
