@@ -1439,6 +1439,15 @@
           <label style="font-size:0.8rem;display:block;margin-bottom:0.4rem;">Vignettes avis (8 maximum)</label>
           <div id="p-avis-rows" style="margin-bottom:0.6rem;"></div>
           <button class="btn btn-outline" id="p-avis-add-btn" type="button" style="width:100%;">+ Ajouter un avis</button>
+
+          <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
+
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.6rem;">
+            <input type="checkbox" id="p-alerte-avis-active" style="width:1.1rem;height:1.1rem;">
+            <label for="p-alerte-avis-active" style="font-size:0.85rem;">Afficher une alerte "faux avis" au-dessus du bouton Google</label>
+          </div>
+          <textarea id="p-alerte-avis-texte" placeholder="ex : Nous avons récemment constaté la présence de faux avis négatifs sur notre fiche Google. Nous avons signalé ces avis et travaillons avec Google pour les faire retirer." rows="3"
+            style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>
         </div>
       </div>
 
@@ -5482,6 +5491,8 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
     : [newAvisRow()];
   renderAvisRows();
   updateAvisAddBtnState();
+  document.getElementById('p-alerte-avis-active').checked = params.alerteFauxAvisActive || false;
+  document.getElementById('p-alerte-avis-texte').value    = params.alerteFauxAvisTexte || '';
   // Jours bloqués
   renderPJoursBloques(params);
   // Tarifs électroménager
@@ -5558,6 +5569,8 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     banniereDateFin:    document.getElementById('p-banniere-date-fin').value   || null,
     avisNoteGlobale:    parseFloat(document.getElementById('p-avis-note').value) || 5.0,
     avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, date: r.date.trim(), texte: r.texte.trim() })),
+    alerteFauxAvisActive: document.getElementById('p-alerte-avis-active').checked,
+    alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
     tarifLavage:       parseInt(document.getElementById('p-tarif-lavage').value)       || 65,
     tarifFroid:        parseInt(document.getElementById('p-tarif-froid').value)        || 70,
@@ -5604,6 +5617,8 @@ async function getAgendaParams(){
       banniereDateFin:    data.banniere_date_fin   ?? '',
       avisNoteGlobale:    data.avis_note_globale ?? 5.0,
       avisListe:          (() => { try{ return data.avis_liste ? JSON.parse(data.avis_liste) : []; }catch(e){ return []; } })(),
+      alerteFauxAvisActive: data.alerte_faux_avis_active ?? false,
+      alerteFauxAvisTexte:  data.alerte_faux_avis_texte  ?? '',
       joursBlockes:  data.jours_bloques  || [],
       tarifCuisson:      data.tarif_cuisson      ?? 60,
       tarifLavage:       data.tarif_lavage       ?? 65,
@@ -5649,6 +5664,8 @@ async function saveAgendaParams(params){
     banniere_date_fin:    params.banniereDateFin    || null,
     avis_note_globale:    params.avisNoteGlobale ?? 5.0,
     avis_liste:           (Array.isArray(params.avisListe) && params.avisListe.length) ? JSON.stringify(params.avisListe) : null,
+    alerte_faux_avis_active: params.alerteFauxAvisActive ?? false,
+    alerte_faux_avis_texte:  params.alerteFauxAvisTexte  || null,
     jours_bloques:     params.joursBlockes,
     tarif_cuisson:      params.tarifCuisson      ?? 60,
     tarif_lavage:       params.tarifLavage       ?? 65,
