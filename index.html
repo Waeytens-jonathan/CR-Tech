@@ -5404,6 +5404,7 @@ let avisRows = [];
 function pluralUnite(n, unite){
   if(unite === 'mois') return 'mois'; // invariable en français
   if(unite === 'an') return n > 1 ? 'ans' : 'an';
+  if(unite === 'semaine') return n > 1 ? 'semaines' : 'semaine';
   return n > 1 ? 'jours' : 'jour'; // jour par défaut
 }
 
@@ -5415,7 +5416,7 @@ function formatAvisDate(nombre, unite){
 // Retrouve nombre/unité à partir d'une ancienne valeur texte libre (rétrocompatibilité)
 function parseAvisDate(str){
   if(!str) return { nombre: 1, unite: 'jour' };
-  const m = String(str).match(/(\d+)\s*(jour|mois|an)/i);
+  const m = String(str).match(/(\d+)\s*(jour|semaine|mois|an)/i);
   if(m) return { nombre: parseInt(m[1]), unite: m[2].toLowerCase() };
   return { nombre: 1, unite: 'jour' };
 }
@@ -5446,6 +5447,7 @@ function renderAvisRows(){
           style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
         <select class="avis-row-date-unite" style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
           <option value="jour" ${row.dateUnite==='jour'?'selected':''}>jour(s)</option>
+          <option value="semaine" ${row.dateUnite==='semaine'?'selected':''}>semaine(s)</option>
           <option value="mois" ${row.dateUnite==='mois'?'selected':''}>mois</option>
           <option value="an" ${row.dateUnite==='an'?'selected':''}>an(s)</option>
         </select>
