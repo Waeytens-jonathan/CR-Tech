@@ -737,10 +737,34 @@
         <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
           <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Interventions</div>
           <div style="font-size:1.5rem;font-weight:700;" id="stat-nb-interventions">0</div>
+          <div style="font-size:0.75rem;margin-top:0.2rem;" id="stat-nb-trend"></div>
         </div>
         <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
           <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">CA encaissé</div>
           <div style="font-size:1.5rem;font-weight:700;" id="stat-ca">0,00 €</div>
+          <div style="font-size:0.75rem;margin-top:0.2rem;" id="stat-ca-trend"></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;margin-bottom:0.7rem;">
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Panier moyen</div>
+          <div style="font-size:1.5rem;font-weight:700;" id="stat-panier-moyen">0,00 €</div>
+        </div>
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Non réparables</div>
+          <div style="font-size:1.5rem;font-weight:700;" id="stat-taux-non-reparable">0 %</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;margin-bottom:0.7rem;">
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Annulations RDV</div>
+          <div style="font-size:1.5rem;font-weight:700;" id="stat-taux-annulation">0 %</div>
+        </div>
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Marque la plus fréquente</div>
+          <div style="font-size:1.15rem;font-weight:700;" id="stat-marque-frequente">—</div>
         </div>
       </div>
 
@@ -1451,6 +1475,16 @@
         </div>
       </div>
 
+      <!-- CHARGES -->
+      <div class="settings-section" data-section="charges">
+        <div class="settings-section-header"><h3>💼 Charges (statistiques)</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Taux URSSAF (%)</label>
+          <input type="number" id="p-urssaf-taux" min="0" max="100" step="0.1" style="width:140px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          <p style="font-size:0.75rem;color:var(--text-muted);margin:0.5rem 0 0;">Utilisé dans l'onglet Stats pour calculer l'argent réellement gagné. À ajuster si votre taux de cotisation change.</p>
+        </div>
+      </div>
+
       <!-- TARIFS ÉLECTROMÉNAGER -->
       <div class="settings-section" data-section="tarifs-em">
         <div class="settings-section-header"><h3>🔧 Tarifs électroménager</h3><span class="settings-section-chevron">▼</span></div>
@@ -1998,20 +2032,62 @@ function getStatsDateRange(period){
   return { start: toISO(start), end: toISO(end) };
 }
 
+function getPreviousStatsRange(period){
+  const now = new Date();
+  let start, end;
+  if(period === 'month'){
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if(period === 'last_month'){
+    start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    end = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+  } else if(period === 'year'){
+    start = new Date(now.getFullYear() - 1, 0, 1);
+    end = new Date(now.getFullYear() - 1, 11, 31);
+  } else {
+    return null; // 'all' -> pas de comparaison possible
+  }
+  const toISO = d => dateToLocalISO(d);
+  return { start: toISO(start), end: toISO(end) };
+}
+
+function renderTrend(elId, current, previous){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  if(previous === null){ el.textContent = ''; return; }
+  if(previous === 0){
+    el.textContent = current > 0 ? '🆕 nouveau' : '';
+    el.style.color = 'var(--text-muted)';
+    return;
+  }
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if(pct === 0){ el.textContent = '= vs période précédente'; el.style.color = 'var(--text-muted)'; return; }
+  el.textContent = (pct > 0 ? '▲ +' : '▼ ') + pct + '% vs période précédente';
+  el.style.color = pct > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e05252)';
+}
+
 function formatEur(n){
   return (Math.round(n * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
-function renderStats(){
+async function renderStats(){
   const period = document.getElementById('stats-period').value;
   const range = getStatsDateRange(period);
+  const prevRange = getPreviousStatsRange(period);
+
+  if(!_agendaConfigCache){ try{ await getAgendaParams(); }catch(e){} }
+  const urssafTaux = (_agendaConfigCache && _agendaConfigCache.urssafTaux != null ? _agendaConfigCache.urssafTaux : 20) / 100;
 
   const candidats = reports.filter(r => !r._isDraft && r.date);
   const filtered = range
     ? candidats.filter(r => r.date >= range.start && r.date <= range.end)
     : candidats;
+  const prevFiltered = prevRange
+    ? candidats.filter(r => r.date >= prevRange.start && r.date <= prevRange.end)
+    : null;
 
-  let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0;
+  let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0, nbNonReparable = 0;
+  const marqueCount = {};
   filtered.forEach(r => {
     totalMo += parseFloat(r['cout-mo']) || 0;
     totalPieces += parseFloat(r['cout-pieces']) || 0;
@@ -2021,14 +2097,46 @@ function renderStats(){
     if(prixFournisseur > 0){
       totalLivraison += (r['livraison'] === '24h') ? 12 : 10;
     }
+    if(r.statut === 'Non_reparable') nbNonReparable++;
+    const marque = (r.marque || '').trim();
+    if(marque) marqueCount[marque] = (marqueCount[marque] || 0) + 1;
   });
 
   const ca = totalMo + totalPieces + totalDepl;
-  const urssaf = ca * URSSAF_TAUX;
+  const urssaf = ca * urssafTaux;
   const net = ca - totalFournisseur - totalLivraison - urssaf;
+
+  // Tendance vs période précédente
+  let prevCa = null;
+  if(prevFiltered){
+    prevCa = prevFiltered.reduce((sum, r) => sum + (parseFloat(r['cout-mo'])||0) + (parseFloat(r['cout-pieces'])||0) + (parseFloat(r['cout-deplacement'])||0), 0);
+  }
+  renderTrend('stat-nb-trend', filtered.length, prevFiltered ? prevFiltered.length : null);
+  renderTrend('stat-ca-trend', ca, prevCa);
+
+  // Panier moyen
+  const panierMoyen = filtered.length ? ca / filtered.length : 0;
+
+  // Taux non réparable
+  const tauxNonReparable = filtered.length ? Math.round((nbNonReparable / filtered.length) * 100) : 0;
+
+  // Marque la plus fréquente
+  let marqueTop = '—';
+  let marqueTopCount = 0;
+  Object.entries(marqueCount).forEach(([m, c]) => { if(c > marqueTopCount){ marqueTop = m; marqueTopCount = c; } });
+
+  // Taux d'annulation RDV sur la même période
+  if(!agendaRdvs.length){ try{ agendaRdvs = await loadAgendaFromSupabase(); }catch(e){} }
+  const rdvPeriode = range ? agendaRdvs.filter(r => r.date >= range.start && r.date <= range.end) : agendaRdvs;
+  const nbAnnules = rdvPeriode.filter(r => r.statut === 'annule').length;
+  const tauxAnnulation = rdvPeriode.length ? Math.round((nbAnnules / rdvPeriode.length) * 100) : 0;
 
   document.getElementById('stat-nb-interventions').textContent = filtered.length;
   document.getElementById('stat-ca').textContent = formatEur(ca);
+  document.getElementById('stat-panier-moyen').textContent = formatEur(panierMoyen);
+  document.getElementById('stat-taux-non-reparable').textContent = tauxNonReparable + ' %';
+  document.getElementById('stat-taux-annulation').textContent = tauxAnnulation + ' %';
+  document.getElementById('stat-marque-frequente').textContent = marqueTopCount > 0 ? `${marqueTop} (${marqueTopCount})` : '—';
   document.getElementById('stat-mo').textContent = formatEur(totalMo);
   document.getElementById('stat-pieces-facturees').textContent = formatEur(totalPieces);
   document.getElementById('stat-deplacement').textContent = formatEur(totalDepl);
@@ -5535,6 +5643,7 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   updateAvisAddBtnState();
   document.getElementById('p-alerte-avis-active').checked = params.alerteFauxAvisActive || false;
   document.getElementById('p-alerte-avis-texte').value    = params.alerteFauxAvisTexte || '';
+  document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
   // Jours bloqués
   renderPJoursBloques(params);
   // Tarifs électroménager
@@ -5613,6 +5722,7 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, date: formatAvisDate(r.dateNombre, r.dateUnite), texte: r.texte.trim() })),
     alerteFauxAvisActive: document.getElementById('p-alerte-avis-active').checked,
     alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
+    urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
     tarifLavage:       parseInt(document.getElementById('p-tarif-lavage').value)       || 65,
     tarifFroid:        parseInt(document.getElementById('p-tarif-froid').value)        || 70,
@@ -5661,6 +5771,7 @@ async function getAgendaParams(){
       avisListe:          (() => { try{ return data.avis_liste ? JSON.parse(data.avis_liste) : []; }catch(e){ return []; } })(),
       alerteFauxAvisActive: data.alerte_faux_avis_active ?? false,
       alerteFauxAvisTexte:  data.alerte_faux_avis_texte  ?? '',
+      urssafTaux: data.urssaf_taux ?? 20,
       joursBlockes:  data.jours_bloques  || [],
       tarifCuisson:      data.tarif_cuisson      ?? 60,
       tarifLavage:       data.tarif_lavage       ?? 65,
@@ -5708,6 +5819,7 @@ async function saveAgendaParams(params){
     avis_liste:           (Array.isArray(params.avisListe) && params.avisListe.length) ? JSON.stringify(params.avisListe) : null,
     alerte_faux_avis_active: params.alerteFauxAvisActive ?? false,
     alerte_faux_avis_texte:  params.alerteFauxAvisTexte  || null,
+    urssaf_taux: params.urssafTaux ?? 20,
     jours_bloques:     params.joursBlockes,
     tarif_cuisson:      params.tarifCuisson      ?? 60,
     tarif_lavage:       params.tarifLavage       ?? 65,
