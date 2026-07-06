@@ -3107,6 +3107,7 @@ function populateNewRdvAppareilOptions(){
 }
 
 let editingRdvAppId = null;
+let editingRdvOriginal = null;
 
 // Distance à vol d'oiseau (Haversine) entre deux points quelconques
 function haversineKm(lat1, lon1, lat2, lon2){
@@ -3271,6 +3272,7 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
 
 document.getElementById('agenda-new-btn').addEventListener('click', () => {
   editingRdvAppId = null;
+  editingRdvOriginal = null;
   populateNewRdvAppareilOptions();
   ['date','prenom','nom','adresse','cp','ville','tel','email','appareil','panne','note'].forEach(id => {
     const el = document.getElementById('newrdv-' + id);
@@ -3294,6 +3296,7 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
   if(!currentAgendaRdv) return;
   const r = currentAgendaRdv;
   editingRdvAppId = r.app_id;
+  editingRdvOriginal = { date: r.date || '', creneau: r.creneau || 'matin' };
   populateNewRdvAppareilOptions();
 
   document.getElementById('newrdv-date').value = r.date || '';
@@ -3404,10 +3407,62 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
         await sb.from(RDV_TABLE).update({ client_id: clientId }).eq('app_id', row.app_id);
       }
       if(clientSearchInput){ clientSearchInput.value = ''; delete clientSearchInput.dataset.selectedClientId; }
+
+      // Email de confirmation, uniquement si un email a été renseigné
+      if(row.email){
+        try{
+          await sb.functions.invoke('send-rdv-confirmation', {
+            body: {
+              app_id: row.app_id,
+              nom: row.nom,
+              prenom: row.prenom,
+              email: row.email,
+              date: row.date,
+              creneau: row.creneau,
+              adresse: row.adresse,
+              cp: row.cp,
+              ville: row.ville,
+              appareil: row.appareil,
+              panne: row.panne
+            }
+          });
+        }catch(emailErr){
+          console.error('Erreur envoi email confirmation :', emailErr);
+          showToast('RDV enregistré (email non envoyé)');
+        }
+      }
+    } else if(editingRdvOriginal && row.email){
+      // Modification d'un RDV existant : email dédié si la date ou le créneau a changé
+      const dateChanged = row.date !== editingRdvOriginal.date || row.creneau !== editingRdvOriginal.creneau;
+      if(dateChanged){
+        try{
+          await sb.functions.invoke('send-rdv-modification', {
+            body: {
+              app_id: editingRdvAppId,
+              nom: row.nom,
+              prenom: row.prenom,
+              email: row.email,
+              ancienne_date: editingRdvOriginal.date,
+              ancien_creneau: editingRdvOriginal.creneau,
+              date: row.date,
+              creneau: row.creneau,
+              adresse: row.adresse,
+              cp: row.cp,
+              ville: row.ville,
+              appareil: row.appareil,
+              panne: row.panne
+            }
+          });
+        }catch(emailErr){
+          console.error('Erreur envoi email modification :', emailErr);
+          showToast('RDV modifié (email non envoyé)');
+        }
+      }
     }
 
     showToast(editingRdvAppId ? 'Rendez-vous modifié' : 'Rendez-vous enregistré');
     editingRdvAppId = null;
+    editingRdvOriginal = null;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-agenda').classList.add('active');
     document.querySelector('.tab-btn[data-view="agenda"]').classList.add('active');
@@ -6313,6 +6368,7 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
   const r = currentDetailReport;
   editingRdvAppId = null;
+  editingRdvOriginal = null;
   populateNewRdvAppareilOptions();
 
   // Pré-remplir les champs client depuis le CR
