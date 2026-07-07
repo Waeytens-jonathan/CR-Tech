@@ -1574,12 +1574,41 @@
 </div>
 
 <!-- Calculatrice rapide -->
-<button id="calc-fab-btn" title="Calculatrice rapide" style="position:fixed;bottom:5.5rem;right:1.2rem;width:56px;height:56px;border-radius:50%;background:var(--orange);color:#1a1206;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:pointer;z-index:9000;">🧮</button>
+<button id="calc-fab-btn" title="Calculatrice rapide" style="position:fixed;top:75vh;left:calc(100vw - 76px);width:56px;height:56px;border-radius:50%;background:var(--orange);color:#1a1206;border:none;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:grab;z-index:9000;touch-action:none;">
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="2" width="16" height="20" rx="2"/>
+    <rect x="7" y="5" width="10" height="4" rx="0.5"/>
+    <circle cx="7.5" cy="13" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="13" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="16.5" cy="13" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="7.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="16.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="7.5" cy="20" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="20" r="0.9" fill="currentColor" stroke="none"/>
+    <circle cx="16.5" cy="20" r="0.9" fill="currentColor" stroke="none"/>
+  </svg>
+</button>
 
 <div id="calc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
-      <h3 style="margin:0;color:var(--orange);">🧮 Calculatrice rapide</h3>
+      <h3 style="margin:0;color:var(--orange);display:flex;align-items:center;gap:0.5rem;">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="2" width="16" height="20" rx="2"/>
+          <rect x="7" y="5" width="10" height="4" rx="0.5"/>
+          <circle cx="7.5" cy="13" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="12" cy="13" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="16.5" cy="13" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="7.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="16.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="7.5" cy="20" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="12" cy="20" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="16.5" cy="20" r="0.9" fill="currentColor" stroke="none"/>
+        </svg>
+        Calculatrice rapide
+      </h3>
       <button id="calc-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
     </div>
     <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 1rem;">Pour annoncer un prix au client, sans créer de compte-rendu.</p>
@@ -4116,12 +4145,89 @@ document.getElementById('calc-livraison').addEventListener('change', recalcQuick
 document.getElementById('calc-mo').addEventListener('input', recalcQuickCalc);
 document.getElementById('calc-deplacement').addEventListener('input', recalcQuickCalc);
 
-document.getElementById('calc-fab-btn').addEventListener('click', () => {
+// ---------- Bouton calculatrice déplaçable (glisser-déposer) ----------
+(function initDraggableCalcFab(){
+  const fab = document.getElementById('calc-fab-btn');
+  const SIZE = 56, MARGIN = 8;
+  let startX, startY, startLeft, startTop, dragging = false, moved = false;
+
+  function clamp(val, min, max){ return Math.min(Math.max(val, min), max); }
+
+  function applyPosition(left, top){
+    left = clamp(left, MARGIN, window.innerWidth - SIZE - MARGIN);
+    top = clamp(top, MARGIN, window.innerHeight - SIZE - MARGIN);
+    fab.style.left = left + 'px';
+    fab.style.top = top + 'px';
+  }
+
+  // Restaurer la position mémorisée, sinon position par défaut (bas-droite, au-dessus du pouce)
+  try{
+    const saved = JSON.parse(localStorage.getItem('calcFabPos') || 'null');
+    if(saved && typeof saved.left === 'number' && typeof saved.top === 'number'){
+      applyPosition(saved.left, saved.top);
+    } else {
+      applyPosition(window.innerWidth - SIZE - 20, window.innerHeight - SIZE - 140);
+    }
+  }catch(e){
+    applyPosition(window.innerWidth - SIZE - 20, window.innerHeight - SIZE - 140);
+  }
+
+  function getPoint(e){
+    return e.touches && e.touches.length ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+  }
+
+  function onStart(e){
+    dragging = true; moved = false;
+    const p = getPoint(e);
+    startX = p.x; startY = p.y;
+    const rect = fab.getBoundingClientRect();
+    startLeft = rect.left; startTop = rect.top;
+    fab.style.cursor = 'grabbing';
+  }
+
+  function onMove(e){
+    if(!dragging) return;
+    const p = getPoint(e);
+    const dx = p.x - startX, dy = p.y - startY;
+    if(Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+    if(moved){
+      e.preventDefault();
+      applyPosition(startLeft + dx, startTop + dy);
+    }
+  }
+
+  function onEnd(){
+    if(!dragging) return;
+    dragging = false;
+    fab.style.cursor = 'grab';
+    if(moved){
+      const rect = fab.getBoundingClientRect();
+      localStorage.setItem('calcFabPos', JSON.stringify({ left: rect.left, top: rect.top }));
+    } else {
+      openCalcModal();
+    }
+  }
+
+  fab.addEventListener('mousedown', onStart);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+  fab.addEventListener('touchstart', onStart, { passive: true });
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onEnd);
+
+  window.addEventListener('resize', () => {
+    const rect = fab.getBoundingClientRect();
+    applyPosition(rect.left, rect.top);
+  });
+})();
+
+function openCalcModal(){
   if(!calcRows.length){ calcRows = [newCalcRow()]; }
   renderCalcRows();
   recalcQuickCalc();
   document.getElementById('calc-modal').style.display = 'flex';
-});
+}
+
 document.getElementById('calc-modal-close').addEventListener('click', () => {
   document.getElementById('calc-modal').style.display = 'none';
 });
