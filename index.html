@@ -1198,25 +1198,27 @@
           <input type="checkbox" id="f-commande-piece">
           <label for="f-commande-piece">Une commande de pièce est nécessaire</label>
         </div>
-        <div class="grid" id="piece-fields" style="margin-top:0.8rem; display:none;">
-          <div class="field full">
-            <label>Désignation de la / des pièce(s)</label>
-            <textarea id="f-piece-desc" placeholder="Référence(s) et désignation des pièces commandées"></textarea>
-          </div>
-          <div class="field">
-            <label>Prix d'achat fournisseur (€)</label>
-            <input type="number" id="f-prix-fournisseur" placeholder="0.00" step="0.01" min="0">
-          </div>
-          <div class="field">
-            <label>Livraison</label>
+        <div id="commande-piece-fields" style="margin-top:0.8rem; display:none;">
+          <input type="hidden" id="f-piece-desc">
+          <div class="field" style="margin-bottom:0.8rem;">
+            <label>Livraison (pour l'ensemble de la commande)</label>
             <select id="f-livraison">
               <option value="standard">Standard (10€)</option>
               <option value="24h">24h (12€)</option>
             </select>
           </div>
-          <div class="field">
-            <label>Prix facturé au client (€)</label>
-            <input type="number" id="f-piece-cout" placeholder="0.00" step="0.01" min="0">
+          <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Pièce(s) à commander</label>
+          <div id="commande-piece-rows" style="margin-bottom:0.6rem;"></div>
+          <button type="button" class="btn btn-outline" id="commande-piece-add-row-btn" style="width:100%;margin-bottom:0.8rem;">+ Ajouter une autre pièce</button>
+          <div class="grid">
+            <div class="field">
+              <label>Total prix d'achat fournisseur (€)</label>
+              <input type="number" id="f-prix-fournisseur" placeholder="0.00" step="0.01" min="0" readonly style="opacity:0.75;">
+            </div>
+            <div class="field">
+              <label>Total prix facturé au client (€)</label>
+              <input type="number" id="f-piece-cout" placeholder="0.00" step="0.01" min="0" readonly style="opacity:0.75;">
+            </div>
           </div>
         </div>
       </div>
@@ -3915,7 +3917,11 @@ function generateRef(){
 
 // ---------- Affichage / masquage champs conditionnels ----------
 document.getElementById('f-commande-piece').addEventListener('change', e => {
-  document.getElementById('piece-fields').style.display = e.target.checked ? 'grid' : 'none';
+  document.getElementById('commande-piece-fields').style.display = e.target.checked ? 'block' : 'none';
+  if(e.target.checked && !commandePieceRows.length){
+    commandePieceRows = [newCommandePieceRow()];
+    renderCommandePieceRows();
+  }
 });
 
 // ---------- Bascule Stock / Commande (étape Pièces) ----------
@@ -3994,12 +4000,6 @@ function recalcTotal(){
   updateResteAEncaisser();
 }
 
-document.getElementById('f-piece-cout').addEventListener('input', () => {
-  const pieceCout = document.getElementById('f-piece-cout').value;
-  document.getElementById('f-cout-pieces').value = pieceCout;
-  recalcTotal();
-});
-
 // ---------- Barème de marge automatique sur prix fournisseur ----------
 const BAREME_MARGE = [
   { min: 0,   max: 20,       taux: 3.00 },
@@ -4015,18 +4015,124 @@ function calculerPrixVente(prixFournisseur, fraisLivraison){
   return Math.round((prixAvecMarge + (fraisLivraison || 0)) * 100) / 100;
 }
 
-function recalculerPrixPiece(){
-  const prixFournisseur = parseFloat(document.getElementById('f-prix-fournisseur').value) || 0;
-  if(prixFournisseur > 0){
-    const livraison = document.getElementById('f-livraison').value === '24h' ? 12 : 10;
-    const prixVente = calculerPrixVente(prixFournisseur, livraison);
-    document.getElementById('f-piece-cout').value = prixVente.toFixed(2);
-    document.getElementById('f-cout-pieces').value = prixVente.toFixed(2);
-    recalcTotal();
-  }
+// ---------- Calculatrice rapide (indépendante des comptes-rendus) ----------
+let calcRows = [];
+
+function newCalcRow(){
+  return { id: 'cc' + Date.now() + Math.random().toString(36).slice(2,7), prix: '' };
 }
 
-document.getElementById('f-prix-fournisseur').addEventListener('input', recalculerPrixPiece);
+function renderCalcRows(){
+  const container = document.getElementById('calc-piece-rows');
+  if(!container) return;
+  container.innerHTML = calcRows.map(row => `
+    <div class="cc-row" data-row-id="${row.id}" style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+      <input type="number" class="cc-row-prix" placeholder="Prix d'achat (€)" min="0" step="0.01" value="${row.prix}"
+        style="flex:1;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      ${calcRows.length > 1 ? `<button type="button" class="cc-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
+    </div>`).join('');
+
+  container.querySelectorAll('.cc-row').forEach(rowEl => {
+    const id = rowEl.dataset.rowId;
+    const row = calcRows.find(r => r.id === id);
+    rowEl.querySelector('.cc-row-prix').addEventListener('input', e => { row.prix = e.target.value; recalcQuickCalc(); });
+    rowEl.querySelector('.cc-row-remove')?.addEventListener('click', () => {
+      calcRows = calcRows.filter(r => r.id !== id);
+      renderCalcRows();
+      recalcQuickCalc();
+    });
+  });
+}
+
+function recalcQuickCalc(){
+  const livraison = document.getElementById('calc-livraison').value === '24h' ? 12 : 10;
+  const validRows = calcRows.filter(r => parseFloat(r.prix) > 0);
+  const totalPieces = validRows.reduce((s,r) => s + calculerPrixVente(parseFloat(r.prix)||0, 0), 0) + (validRows.length ? livraison : 0);
+  const mo = parseFloat(document.getElementById('calc-mo').value) || 0;
+  const depl = parseFloat(document.getElementById('calc-deplacement').value) || 0;
+  const total = totalPieces + mo + depl;
+
+  const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
+  document.getElementById('calc-out-pieces').textContent = fmt(totalPieces);
+  document.getElementById('calc-out-mo').textContent = fmt(mo);
+  document.getElementById('calc-out-depl').textContent = fmt(depl);
+  document.getElementById('calc-out-total').textContent = fmt(total);
+}
+
+document.getElementById('calc-piece-add-btn').addEventListener('click', () => {
+  calcRows.push(newCalcRow());
+  renderCalcRows();
+});
+document.getElementById('calc-livraison').addEventListener('change', recalcQuickCalc);
+document.getElementById('calc-mo').addEventListener('input', recalcQuickCalc);
+document.getElementById('calc-deplacement').addEventListener('input', recalcQuickCalc);
+
+document.getElementById('calc-fab-btn').addEventListener('click', () => {
+  if(!calcRows.length){ calcRows = [newCalcRow()]; }
+  renderCalcRows();
+  recalcQuickCalc();
+  document.getElementById('calc-modal').style.display = 'flex';
+});
+document.getElementById('calc-modal-close').addEventListener('click', () => {
+  document.getElementById('calc-modal').style.display = 'none';
+});
+
+// ---------- Commande de pièce(s) — lignes multiples ----------
+let commandePieceRows = [];
+
+function newCommandePieceRow(prefill){
+  return Object.assign({ id: 'cp' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', prixFournisseur: '' }, prefill || {});
+}
+
+function renderCommandePieceRows(){
+  const container = document.getElementById('commande-piece-rows');
+  if(!container) return;
+  container.innerHTML = commandePieceRows.map((row, i) => `
+    <div class="cp-row" data-row-id="${row.id}" style="display:flex;gap:0.5rem;margin-bottom:0.5rem;align-items:flex-start;">
+      <div style="flex:1;">
+        <input type="text" class="cp-row-nom" placeholder="Désignation / référence" value="${escapeHtml(row.nom)}"
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
+        <input type="number" class="cp-row-prix" placeholder="Prix d'achat fournisseur (€)" step="0.01" min="0" value="${row.prixFournisseur}"
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+      </div>
+      ${commandePieceRows.length > 1 ? `<button type="button" class="cp-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
+    </div>`).join('');
+
+  container.querySelectorAll('.cp-row').forEach(rowEl => {
+    const id = rowEl.dataset.rowId;
+    const row = commandePieceRows.find(r => r.id === id);
+    rowEl.querySelector('.cp-row-nom').addEventListener('input', e => { row.nom = e.target.value; recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-prix').addEventListener('input', e => { row.prixFournisseur = e.target.value; recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-remove')?.addEventListener('click', () => {
+      commandePieceRows = commandePieceRows.filter(r => r.id !== id);
+      renderCommandePieceRows();
+      recalculerPrixPiece();
+    });
+  });
+}
+
+document.getElementById('commande-piece-add-row-btn').addEventListener('click', () => {
+  commandePieceRows.push(newCommandePieceRow());
+  renderCommandePieceRows();
+});
+
+function recalculerPrixPiece(){
+  const livraison = document.getElementById('f-livraison').value === '24h' ? 12 : 10;
+  const validRows = commandePieceRows.filter(r => r.nom.trim() || parseFloat(r.prixFournisseur) > 0);
+
+  const totalFournisseur = validRows.reduce((s,r) => s + (parseFloat(r.prixFournisseur)||0), 0);
+  const totalFacture = validRows.reduce((s,r) => {
+    const pf = parseFloat(r.prixFournisseur) || 0;
+    return s + (pf > 0 ? calculerPrixVente(pf, 0) : 0);
+  }, 0) + (totalFournisseur > 0 ? livraison : 0);
+
+  document.getElementById('f-prix-fournisseur').value = totalFournisseur > 0 ? totalFournisseur.toFixed(2) : '';
+  document.getElementById('f-piece-cout').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
+  document.getElementById('f-cout-pieces').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
+  document.getElementById('f-piece-desc').value = validRows.map(r => r.nom.trim()).filter(Boolean).join(', ');
+  recalcTotal();
+}
+
 document.getElementById('f-livraison').addEventListener('change', recalculerPrixPiece);
 
 
@@ -4356,7 +4462,7 @@ function resetForm(){
   document.getElementById('f-paiement-statut').value = 'Paye_total';
   document.getElementById('f-paiement-statut').disabled = false;
   document.getElementById('f-reste-encaisser').value = '0.00';
-  document.getElementById('piece-fields').style.display = 'none';
+  document.getElementById('commande-piece-fields').style.display = 'none';
   document.getElementById('acompte-field').style.display = 'none';
   setPieceMode('stock');
   // delete-btn supprimé
@@ -4368,6 +4474,8 @@ function resetForm(){
   renderPlaqueThumb();
   selectedStockPieces = [];
   renderStockPiecesSelectedList();
+  commandePieceRows = [];
+  renderCommandePieceRows();
   currentId = null;
   document.getElementById('ref-display').textContent = generateRef();
 }
@@ -4387,7 +4495,14 @@ function loadIntoForm(report){
   if(report['commande-piece'] || report.stockPiece || (Array.isArray(report.stockPieces) && report.stockPieces.length)){
     document.getElementById('f-besoin-piece').checked = true;
   }
-  document.getElementById('piece-fields').style.display = report['commande-piece'] ? 'grid' : 'none';
+  document.getElementById('commande-piece-fields').style.display = report['commande-piece'] ? 'block' : 'none';
+  // Rétrocompatibilité : anciens CR n'ont qu'une désignation/prix agrégés, pas de lignes détaillées
+  if(report['piece-desc'] || report['prix-fournisseur']){
+    commandePieceRows = [newCommandePieceRow({ nom: report['piece-desc'] || '', prixFournisseur: report['prix-fournisseur'] || '' })];
+  } else {
+    commandePieceRows = [];
+  }
+  renderCommandePieceRows();
   document.getElementById('acompte-field').style.display = (report['paiement-statut'] === 'Acompte') ? 'block' : 'none';
   // delete-btn supprimé
   signatureData = report.signature || null;
@@ -7338,5 +7453,53 @@ document.getElementById('attestation-generate').addEventListener('click', async 
 </div>
 
 <!-- ===================== MODALE POSE PIÈCE (reprise dossier) ===================== -->
+<!-- Calculatrice rapide -->
+<button id="calc-fab-btn" title="Calculatrice rapide" style="position:fixed;bottom:5.5rem;right:1.2rem;width:56px;height:56px;border-radius:50%;background:var(--orange);color:#1a1206;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:pointer;z-index:9000;">🧮</button>
+
+<div id="calc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+      <h3 style="margin:0;color:var(--orange);">🧮 Calculatrice rapide</h3>
+      <button id="calc-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
+    </div>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 1rem;">Pour annoncer un prix au client, sans créer de compte-rendu.</p>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Pièce(s) — prix d'achat fournisseur</label>
+    <div id="calc-piece-rows" style="margin-bottom:0.5rem;"></div>
+    <button type="button" class="btn btn-outline" id="calc-piece-add-btn" style="width:100%;margin-bottom:0.8rem;">+ Ajouter une pièce</button>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Livraison</label>
+    <select id="calc-livraison" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.8rem;">
+      <option value="standard">Standard (10€)</option>
+      <option value="24h">24h (12€)</option>
+    </select>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">
+      <div>
+        <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Main d'œuvre (€)</label>
+        <input type="number" id="calc-mo" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Déplacement (€)</label>
+        <input type="number" id="calc-deplacement" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+    </div>
+
+    <div style="background:rgba(245,166,35,0.08);border:1px solid var(--orange);border-radius:10px;padding:1rem;">
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.3rem;">
+        <span>Pièces (avec marge + livraison)</span><span id="calc-out-pieces">0,00 €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.3rem;">
+        <span>Main d'œuvre</span><span id="calc-out-mo">0,00 €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.6rem;">
+        <span>Déplacement</span><span id="calc-out-depl">0,00 €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:1.3rem;font-weight:700;color:var(--orange);border-top:1px solid var(--border);padding-top:0.6rem;">
+        <span>Total à annoncer</span><span id="calc-out-total">0,00 €</span>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
