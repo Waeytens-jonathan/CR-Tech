@@ -2926,6 +2926,7 @@ document.getElementById('depot-detail-create-cr').addEventListener('click', () =
   document.getElementById('f-tel').value = d.tel || '';
   document.getElementById('f-email').value = d.email || '';
   document.getElementById('f-appareil').value = matchAppareilOption(d.appareil);
+  autoFillMainOeuvre(document.getElementById('f-appareil').value);
   document.getElementById('f-panne').value = d.description || '';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -3198,6 +3199,7 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
   document.getElementById('f-tel').value = r.tel || '';
   document.getElementById('f-email').value = r.email || '';
   document.getElementById('f-appareil').value = matchAppareilOption(r.appareil);
+  autoFillMainOeuvre(document.getElementById('f-appareil').value);
   document.getElementById('f-panne').value = r.panne || '';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -3994,6 +3996,47 @@ function generateRef(){
 }
 
 // ---------- Affichage / masquage champs conditionnels ----------
+// ---------- Préremplissage automatique de la main d'œuvre selon le type d'appareil ----------
+const APPAREIL_TARIF_MAP = {
+  'Four': 'tarifCuisson',
+  'Plaque de cuisson': 'tarifCuisson',
+  'Micro-ondes': 'tarifCuisson',
+  'Hotte aspirante': 'tarifCuisson',
+  'Cave à vin': 'tarifCuisson',
+  'Téléviseur': 'tarifCuisson',
+  'Barre de son': 'tarifCuisson',
+  'Chaîne Hi-Fi': 'tarifCuisson',
+  'Ampli / Récepteur': 'tarifCuisson',
+  'Lecteur Blu-ray / DVD': 'tarifCuisson',
+  'Vidéoprojecteur': 'tarifCuisson',
+  'Enceinte': 'tarifCuisson',
+  'Lave-linge': 'tarifLavage',
+  'Lave-vaisselle': 'tarifLavage',
+  'Sèche-linge': 'tarifLavage',
+  'Réfrigérateur': 'tarifFroid',
+  'Congélateur': 'tarifFroid',
+  'Ordinateur portable': 'tarifPcPortable',
+  'Ordinateur fixe': 'tarifPcFixe',
+  'Console de jeux': 'tarifConsole'
+};
+
+async function autoFillMainOeuvre(appareil){
+  const key = APPAREIL_TARIF_MAP[appareil];
+  if(!key) return;
+  if(!_agendaConfigCache){ try{ await getAgendaParams(); }catch(e){ return; } }
+  const prix = _agendaConfigCache && _agendaConfigCache[key];
+  if(prix == null) return;
+  const moField = document.getElementById('f-cout-mo');
+  if(moField){
+    moField.value = prix;
+    recalcTotal();
+  }
+}
+
+document.getElementById('f-appareil').addEventListener('change', (e) => {
+  autoFillMainOeuvre(e.target.value);
+});
+
 document.getElementById('f-commande-piece').addEventListener('change', e => {
   document.getElementById('commande-piece-fields').style.display = e.target.checked ? 'block' : 'none';
   if(e.target.checked && !commandePieceRows.length){
