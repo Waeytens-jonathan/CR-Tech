@@ -1573,6 +1573,55 @@
   </div>
 </div>
 
+<!-- Calculatrice rapide -->
+<button id="calc-fab-btn" title="Calculatrice rapide" style="position:fixed;bottom:5.5rem;right:1.2rem;width:56px;height:56px;border-radius:50%;background:var(--orange);color:#1a1206;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:pointer;z-index:9000;">🧮</button>
+
+<div id="calc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+      <h3 style="margin:0;color:var(--orange);">🧮 Calculatrice rapide</h3>
+      <button id="calc-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
+    </div>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 1rem;">Pour annoncer un prix au client, sans créer de compte-rendu.</p>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Pièce(s) — prix d'achat fournisseur</label>
+    <div id="calc-piece-rows" style="margin-bottom:0.5rem;"></div>
+    <button type="button" class="btn btn-outline" id="calc-piece-add-btn" style="width:100%;margin-bottom:0.8rem;">+ Ajouter une pièce</button>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Livraison</label>
+    <select id="calc-livraison" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.8rem;">
+      <option value="standard">Standard (10€)</option>
+      <option value="24h">24h (12€)</option>
+    </select>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">
+      <div>
+        <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Main d'œuvre (€)</label>
+        <input type="number" id="calc-mo" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Déplacement (€)</label>
+        <input type="number" id="calc-deplacement" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+    </div>
+
+    <div style="background:rgba(245,166,35,0.08);border:1px solid var(--orange);border-radius:10px;padding:1rem;">
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.3rem;">
+        <span>Pièces (avec marge + livraison)</span><span id="calc-out-pieces">0,00 €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.3rem;">
+        <span>Main d'œuvre</span><span id="calc-out-mo">0,00 €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.6rem;">
+        <span>Déplacement</span><span id="calc-out-depl">0,00 €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:1.3rem;font-weight:700;color:var(--orange);border-top:1px solid var(--border);padding-top:0.6rem;">
+        <span>Total à annoncer</span><span id="calc-out-total">0,00 €</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 
 // ---------- Données ----------
@@ -7453,53 +7502,5 @@ document.getElementById('attestation-generate').addEventListener('click', async 
 </div>
 
 <!-- ===================== MODALE POSE PIÈCE (reprise dossier) ===================== -->
-<!-- Calculatrice rapide -->
-<button id="calc-fab-btn" title="Calculatrice rapide" style="position:fixed;bottom:5.5rem;right:1.2rem;width:56px;height:56px;border-radius:50%;background:var(--orange);color:#1a1206;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(0,0,0,0.4);cursor:pointer;z-index:9000;">🧮</button>
-
-<div id="calc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
-  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
-      <h3 style="margin:0;color:var(--orange);">🧮 Calculatrice rapide</h3>
-      <button id="calc-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
-    </div>
-    <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 1rem;">Pour annoncer un prix au client, sans créer de compte-rendu.</p>
-
-    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Pièce(s) — prix d'achat fournisseur</label>
-    <div id="calc-piece-rows" style="margin-bottom:0.5rem;"></div>
-    <button type="button" class="btn btn-outline" id="calc-piece-add-btn" style="width:100%;margin-bottom:0.8rem;">+ Ajouter une pièce</button>
-
-    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Livraison</label>
-    <select id="calc-livraison" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.8rem;">
-      <option value="standard">Standard (10€)</option>
-      <option value="24h">24h (12€)</option>
-    </select>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">
-      <div>
-        <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Main d'œuvre (€)</label>
-        <input type="number" id="calc-mo" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-      <div>
-        <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Déplacement (€)</label>
-        <input type="number" id="calc-deplacement" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-      </div>
-    </div>
-
-    <div style="background:rgba(245,166,35,0.08);border:1px solid var(--orange);border-radius:10px;padding:1rem;">
-      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.3rem;">
-        <span>Pièces (avec marge + livraison)</span><span id="calc-out-pieces">0,00 €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.3rem;">
-        <span>Main d'œuvre</span><span id="calc-out-mo">0,00 €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.6rem;">
-        <span>Déplacement</span><span id="calc-out-depl">0,00 €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:1.3rem;font-weight:700;color:var(--orange);border-top:1px solid var(--border);padding-top:0.6rem;">
-        <span>Total à annoncer</span><span id="calc-out-total">0,00 €</span>
-      </div>
-    </div>
-  </div>
-</div>
 </body>
 </html>
