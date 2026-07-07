@@ -1329,7 +1329,7 @@
       <div class="actions">
         <button class="btn btn-primary" id="save-btn" style="display:none;">Enregistrer</button>
         <button class="btn btn-secondary" id="pdf-btn">📄 Exporter en PDF</button>
-        <button class="btn btn-outline" id="email-btn">📧 Envoyer par email</button>
+        <button class="btn btn-outline" id="email-btn">📧 Envoyer au client par email</button>
       </div>
     </div>
 
@@ -4516,16 +4516,40 @@ function buildMessage(data){
 }
 
 
-document.getElementById('email-btn').addEventListener('click', () => {
+document.getElementById('email-btn').addEventListener('click', async () => {
   const data = collectFormData();
   if(!data.email){
     showToast('Email du client manquant', true);
     return;
   }
-  const subject = `Compte-rendu d'intervention ${data.ref||''} — Technik-Home`;
-  const message = buildMessage(data);
-  const url = `mailto:${encodeURIComponent(data.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-  window.location.href = url;
+
+  const btn = document.getElementById('email-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi en cours…';
+
+  try{
+    const pdfBytes = await generatePdfFor(data, 'email');
+    const pdfBase64 = arrayBufferToBase64(pdfBytes);
+
+    const { error } = await sb.functions.invoke('send-compte-rendu', {
+      body: {
+        email: data.email,
+        nom: data.nom,
+        prenom: data.prenom,
+        appareil: data.appareil,
+        ref: data.ref,
+        pdf_base64: pdfBase64,
+        include_conseils: !!data['conseils-entretien']
+      }
+    });
+    if(error) throw error;
+    showToast('Compte-rendu envoyé au client par email ✓');
+  }catch(e){
+    console.error('Erreur envoi compte-rendu :', e);
+    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
+  }
+  btn.disabled = false;
+  btn.textContent = '📧 Envoyer au client par email';
 });
 
 
@@ -5064,24 +5088,31 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
   const btn = document.getElementById('detail-email-btn');
   const originalText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Génération du PDF…';
+  btn.textContent = 'Envoi en cours…';
 
-  // 1. Générer et télécharger le PDF (à partir des données du dossier consulté, pas du formulaire)
-  try {
-    await generatePdfFor(r);
-  } catch(e) { console.error('PDF error', e); }
+  try{
+    const pdfBytes = await generatePdfFor(r, 'email');
+    const pdfBase64 = arrayBufferToBase64(pdfBytes);
 
-  // 2. Laisser le temps au navigateur de finaliser le téléchargement avant de changer de page
-  await new Promise(resolve => setTimeout(resolve, 1200));
-
+    const { error } = await sb.functions.invoke('send-compte-rendu', {
+      body: {
+        email: r.email,
+        nom: r.nom,
+        prenom: r.prenom,
+        appareil: r.appareil,
+        ref: r.ref,
+        pdf_base64: pdfBase64,
+        include_conseils: !!r['conseils-entretien']
+      }
+    });
+    if(error) throw error;
+    showToast('Compte-rendu envoyé au client par email ✓');
+  }catch(e){
+    console.error('Erreur envoi compte-rendu :', e);
+    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
+  }
   btn.disabled = false;
   btn.textContent = originalText;
-
-  // 3. Ouvrir le client mail avec le message
-  const subject = `Compte-rendu d'intervention ${r.ref||''} — Technik-Home`;
-  const body = buildMessage(r);
-  const url = `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = url;
 });
 
 // Brouillon auto-sauvegardé en local uniquement (localStorage), au départ du formulaire
@@ -5187,7 +5218,8 @@ function getImageDimensions(dataUrl){
 }
 
 // ---------- Export PDF ----------
-async function generatePdfFor(data){
+async function generatePdfFor(data, mode){
+  mode = mode || 'download';
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:'a4'});
   const navy = [13,27,42];
@@ -5435,6 +5467,7 @@ async function generatePdfFor(data){
       conseilsPages.forEach(p => mergedPdf.addPage(p));
 
       const mergedBytes = await mergedPdf.save();
+      if(mode === 'email') return mergedBytes;
       downloadBytes(mergedBytes, filename);
       showToast('PDF généré (avec conseils d\'entretien)');
       return;
@@ -5444,6 +5477,7 @@ async function generatePdfFor(data){
     }
   }
 
+  if(mode === 'email') return doc.output('arraybuffer');
   doc.save(filename);
   showToast('PDF généré');
 }
@@ -5451,6 +5485,16 @@ async function generatePdfFor(data){
 document.getElementById('pdf-btn').addEventListener('click', async () => {
   await generatePdfFor(collectFormData());
 });
+
+function arrayBufferToBase64(buffer){
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for(let i = 0; i < bytes.length; i += chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
 
 function base64ToArrayBuffer(base64){
   const binary = atob(base64);
