@@ -4428,11 +4428,11 @@ function collectFormData(){
 }
 
 // ---------- Sauvegarde ----------
-document.getElementById('save-btn').addEventListener('click', async () => {
+async function saveCurrentReport(){
   const data = collectFormData();
   if(!data.nom && !data.prenom){
     showToast('Merci de renseigner au moins le nom du client', true);
-    return;
+    return null;
   }
   if(currentId){
     const idx = reports.findIndex(r => r.id === currentId);
@@ -4478,10 +4478,15 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     }catch(e){ console.error('Erreur création dossier auto :', e); }
   }
 
-  saveReportToSupabase(data);
+  await saveReportToSupabase(data);
   await consumeStockPiecesIfAny(data.stockPieces);
   clearDraft();
-  showToast('Compte-rendu enregistré');
+  return data;
+}
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const data = await saveCurrentReport();
+  if(data) showToast('Compte-rendu enregistré');
 });
 
 // Met à jour/supprime les pièces de stock consommées par ce compte-rendu
@@ -4517,14 +4522,19 @@ function buildMessage(data){
 
 
 document.getElementById('email-btn').addEventListener('click', async () => {
-  const data = collectFormData();
-  if(!data.email){
+  const formData = collectFormData();
+  if(!formData.email){
     showToast('Email du client manquant', true);
     return;
   }
 
   const btn = document.getElementById('email-btn');
   btn.disabled = true;
+  btn.textContent = 'Enregistrement…';
+
+  const data = await saveCurrentReport();
+  if(!data){ btn.disabled = false; btn.textContent = '📧 Envoyer au client par email'; return; }
+
   btn.textContent = 'Envoi en cours…';
 
   try{
@@ -4543,10 +4553,10 @@ document.getElementById('email-btn').addEventListener('click', async () => {
       }
     });
     if(error) throw error;
-    showToast('Compte-rendu envoyé au client par email ✓');
+    showToast('Compte-rendu enregistré et envoyé au client ✓');
   }catch(e){
     console.error('Erreur envoi compte-rendu :', e);
-    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
+    showToast('Enregistré, mais échec de l\'envoi : ' + (e.message || 'voir console'), true);
   }
   btn.disabled = false;
   btn.textContent = '📧 Envoyer au client par email';
