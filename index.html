@@ -499,9 +499,12 @@
   <!-- ===================== VUE LISTE ===================== -->
   <div class="view" id="view-list">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.5rem;flex-wrap:wrap;">
         <h2 style="margin:0;">Dossiers-clients</h2>
-        <button class="btn btn-primary" id="tab-new" style="padding:0.5rem 1rem;">➕ Nouveau dossier</button>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-outline" id="export-non-factures-btn" style="padding:0.5rem 0.9rem;font-size:0.85rem;">📤 Export non facturés (0)</button>
+          <button class="btn btn-primary" id="tab-new" style="padding:0.5rem 1rem;">➕ Nouveau dossier</button>
+        </div>
       </div>
       <div class="search-bar">
         <input type="text" id="search-input" placeholder="Rechercher (nom, ville, référence...)">
@@ -3882,6 +3885,52 @@ document.getElementById('tab-new').addEventListener('click', () => {
   openNouveauDossier();
 });
 
+// ---------- Export CSV des interventions terminées non facturées ----------
+function csvEscape(val){
+  const str = String(val ?? '');
+  if(str.includes(';') || str.includes('"') || str.includes('\n')){
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+document.getElementById('export-non-factures-btn').addEventListener('click', () => {
+  const aFacturer = reports.filter(r =>
+    !r._isDraft &&
+    (r.statut === 'Terminée' || r.statut === 'Non_reparable') &&
+    !r['facture-creee']
+  );
+
+  if(!aFacturer.length){
+    showToast('Aucune intervention en attente de facturation');
+    return;
+  }
+
+  const headers = ['Nom','Prénom','Adresse','Code postal','Ville','Téléphone','Email'];
+  const rows = aFacturer.map(r => [
+    r.nom || '',
+    r.prenom || '',
+    r.adresse || '',
+    r.cp || '',
+    r.ville || '',
+    r.tel || '',
+    r.email || ''
+  ]);
+
+  const csvContent = [headers, ...rows].map(row => row.map(csvEscape).join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `non-factures-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast(`${aFacturer.length} intervention(s) exportée(s)`);
+});
+
 // ---------- Mode étapes ----------
 const TOTAL_STEPS = 9;
 let currentStep = 1;
@@ -4968,6 +5017,14 @@ function renderList(){
   const container = document.getElementById('report-list');
   const emptyMsg = document.getElementById('empty-msg');
   const query = document.getElementById('search-input').value.toLowerCase().trim();
+
+  const nbNonFactures = reports.filter(r =>
+    !r._isDraft &&
+    (r.statut === 'Terminée' || r.statut === 'Non_reparable') &&
+    !r['facture-creee']
+  ).length;
+  const exportBtn = document.getElementById('export-non-factures-btn');
+  if(exportBtn) exportBtn.textContent = `📤 Export non facturés (${nbNonFactures})`;
 
   let filtered = reports;
   if(query){
