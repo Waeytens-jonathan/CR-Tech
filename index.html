@@ -5448,8 +5448,9 @@ async function generatePdfFor(data, mode){
     });
   }
 
-  // Fusion avec le PDF de conseils d'entretien si demandé
-  if(data['conseils-entretien']){
+  // Fusion avec le PDF de conseils d'entretien si demandé (téléchargement uniquement —
+  // pour l'envoi par email, c'est la fonction Edge qui joint les conseils séparément)
+  if(data['conseils-entretien'] && mode !== 'email'){
     try{
       const { PDFDocument } = window.PDFLib;
       const mainBytes = doc.output('arraybuffer');
@@ -5467,7 +5468,6 @@ async function generatePdfFor(data, mode){
       conseilsPages.forEach(p => mergedPdf.addPage(p));
 
       const mergedBytes = await mergedPdf.save();
-      if(mode === 'email') return mergedBytes;
       downloadBytes(mergedBytes, filename);
       showToast('PDF généré (avec conseils d\'entretien)');
       return;
@@ -6740,7 +6740,11 @@ document.getElementById('client-form-save').addEventListener('click', async () =
     showView('client-detail');
   }catch(e){
     console.error('Erreur sauvegarde client :', e);
-    showToast('Erreur sauvegarde client', true);
+    if(e.code === '23505' && (e.message||'').includes('email')){
+      showToast('Cet email est déjà utilisé par un autre client', true);
+    } else {
+      showToast('Erreur sauvegarde client', true);
+    }
   }
   btn.disabled = false; btn.textContent = 'Enregistrer ✓';
 });
