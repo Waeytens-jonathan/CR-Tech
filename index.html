@@ -784,7 +784,7 @@
       <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;margin-bottom:0.7rem;">
         <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#f5a623;margin-bottom:0.6rem;">Charges déduites</div>
         <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);"><span style="color:#aab;">Coût réel des pièces (achat fournisseur + livraison)</span><span id="stat-cout-fournisseur">0,00 €</span></div>
-        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;"><span style="color:#aab;">URSSAF (20% du CA)</span><span id="stat-urssaf">0,00 €</span></div>
+        <div style="display:flex;justify-content:space-between;padding:0.3rem 0;"><span style="color:#aab;">URSSAF (<span id="stat-urssaf-taux">20</span>% du CA)</span><span id="stat-urssaf">0,00 €</span></div>
       </div>
 
       <div style="background:rgba(63,191,111,0.12);border:1px solid rgba(63,191,111,0.3);border-radius:10px;padding:1rem;">
@@ -2222,7 +2222,10 @@ async function renderStats(){
   const prevRange = getPreviousStatsRange(period);
 
   if(!_agendaConfigCache){ try{ await getAgendaParams(); }catch(e){} }
-  const urssafTaux = (_agendaConfigCache && _agendaConfigCache.urssafTaux != null ? _agendaConfigCache.urssafTaux : 20) / 100;
+  const urssafTauxPct = (_agendaConfigCache && _agendaConfigCache.urssafTaux != null ? _agendaConfigCache.urssafTaux : 20);
+  const urssafTaux = urssafTauxPct / 100;
+  const urssafTauxLabel = document.getElementById('stat-urssaf-taux');
+  if(urssafTauxLabel) urssafTauxLabel.textContent = urssafTauxPct;
 
   const candidats = reports.filter(r => !r._isDraft && r.date);
   const filtered = range
