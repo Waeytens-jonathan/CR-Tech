@@ -1798,6 +1798,7 @@ function reportToRow(r){
     pieces_posees: (Array.isArray(r.piecesPosees) && r.piecesPosees.length) ? JSON.stringify(r.piecesPosees) : '',
     client_id: r.client_id || null,
     dossier_id: r.dossier_id || null,
+    rdv_app_id: r.rdv_app_id || null,
     date_termine: r.date_termine || null,
     _is_draft: false
   };
@@ -1885,6 +1886,7 @@ function rowToReport(row){
     piecesPosees: row.pieces_posees ? (() => { try{ return JSON.parse(row.pieces_posees); }catch(e){ return []; } })() : [],
     client_id: row.client_id || null,
     dossier_id: row.dossier_id || null,
+    rdv_app_id: row.rdv_app_id || null,
     date_termine: row.date_termine || null,
     date_archivage: row.date_archivage || null,
     is_sav: !!row.is_sav,
@@ -1904,7 +1906,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,date_termine,date_archivage,is_sav,parent_app_id,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -3297,6 +3299,11 @@ function showAgendaDetail(appId){
   cancelBtn.textContent = '🚫 Annuler le RDV';
   doneBtn.textContent = r.statut === 'effectue' ? '↩️ Annuler le statut effectué' : '✅ Marquer effectué';
 
+  // Cacher "Faire le compte-rendu" si un CR existe déjà pour ce RDV
+  const createCrBtn = document.getElementById('agenda-detail-create-cr');
+  const crExiste = reports.some(rep => !rep._isDraft && rep.rdv_app_id === r.app_id);
+  createCrBtn.style.display = crExiste ? 'none' : 'inline-flex';
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-agenda-detail').classList.add('active');
@@ -3354,6 +3361,7 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
 
   resetForm();
   clearDraft();
+  window._creatingFromRdvAppId = r.app_id;
   document.getElementById('f-nom').value = r.nom || '';
   document.getElementById('f-prenom').value = r.prenom || '';
   document.getElementById('f-adresse').value = r.adresse || '';
@@ -4956,6 +4964,10 @@ async function saveCurrentReport(){
   if(!data.nom && !data.prenom){
     showToast('Merci de renseigner au moins le nom du client', true);
     return null;
+  }
+  if(window._creatingFromRdvAppId){
+    data.rdv_app_id = window._creatingFromRdvAppId;
+    window._creatingFromRdvAppId = null;
   }
   if(currentId){
     const idx = reports.findIndex(r => r.id === currentId);
