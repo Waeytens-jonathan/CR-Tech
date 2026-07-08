@@ -1792,6 +1792,7 @@ function rowToReport(row){
     try{ extra = JSON.parse(notes.slice(metaIdx + 6)); }catch(e){}
     notes = notes.slice(0, metaIdx);
   }
+  const isLightRow = !('photos' in row);
   let photos = [], plaquePhotoArr = [];
   try{ photos = row.photos ? JSON.parse(row.photos) : []; }catch(e){ photos = []; }
   try{ plaquePhotoArr = row.photos_plaque ? JSON.parse(row.photos_plaque) : []; }catch(e){ plaquePhotoArr = []; }
@@ -1855,8 +1856,13 @@ function rowToReport(row){
     client_id: row.client_id || null,
     dossier_id: row.dossier_id || null,
     date_termine: row.date_termine || null,
+    date_archivage: row.date_archivage || null,
+    is_sav: !!row.is_sav,
+    parent_app_id: row.parent_app_id || null,
+    created_at: row.created_at || null,
     _isDraft: !!row._is_draft,
-    _draftStep: extra._draftStep
+    _draftStep: extra._draftStep,
+    _lightOnly: isLightRow
   };
 }
 
@@ -1867,11 +1873,14 @@ let currentDossier = null;
 let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
+// Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,date_termine,date_archivage,is_sav,parent_app_id,created_at,_is_draft';
+
 async function loadReportsFromSupabase(){
   try{
     const { data, error } = await sb
       .from(TABLE)
-      .select('*')
+      .select(LIGHT_REPORT_COLUMNS)
       .order('created_at', { ascending: false });
     if(error) throw error;
     reports = (data || []).map(rowToReport);
@@ -1882,6 +1891,28 @@ async function loadReportsFromSupabase(){
   }
   reportsLoaded = true;
   if(typeof afterReportsLoaded === 'function') afterReportsLoaded();
+}
+
+// Complète un report "léger" avec ses photos/signature, uniquement à l'ouverture d'un dossier précis
+async function ensureFullReportLoaded(r){
+  if(!r || !r._lightOnly) return r;
+  try{
+    const { data, error } = await sb
+      .from(TABLE)
+      .select('photos,photos_plaque,signature,photo_piece_posee,piece_depose_photos')
+      .eq('app_id', r.id)
+      .single();
+    if(error) throw error;
+    try{ r.photos = data.photos ? JSON.parse(data.photos) : []; }catch(e){ r.photos = []; }
+    try{ const arr = data.photos_plaque ? JSON.parse(data.photos_plaque) : []; r.plaquePhoto = arr[0] || null; }catch(e){ r.plaquePhoto = null; }
+    r.signature = data.signature || null;
+    r.photoPiecePosee = data.photo_piece_posee || null;
+    try{ r.pieceDeposePhotos = data.piece_depose_photos ? JSON.parse(data.piece_depose_photos) : []; }catch(e){ r.pieceDeposePhotos = []; }
+    delete r._lightOnly;
+  }catch(e){
+    console.error('Erreur chargement photos/signature :', e);
+  }
+  return r;
 }
 
 async function saveReportToSupabase(report){
@@ -4727,7 +4758,8 @@ function resetForm(){
   document.getElementById('ref-display').textContent = generateRef();
 }
 
-function loadIntoForm(report){
+async function loadIntoForm(report){
+  await ensureFullReportLoaded(report);
   currentId = report.id;
   document.getElementById('ref-display').textContent = report.ref;
   fieldIds.forEach(id => {
@@ -5387,7 +5419,8 @@ function renderDetailContent(r, container){
   }
 }
 
-function showDetail(r){
+async function showDetail(r){
+  await ensureFullReportLoaded(r);
   currentDetailReport = r;
   renderDetailContent(r);
   showView('detail');
@@ -6708,7 +6741,7 @@ function renderDossierView(){
   renderDossierAppareilContent(currentDossierRapports[activeDossierTabIdx]);
 }
 
-function renderDossierAppareilContent(r){
+async function renderDossierAppareilContent(r){
   const el = document.getElementById('dossier-appareil-content');
   // Réutiliser showDetail mais dans ce conteneur
   el.innerHTML = '';
@@ -6770,6 +6803,7 @@ function renderDossierAppareilContent(r){
   detailDiv.id = 'detail-content-dossier';
   el.appendChild(detailDiv);
   // Utiliser la fonction existante de rendu de détail
+  await ensureFullReportLoaded(r);
   renderDetailContent(r, detailDiv);
 }
 
