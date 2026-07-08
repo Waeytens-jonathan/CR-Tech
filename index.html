@@ -12,6 +12,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
   :root{
     --navy:#0d1b2a;
@@ -787,6 +790,13 @@
       <div style="background:rgba(63,191,111,0.12);border:1px solid rgba(63,191,111,0.3);border-radius:10px;padding:1rem;">
         <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--green,#3fbf6f);margin-bottom:0.3rem;">Argent réellement gagné</div>
         <div style="font-size:1.8rem;font-weight:700;color:var(--green,#3fbf6f);" id="stat-net">0,00 €</div>
+      </div>
+
+      <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;margin-top:0.7rem;">
+        <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#f5a623;margin-bottom:0.6rem;">Où j'interviens le plus</div>
+        <div id="stats-heatmap-container" style="height:320px;border-radius:8px;overflow:hidden;"></div>
+        <div id="stats-top-villes" style="margin-top:0.7rem;"></div>
+        <p style="font-size:0.72rem;color:#778;margin:0.5rem 0 0;">Basé sur la ville de chaque intervention de la période sélectionnée.</p>
       </div>
 
       <div class="empty" id="stats-no-data-msg" style="display:none;margin-top:1rem;">Aucun compte-rendu sur cette période.</div>
@@ -2259,6 +2269,85 @@ async function renderStats(){
   document.getElementById('stat-net').textContent = formatEur(net);
 
   document.getElementById('stats-no-data-msg').style.display = filtered.length ? 'none' : 'block';
+  renderStatsHeatmap(filtered);
+}
+
+// ---------- Heatmap des interventions par ville ----------
+const villeCoordsCache = {};
+let statsHeatMap = null;
+let statsHeatLayer = null;
+
+async function geocodeVille(ville){
+  const key = ville.trim().toLowerCase();
+  if(villeCoordsCache[key] !== undefined) return villeCoordsCache[key];
+  try{
+    const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(ville + ', France')}&type=StreetAddress&maximumResponses=1`);
+    const data = await res.json();
+    const point = data.results && data.results[0];
+    if(point && point.x && point.y){
+      villeCoordsCache[key] = { lat: point.y, lon: point.x };
+    } else {
+      villeCoordsCache[key] = null;
+    }
+  }catch(e){
+    villeCoordsCache[key] = null;
+  }
+  return villeCoordsCache[key];
+}
+
+async function renderStatsHeatmap(filtered){
+  const container = document.getElementById('stats-heatmap-container');
+  if(!container || typeof L === 'undefined') return;
+
+  if(!statsHeatMap){
+    statsHeatMap = L.map(container, { attributionControl: false }).setView([LENS_COORDS.lat, LENS_COORDS.lon], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(statsHeatMap);
+  }
+
+  // Compter les interventions par ville
+  const parVille = {};
+  filtered.forEach(r => {
+    const ville = (r.ville || '').trim();
+    if(!ville) return;
+    parVille[ville] = (parVille[ville] || 0) + 1;
+  });
+
+  const villes = Object.keys(parVille);
+
+  // Top 3 des villes les plus desservies
+  const topVillesDiv = document.getElementById('stats-top-villes');
+  if(topVillesDiv){
+    const top3 = [...villes].sort((a,b) => parVille[b] - parVille[a]).slice(0,3);
+    if(top3.length){
+      topVillesDiv.innerHTML = top3.map((v,i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;${i < top3.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
+          <span style="font-size:0.85rem;"><strong style="color:var(--orange);">${i+1}.</strong> ${escapeHtml(v)}</span>
+          <span style="font-size:0.85rem;color:var(--text-muted);">${parVille[v]} intervention${parVille[v]>1?'s':''}</span>
+        </div>`).join('');
+    } else {
+      topVillesDiv.innerHTML = '';
+    }
+  }
+
+  if(!villes.length){
+    if(statsHeatLayer){ statsHeatMap.removeLayer(statsHeatLayer); statsHeatLayer = null; }
+    return;
+  }
+
+  const coordsResults = await Promise.all(villes.map(v => geocodeVille(v)));
+  const points = [];
+  villes.forEach((v, i) => {
+    const c = coordsResults[i];
+    if(c) points.push([c.lat, c.lon, parVille[v]]);
+  });
+
+  if(statsHeatLayer) statsHeatMap.removeLayer(statsHeatLayer);
+  if(points.length){
+    statsHeatLayer = L.heatLayer(points, { radius: 35, blur: 25, maxZoom: 13, max: Math.max(...points.map(p => p[2])) }).addTo(statsHeatMap);
+    const bounds = L.latLngBounds(points.map(p => [p[0], p[1]]));
+    statsHeatMap.fitBounds(bounds, { padding: [30,30], maxZoom: 12 });
+  }
+  setTimeout(() => statsHeatMap.invalidateSize(), 200);
 }
 
 document.getElementById('stats-period').addEventListener('change', renderStats);
