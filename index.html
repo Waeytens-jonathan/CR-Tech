@@ -3312,7 +3312,6 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
     if(error) throw error;
 
     facturesLight.push({ app_id: factureAppId, numero, rapport_app_id: r.id, annee, sequence });
-    doc.save(`${numero}.pdf`);
     showToast(`Facture ${numero} générée et enregistrée ✓`);
     updateFactureButtons(r);
   }catch(e){
@@ -3539,7 +3538,6 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
     if(error) throw error;
 
     devisLight.push({ app_id: devisAppId, numero, rapport_app_id: r.id, annee, sequence });
-    doc.save(`${numero}.pdf`);
     showToast(`Devis ${numero} généré et enregistré ✓`);
     document.getElementById('devis-modal').style.display = 'none';
     updateDevisButtons(r);
