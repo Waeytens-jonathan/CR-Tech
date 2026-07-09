@@ -1638,6 +1638,41 @@
       <option value="Non_reparable">Non réparable / irréparable</option>
     </select>
 
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">💰 Statut de paiement</label>
+    <select id="pose-piece-paiement-statut" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
+      <option value="Paye_total">Payé en totalité</option>
+      <option value="Acompte">Acompte versé</option>
+      <option value="Non_paye">Non payé / facture à envoyer</option>
+      <option value="Gratuit">Gratuit (devis, sous garantie...)</option>
+    </select>
+    <div id="pose-piece-acompte-field" style="display:none;margin-bottom:0.8rem;">
+      <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Montant de l'acompte (€)</label>
+      <input type="number" id="pose-piece-acompte-montant" placeholder="0.00" step="0.01" min="0" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+    </div>
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Moyen de paiement</label>
+    <select id="pose-piece-paiement-moyen" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
+      <option value="">-- Sélectionner --</option>
+      <option>Espèces</option>
+      <option>Carte bancaire</option>
+      <option value="Mixte">Mixte (espèces + carte)</option>
+    </select>
+    <div class="grid" id="pose-piece-mixte-fields" style="display:none;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Espèces (€)</label>
+        <input type="number" id="pose-piece-paiement-especes" placeholder="0.00" step="0.01" min="0" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Carte (€)</label>
+        <input type="number" id="pose-piece-paiement-carte" placeholder="0.00" step="0.01" min="0" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      </div>
+    </div>
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;"><strong>Reste à encaisser (€)</strong></label>
+      <input type="number" id="pose-piece-reste-encaisser" placeholder="0.00" step="0.01" readonly style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--orange);font-weight:600;box-sizing:border-box;">
+    </div>
+
     <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
       <button class="btn btn-outline" id="pose-piece-cancel-btn">Annuler</button>
       <button class="btn btn-primary" id="pose-piece-save-btn">Valider ✓</button>
@@ -5058,6 +5093,12 @@ document.getElementById('f-paiement-statut').addEventListener('change', e => {
 document.getElementById('f-paiement-moyen').addEventListener('change', e => {
   document.getElementById('paiement-mixte-fields').style.display = (e.target.value === 'Mixte') ? 'grid' : 'none';
 });
+document.getElementById('f-paiement-especes').addEventListener('input', () => {
+  const total = parseFloat(document.getElementById('f-cout-total').value) || 0;
+  const especes = parseFloat(document.getElementById('f-paiement-especes').value) || 0;
+  const reste = Math.max(0, total - especes);
+  document.getElementById('f-paiement-carte').value = reste.toFixed(2);
+});
 
 // ---------- Calcul automatique du total et du reste à encaisser ----------
 function updateResteAEncaisser(){
@@ -6974,6 +7015,48 @@ document.getElementById('pose-piece-add-row-btn').addEventListener('click', () =
   renderPosePieceRows();
 });
 
+function prefillPosePiecePaiement(r){
+  document.getElementById('pose-piece-paiement-statut').value = r['paiement-statut'] || 'Non_paye';
+  document.getElementById('pose-piece-acompte-montant').value = r['acompte-montant'] || '';
+  document.getElementById('pose-piece-paiement-moyen').value = r['paiement-moyen'] || '';
+  document.getElementById('pose-piece-paiement-especes').value = r['paiement-especes'] || '';
+  document.getElementById('pose-piece-paiement-carte').value = r['paiement-carte'] || '';
+  document.getElementById('pose-piece-acompte-field').style.display = (r['paiement-statut'] === 'Acompte') ? 'block' : 'none';
+  document.getElementById('pose-piece-mixte-fields').style.display = (r['paiement-moyen'] === 'Mixte') ? 'grid' : 'none';
+  updatePosePieceResteAEncaisser();
+}
+
+function updatePosePieceResteAEncaisser(){
+  const total = parseFloat(currentDetailReport && currentDetailReport['cout-total']) || 0;
+  const statut = document.getElementById('pose-piece-paiement-statut').value;
+  let reste = 0;
+  if(statut === 'Paye_total' || statut === 'Gratuit'){
+    reste = 0;
+  } else if(statut === 'Acompte'){
+    const acompte = parseFloat(document.getElementById('pose-piece-acompte-montant').value) || 0;
+    reste = total - acompte;
+  } else if(statut === 'Non_paye'){
+    reste = total;
+  }
+  if(reste < 0) reste = 0;
+  document.getElementById('pose-piece-reste-encaisser').value = reste.toFixed(2);
+}
+
+document.getElementById('pose-piece-paiement-statut').addEventListener('change', e => {
+  document.getElementById('pose-piece-acompte-field').style.display = (e.target.value === 'Acompte') ? 'block' : 'none';
+  updatePosePieceResteAEncaisser();
+});
+document.getElementById('pose-piece-acompte-montant').addEventListener('input', updatePosePieceResteAEncaisser);
+document.getElementById('pose-piece-paiement-moyen').addEventListener('change', e => {
+  document.getElementById('pose-piece-mixte-fields').style.display = (e.target.value === 'Mixte') ? 'grid' : 'none';
+});
+document.getElementById('pose-piece-paiement-especes').addEventListener('input', () => {
+  const total = parseFloat(currentDetailReport && currentDetailReport['cout-total']) || 0;
+  const especes = parseFloat(document.getElementById('pose-piece-paiement-especes').value) || 0;
+  const reste = Math.max(0, total - especes);
+  document.getElementById('pose-piece-paiement-carte').value = reste.toFixed(2);
+});
+
 document.getElementById('detail-pose-piece-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
   posePieceRows = (Array.isArray(currentDetailReport.piecesPosees) && currentDetailReport.piecesPosees.length)
@@ -6983,6 +7066,7 @@ document.getElementById('detail-pose-piece-btn').addEventListener('click', () =>
         : [newPosePieceRow()]);
   renderPosePieceRows();
   document.getElementById('pose-piece-statut').value = 'Terminée';
+  prefillPosePiecePaiement(currentDetailReport);
   posePiecePhotos = [];
   renderPosePiecePhotoGrid();
   document.getElementById('pose-piece-modal').style.display = 'flex';
@@ -7011,6 +7095,12 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   reports[idx].pieceDeposeRef = piecesPosees[0].ref;
   reports[idx].pieceDeposePhotos = posePiecePhotos.slice();
   reports[idx].statut = document.getElementById('pose-piece-statut').value;
+  reports[idx]['paiement-statut'] = document.getElementById('pose-piece-paiement-statut').value;
+  reports[idx]['acompte-montant'] = document.getElementById('pose-piece-acompte-montant').value;
+  reports[idx]['paiement-moyen'] = document.getElementById('pose-piece-paiement-moyen').value;
+  reports[idx]['paiement-especes'] = document.getElementById('pose-piece-paiement-especes').value;
+  reports[idx]['paiement-carte'] = document.getElementById('pose-piece-paiement-carte').value;
+  reports[idx]['reste-encaisser'] = document.getElementById('pose-piece-reste-encaisser').value;
 
   // localStorage désactivé — données dans Supabase
   await saveReportToSupabase(reports[idx]);
@@ -7714,6 +7804,7 @@ async function renderDossierAppareilContent(r){
       ? r.piecesPosees.map(p => newPosePieceRow(p))
       : (r.pieceDeposeNom ? [newPosePieceRow({ nom: r.pieceDeposeNom, ref: r.pieceDeposeRef || '' })] : [newPosePieceRow()]);
     renderPosePieceRows();
+    prefillPosePiecePaiement(r);
     posePiecePhotos = [];
     renderPosePiecePhotoGrid();
     document.getElementById('pose-piece-modal').style.display = 'flex';
