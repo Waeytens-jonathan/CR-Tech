@@ -1552,6 +1552,10 @@
       <div class="settings-section" data-section="numerotation">
         <div class="settings-section-header"><h3>🔢 Numérotation factures & devis</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
+          <div id="p-numero-preview" style="background:var(--bg-soft,#1a2a3d);border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:1rem;font-size:0.85rem;">
+            <div>Prochaine facture : <strong id="p-numero-preview-facture">…</strong></div>
+            <div>Prochain devis : <strong id="p-numero-preview-devis">…</strong></div>
+          </div>
           <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Prochain numéro de facture (ex : 33)</label>
           <input type="number" id="p-numero-facture-override" min="1" step="1" placeholder="Laisser vide pour continuer automatiquement" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.8rem;">
           <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Prochain numéro de devis (ex : 5)</label>
@@ -3218,6 +3222,36 @@ async function loadFacturesLight(){
   }catch(e){
     console.error('Erreur chargement factures :', e);
     facturesLight = [];
+  }
+}
+
+async function previewProchainsNumeros(params){
+  const annee = new Date().getFullYear();
+
+  // Facture
+  try{
+    if(params.numeroFactureOverride != null && params.numeroFactureOverride !== ''){
+      document.getElementById('p-numero-preview-facture').textContent = `FACT-${annee}-${String(params.numeroFactureOverride).padStart(4,'0')}`;
+    } else {
+      const { data } = await sb.from('factures').select('sequence').eq('annee', annee).order('sequence', { ascending: false }).limit(1);
+      const next = (data && data.length) ? data[0].sequence + 1 : 1;
+      document.getElementById('p-numero-preview-facture').textContent = `FACT-${annee}-${String(next).padStart(4,'0')}`;
+    }
+  }catch(e){
+    document.getElementById('p-numero-preview-facture').textContent = '—';
+  }
+
+  // Devis
+  try{
+    if(params.numeroDevisOverride != null && params.numeroDevisOverride !== ''){
+      document.getElementById('p-numero-preview-devis').textContent = `DEVIS-${annee}-${String(params.numeroDevisOverride).padStart(4,'0')}`;
+    } else {
+      const { data } = await sb.from('devis').select('sequence').eq('annee', annee).order('sequence', { ascending: false }).limit(1);
+      const next = (data && data.length) ? data[0].sequence + 1 : 1;
+      document.getElementById('p-numero-preview-devis').textContent = `DEVIS-${annee}-${String(next).padStart(4,'0')}`;
+    }
+  }catch(e){
+    document.getElementById('p-numero-preview-devis').textContent = '—';
   }
 }
 
@@ -7344,6 +7378,7 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
   document.getElementById('p-numero-facture-override').value = params.numeroFactureOverride ?? '';
   document.getElementById('p-numero-devis-override').value = params.numeroDevisOverride ?? '';
+  previewProchainsNumeros(params);
   // Jours bloqués
   renderPJoursBloques(params);
   // Tarifs électroménager
