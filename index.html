@@ -864,6 +864,16 @@
         <label>Prix de vente client (€)</label>
         <input type="number" id="stock-edit-prix" placeholder="0.00" step="0.01" min="0">
       </div>
+      <div class="field">
+        <label>Durée de garantie</label>
+        <select id="stock-edit-garantie">
+          <option value="3 mois">Défaut (3 mois)</option>
+          <option value="6 mois">Miele / BSH (6 mois)</option>
+          <option value="2 ans">Extra (2 ans)</option>
+          <option value="autre">Autre…</option>
+        </select>
+        <input type="text" id="stock-edit-garantie-autre" placeholder="ex : 9 mois" style="display:none;margin-top:0.5rem;">
+      </div>
       <div class="field" id="stock-edit-statut-field">
         <label>Statut</label>
         <select id="stock-edit-statut">
@@ -2538,6 +2548,16 @@ function renderStockPiecesList(){
   });
 }
 
+const GARANTIE_PRESETS = [
+  { label: 'Défaut (3 mois)', value: '3 mois' },
+  { label: 'Miele / BSH (6 mois)', value: '6 mois' },
+  { label: 'Extra (2 ans)', value: '2 ans' },
+  { label: 'Autre…', value: 'autre' }
+];
+function isGarantiePreset(value){
+  return GARANTIE_PRESETS.some(p => p.value === value && p.value !== 'autre');
+}
+
 function openStockEdit(type, appId){
   editingStockType = type;
   editingStockAppId = appId || null;
@@ -2554,6 +2574,16 @@ function openStockEdit(type, appId){
     document.getElementById('stock-edit-nom').value = item.nom || '';
     document.getElementById('stock-edit-ref').value = item.ref || '';
     document.getElementById('stock-edit-prix').value = item.prix_vente || '';
+    const garantieVal = item.garantie || '3 mois';
+    if(isGarantiePreset(garantieVal)){
+      document.getElementById('stock-edit-garantie').value = garantieVal;
+      document.getElementById('stock-edit-garantie-autre').style.display = 'none';
+      document.getElementById('stock-edit-garantie-autre').value = '';
+    } else {
+      document.getElementById('stock-edit-garantie').value = 'autre';
+      document.getElementById('stock-edit-garantie-autre').style.display = 'block';
+      document.getElementById('stock-edit-garantie-autre').value = garantieVal;
+    }
     if(type === 'embarque') document.getElementById('stock-edit-statut').value = item.statut || 'en_stock';
     deleteBtn.style.display = 'block';
   } else {
@@ -2561,6 +2591,9 @@ function openStockEdit(type, appId){
     document.getElementById('stock-edit-nom').value = '';
     document.getElementById('stock-edit-ref').value = '';
     document.getElementById('stock-edit-prix').value = '';
+    document.getElementById('stock-edit-garantie').value = '3 mois';
+    document.getElementById('stock-edit-garantie-autre').style.display = 'none';
+    document.getElementById('stock-edit-garantie-autre').value = '';
     document.getElementById('stock-edit-statut').value = 'en_stock';
     deleteBtn.style.display = 'none';
   }
@@ -2573,6 +2606,10 @@ function openStockEdit(type, appId){
 document.getElementById('stock-embarque-new-btn').addEventListener('click', () => openStockEdit('embarque', null));
 document.getElementById('stock-pieces-new-btn').addEventListener('click', () => openStockEdit('pieces', null));
 
+document.getElementById('stock-edit-garantie').addEventListener('change', (e) => {
+  document.getElementById('stock-edit-garantie-autre').style.display = e.target.value === 'autre' ? 'block' : 'none';
+});
+
 document.getElementById('stock-edit-back').addEventListener('click', () => {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(editingStockReturnView).classList.add('active');
@@ -2582,11 +2619,17 @@ document.getElementById('stock-edit-save-btn').addEventListener('click', async (
   const nom = document.getElementById('stock-edit-nom').value.trim();
   if(!nom){ showToast('Le nom de la pièce est requis', true); return; }
 
+  const garantieSelect = document.getElementById('stock-edit-garantie').value;
+  const garantieFinale = garantieSelect === 'autre'
+    ? (document.getElementById('stock-edit-garantie-autre').value.trim() || '3 mois')
+    : garantieSelect;
+
   const table = editingStockType === 'embarque' ? 'stock_embarque' : 'stock_pieces';
   const row = {
     nom: nom,
     ref: document.getElementById('stock-edit-ref').value.trim(),
-    prix_vente: document.getElementById('stock-edit-prix').value
+    prix_vente: document.getElementById('stock-edit-prix').value,
+    garantie: garantieFinale
   };
   if(editingStockType === 'embarque'){
     row.statut = document.getElementById('stock-edit-statut').value;
@@ -3142,23 +3185,27 @@ function buildFactureLignes(r){
   const lignes = [];
   const mo = parseFloat(r['cout-mo']) || 0;
   if(mo > 0){
-    lignes.push({ designation: `Main d'œuvre — ${r.appareil || ''}`.trim(), quantite: 1, prix_unitaire: mo, total: mo });
+    const marqueModele = `${r.marque||''} ${r.modele||''}`.trim();
+    const descMo = [r.appareil||'', marqueModele].filter(Boolean).join(' — ');
+    lignes.push({ designation: 'Main d\'œuvre', description: descMo, quantite: 1, prix_unitaire: mo, total: mo });
   }
   const pieces = (Array.isArray(r.piecesPosees) && r.piecesPosees.length)
     ? r.piecesPosees
-    : (r.pieceDeposeNom ? [{ nom: r.pieceDeposeNom }] : []);
+    : (r.pieceDeposeNom ? [{ nom: r.pieceDeposeNom, ref: r.pieceDeposeRef, garantie: '3 mois' }] : []);
   const coutPieces = parseFloat(r['cout-pieces']) || 0;
   if(pieces.length){
     const prixParPiece = coutPieces / pieces.length;
     pieces.forEach(p => {
-      lignes.push({ designation: `Pièce — ${p.nom || 'Pièce détachée'} (fournie et posée)`, quantite: 1, prix_unitaire: prixParPiece, total: prixParPiece });
+      const desc = p.nom || 'Pièce détachée';
+      lignes.push({ designation: 'Pièce', description: desc + (p.ref ? ` (Réf. ${p.ref})` : ''), garantie: p.garantie || '3 mois', quantite: 1, prix_unitaire: prixParPiece, total: prixParPiece });
     });
   } else if(coutPieces > 0){
-    lignes.push({ designation: 'Pièces détachées', quantite: 1, prix_unitaire: coutPieces, total: coutPieces });
+    const descCommande = (r['piece-desc'] || '').trim();
+    lignes.push({ designation: 'Pièce', description: descCommande || 'Pièce détachée', garantie: '3 mois', quantite: 1, prix_unitaire: coutPieces, total: coutPieces });
   }
   const depl = parseFloat(r['cout-deplacement']) || 0;
   if(depl > 0){
-    lignes.push({ designation: 'Déplacement', quantite: 1, prix_unitaire: depl, total: depl });
+    lignes.push({ designation: 'Déplacement', description: '', quantite: 1, prix_unitaire: depl, total: depl });
   }
   return lignes;
 }
@@ -3200,7 +3247,7 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   const clientLignesFacture = [`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim()];
   if(r.tel) clientLignesFacture.push(`Tél : ${r.tel}`);
   if(r.email) clientLignesFacture.push(`Email : ${r.email}`);
-  const clientBoxHeightFacture = 12 + clientLignesFacture.length * 5;
+  const clientBoxHeightFacture = 20 + (clientLignesFacture.length - 1) * 5;
 
   doc.setFillColor(245,247,250);
   doc.roundedRect(margin, y, W-margin*2, clientBoxHeightFacture, 3, 3, 'F');
@@ -3212,6 +3259,23 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
     doc.text(ligne, margin+4, y+17+i*5);
   });
   y += clientBoxHeightFacture + 8;
+
+  if(r.appareil || r.marque || r.modele){
+    const appareilLignes = [];
+    if(r.marque || r.modele) appareilLignes.push(`${r.marque||''} ${r.modele||''}`.trim());
+    const appareilBoxHeight = 20 + Math.max(appareilLignes.length - 1, 0) * 5;
+
+    doc.setFillColor(245,247,250);
+    doc.roundedRect(margin, y, W-margin*2, appareilBoxHeight, 3, 3, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(245,166,35);
+    doc.text('APPAREIL', margin+4, y+6);
+    doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40); doc.setFontSize(9.5);
+    doc.text(r.appareil || '', margin+4, y+12);
+    appareilLignes.forEach((ligne, i) => {
+      doc.text(ligne, margin+4, y+17+i*5);
+    });
+    y += appareilBoxHeight + 8;
+  }
 
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(245,166,35);
   doc.text('Nature de l\'opération : Prestation de services', margin, y);
@@ -3229,13 +3293,26 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
 
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
   lignes.forEach((l, i) => {
-    if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, 7, 'F'); }
-    const desLines = doc.splitTextToSize(l.designation, 95);
-    doc.text(desLines[0], margin+3, y+5);
+    const rowHeight = l.description ? 12 : 7;
+    if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, rowHeight, 'F'); }
+
+    doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40);
+    doc.text(l.designation, margin+3, y+5);
+    doc.setFont('helvetica','normal');
     doc.text(String(l.quantite), W-margin-45, y+5);
     doc.text(l.prix_unitaire.toFixed(2)+' €', W-margin-32, y+5);
     doc.text(l.total.toFixed(2)+' €', W-margin-3, y+5, {align:'right'});
-    y += 7;
+
+    if(l.description){
+      doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(100,100,100);
+      let descText = l.description;
+      if(l.garantie) descText += `  —  Garantie : ${l.garantie}`;
+      const descLines = doc.splitTextToSize(descText, 130);
+      doc.text(descLines[0], margin+3, y+10);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
+    }
+
+    y += rowHeight;
   });
 
   y += 3;
@@ -3251,8 +3328,20 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   doc.text(tvaLines, margin, y);
   y += tvaLines.length*4 + 4;
 
-  doc.text(`Mode de paiement : ${r['mode-paiement'] || 'Carte bancaire / Espèces'}`, margin, y);
+  doc.text(`Mode de paiement : ${r['paiement-moyen'] || 'CB ou espèces'}`, margin, y);
   y += 4;
+  const dateFrPaiement = r.date ? new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'}) : dateFr;
+  if(r['paiement-statut'] === 'Paye_total' || r['paiement-statut'] === 'Gratuit'){
+    doc.setFont('helvetica','bold'); doc.setTextColor(63,191,111);
+    doc.text(`✓ Payé le ${dateFrPaiement}`, margin, y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
+    y += 4;
+  } else if(r['paiement-statut'] === 'Acompte'){
+    doc.setFont('helvetica','bold'); doc.setTextColor(245,166,35);
+    doc.text(`Acompte versé le ${dateFrPaiement}`, margin, y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
+    y += 4;
+  }
   doc.text('Conditions de règlement : Payable comptant à réception', margin, y);
   y += 4;
   doc.text("Pénalités de retard : taux BCE + 10 points — Indemnité forfaitaire de recouvrement : 40 €", margin, y);
@@ -3313,7 +3402,7 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
       client_ville: r.ville || '',
       lignes: JSON.stringify(lignes),
       montant_total: montantTotal,
-      mode_paiement: r['mode-paiement'] || '',
+      mode_paiement: r['paiement-moyen'] || '',
       pdf_base64: pdfBase64
     });
     if(error) throw error;
@@ -3415,7 +3504,12 @@ document.getElementById('generer-devis-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
   const lignesInit = buildFactureLignes(currentDetailReport);
   devisEditRows = lignesInit.length
-    ? lignesInit.map(l => newDevisRow({ designation: l.designation, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
+    ? lignesInit.map(l => newDevisRow({
+        designation: l.description
+          ? `${l.designation} — ${l.description}${l.garantie ? ' (Garantie : '+l.garantie+')' : ''}`
+          : l.designation,
+        quantite: l.quantite, prix_unitaire: l.prix_unitaire
+      }))
     : [newDevisRow()];
   renderDevisRows();
   document.getElementById('devis-modal').style.display = 'flex';
@@ -3457,7 +3551,7 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
   const clientLignesDevis = [`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim()];
   if(r.tel) clientLignesDevis.push(`Tél : ${r.tel}`);
   if(r.email) clientLignesDevis.push(`Email : ${r.email}`);
-  const clientBoxHeightDevis = 12 + clientLignesDevis.length * 5;
+  const clientBoxHeightDevis = 20 + (clientLignesDevis.length - 1) * 5;
 
   doc.setFillColor(245,247,250);
   doc.roundedRect(margin, y, W-margin*2, clientBoxHeightDevis, 3, 3, 'F');
@@ -6803,7 +6897,7 @@ document.getElementById('pose-piece-photo-input').addEventListener('change', asy
 let posePieceRows = [];
 
 function newPosePieceRow(prefill){
-  return Object.assign({ id: 'r' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', ref: '', stockAppId: null, stockType: null }, prefill || {});
+  return Object.assign({ id: 'r' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', ref: '', garantie: '3 mois', stockAppId: null, stockType: null }, prefill || {});
 }
 
 function renderPosePieceRows(){
@@ -6815,7 +6909,12 @@ function renderPosePieceRows(){
         <input type="text" class="pp-row-nom" placeholder="Nom de la pièce" value="${escapeHtml(row.nom)}"
           style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
         <input type="text" class="pp-row-ref" placeholder="Référence (optionnel)" value="${escapeHtml(row.ref)}"
-          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
+        <select class="pp-row-garantie" style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
+          ${GARANTIE_PRESETS.map(p => `<option value="${p.value}" ${(isGarantiePreset(row.garantie) ? row.garantie : 'autre')===p.value?'selected':''}>${p.label}</option>`).join('')}
+        </select>
+        <input type="text" class="pp-row-garantie-autre" placeholder="ex : 9 mois" value="${!isGarantiePreset(row.garantie) ? escapeHtml(row.garantie) : ''}"
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;display:${!isGarantiePreset(row.garantie) ? 'block' : 'none'};">
       </div>
       ${posePieceRows.length > 1 ? `<button type="button" class="pp-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
     </div>`).join('');
@@ -6825,6 +6924,18 @@ function renderPosePieceRows(){
     const row = posePieceRows.find(r => r.id === id);
     rowEl.querySelector('.pp-row-nom').addEventListener('input', (e) => { row.nom = e.target.value; });
     rowEl.querySelector('.pp-row-ref').addEventListener('input', (e) => { row.ref = e.target.value; });
+    const garantieSelect = rowEl.querySelector('.pp-row-garantie');
+    const garantieAutre = rowEl.querySelector('.pp-row-garantie-autre');
+    garantieSelect.addEventListener('change', (e) => {
+      if(e.target.value === 'autre'){
+        garantieAutre.style.display = 'block';
+        row.garantie = garantieAutre.value.trim() || 'autre';
+      } else {
+        garantieAutre.style.display = 'none';
+        row.garantie = e.target.value;
+      }
+    });
+    garantieAutre.addEventListener('input', (e) => { row.garantie = e.target.value.trim(); });
     rowEl.querySelector('.pp-row-remove')?.addEventListener('click', () => {
       posePieceRows = posePieceRows.filter(r => r.id !== id);
       renderPosePieceRows();
@@ -6867,7 +6978,7 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   btn.disabled = true;
   btn.textContent = 'Enregistrement…';
 
-  const piecesPosees = validRows.map(r => ({ nom: r.nom.trim(), ref: r.ref.trim() }));
+  const piecesPosees = validRows.map(r => ({ nom: r.nom.trim(), ref: r.ref.trim(), garantie: r.garantie || '3 mois' }));
   reports[idx].piecesPosees = piecesPosees;
   // Champs legacy conservés pour compatibilité (1ère pièce de la liste)
   reports[idx].pieceDeposeNom = piecesPosees[0].nom;
@@ -7322,6 +7433,7 @@ function isDateBlocked(dateISO){
         if(!target){ target = newPosePieceRow(); posePieceRows.push(target); }
         target.nom = item.nom || '';
         target.ref = item.ref || '';
+        target.garantie = item.garantie || '3 mois';
         target.stockAppId = item.app_id;
         target.stockType = type;
         renderPosePieceRows();
