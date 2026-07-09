@@ -3197,17 +3197,24 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   }
   y += 4;
 
+  const clientLignesFacture = [`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim()];
+  if(r.tel) clientLignesFacture.push(`Tél : ${r.tel}`);
+  if(r.email) clientLignesFacture.push(`Email : ${r.email}`);
+  const clientBoxHeightFacture = 12 + clientLignesFacture.length * 5;
+
   doc.setFillColor(245,247,250);
-  doc.roundedRect(margin, y, W-margin*2, 20, 3, 3, 'F');
+  doc.roundedRect(margin, y, W-margin*2, clientBoxHeightFacture, 3, 3, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(245,166,35);
   doc.text('CLIENT', margin+4, y+6);
   doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40); doc.setFontSize(9.5);
   doc.text(`${r.prenom||''} ${r.nom||''}`.trim(), margin+4, y+12);
-  doc.text(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim(), margin+4, y+17);
-  y += 28;
+  clientLignesFacture.forEach((ligne, i) => {
+    doc.text(ligne, margin+4, y+17+i*5);
+  });
+  y += clientBoxHeightFacture + 8;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(245,166,35);
-  doc.text('Nature de l\'opération : Prestation de services et vente de biens', margin, y);
+  doc.text('Nature de l\'opération : Prestation de services', margin, y);
   y += 8;
 
   // Tableau des lignes
@@ -3447,14 +3454,21 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
   doc.text(`Devis valable jusqu'au : ${dateValiditeFr} (30 jours)`, margin, y);
   y += 9;
 
+  const clientLignesDevis = [`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim()];
+  if(r.tel) clientLignesDevis.push(`Tél : ${r.tel}`);
+  if(r.email) clientLignesDevis.push(`Email : ${r.email}`);
+  const clientBoxHeightDevis = 12 + clientLignesDevis.length * 5;
+
   doc.setFillColor(245,247,250);
-  doc.roundedRect(margin, y, W-margin*2, 20, 3, 3, 'F');
+  doc.roundedRect(margin, y, W-margin*2, clientBoxHeightDevis, 3, 3, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,115,200);
   doc.text('CLIENT', margin+4, y+6);
   doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40); doc.setFontSize(9.5);
   doc.text(`${r.prenom||''} ${r.nom||''}`.trim(), margin+4, y+12);
-  doc.text(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim(), margin+4, y+17);
-  y += 30;
+  clientLignesDevis.forEach((ligne, i) => {
+    doc.text(ligne, margin+4, y+17+i*5);
+  });
+  y += clientBoxHeightDevis + 8;
 
   doc.setFillColor(13,27,42);
   doc.rect(margin, y, W-margin*2, 8, 'F');
