@@ -1311,7 +1311,18 @@
             <option value="">-- Sélectionner --</option>
             <option>Espèces</option>
             <option>Carte bancaire</option>
+            <option value="Mixte">Mixte (espèces + carte)</option>
           </select>
+        </div>
+        <div class="grid" id="paiement-mixte-fields" style="display:none;">
+          <div class="field">
+            <label>Montant en espèces (€)</label>
+            <input type="number" id="f-paiement-especes" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="field">
+            <label>Montant en carte (€)</label>
+            <input type="number" id="f-paiement-carte" placeholder="0.00" step="0.01" min="0">
+          </div>
         </div>
         <div class="field">
           <label><strong>Reste à encaisser (€)</strong></label>
@@ -1833,6 +1844,8 @@ function reportToRow(r){
     paiement_statue: r['paiement-statut'] || '',
     reste_encaisser: r['reste-encaisser'] || '',
     mode_paiement: r['paiement-moyen'] || '',
+    paiement_especes: r['paiement-especes'] || null,
+    paiement_carte: r['paiement-carte'] || null,
     garantie: !!r.garantie,
     facture_creee: !!r['facture-creee'],
     conseil_entretien: !!r['conseils-entretien'],
@@ -1917,6 +1930,8 @@ function rowToReport(row){
     'reste-encaisser': row.reste_encaisser,
     'acompte-montant': extra.acompte_montant || '',
     'paiement-moyen': row.mode_paiement,
+    'paiement-especes': row.paiement_especes || '',
+    'paiement-carte': row.paiement_carte || '',
     garantie: !!row.garantie,
     'facture-creee': !!row.facture_creee,
     'conseils-entretien': !!row.conseil_entretien,
@@ -1956,7 +1971,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -3328,7 +3343,13 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   doc.text(tvaLines, margin, y);
   y += tvaLines.length*4 + 4;
 
-  doc.text(`Mode de paiement : ${r['paiement-moyen'] || 'CB ou espèces'}`, margin, y);
+  if(r['paiement-moyen'] === 'Mixte'){
+    const esp = parseFloat(r['paiement-especes']) || 0;
+    const cb = parseFloat(r['paiement-carte']) || 0;
+    doc.text(`Mode de paiement : Mixte — Espèces : ${esp.toFixed(2)} € / Carte bancaire : ${cb.toFixed(2)} €`, margin, y);
+  } else {
+    doc.text(`Mode de paiement : ${r['paiement-moyen'] || 'CB ou espèces'}`, margin, y);
+  }
   y += 4;
   const dateFrPaiement = r.date ? new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'}) : dateFr;
   if(r['paiement-statut'] === 'Paye_total' || r['paiement-statut'] === 'Gratuit'){
@@ -5034,6 +5055,9 @@ document.getElementById('f-paiement-statut').addEventListener('change', e => {
   document.getElementById('acompte-field').style.display = (e.target.value === 'Acompte') ? 'block' : 'none';
   updateResteAEncaisser();
 });
+document.getElementById('f-paiement-moyen').addEventListener('change', e => {
+  document.getElementById('paiement-mixte-fields').style.display = (e.target.value === 'Mixte') ? 'grid' : 'none';
+});
 
 // ---------- Calcul automatique du total et du reste à encaisser ----------
 function updateResteAEncaisser(){
@@ -5597,7 +5621,7 @@ const fieldIds = [
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
   'f-piece-desc','f-prix-fournisseur','f-livraison','f-piece-cout',
   'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-cout-total','f-reste-encaisser',
-  'f-paiement-statut','f-acompte-montant','f-paiement-moyen',
+  'f-paiement-statut','f-acompte-montant','f-paiement-moyen','f-paiement-especes','f-paiement-carte',
   'f-notes'
 ];
 const checkboxIds = ['f-besoin-piece','f-commande-piece','f-garantie','f-conseils-entretien'];
@@ -5615,6 +5639,7 @@ function resetForm(){
   document.getElementById('f-reste-encaisser').value = '0.00';
   document.getElementById('commande-piece-fields').style.display = 'none';
   document.getElementById('acompte-field').style.display = 'none';
+  document.getElementById('paiement-mixte-fields').style.display = 'none';
   setPieceMode('stock');
   // delete-btn supprimé
   signatureData = null;
@@ -5656,6 +5681,7 @@ async function loadIntoForm(report){
   }
   renderCommandePieceRows();
   document.getElementById('acompte-field').style.display = (report['paiement-statut'] === 'Acompte') ? 'block' : 'none';
+  document.getElementById('paiement-mixte-fields').style.display = (report['paiement-moyen'] === 'Mixte') ? 'grid' : 'none';
   // delete-btn supprimé
   signatureData = report.signature || null;
   updateSigPreview();
