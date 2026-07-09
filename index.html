@@ -1043,6 +1043,12 @@
         <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">🛠️ Rouvrir en SAV</button>
         <button class="btn btn-outline" id="detail-archiver-btn" style="display:none;font-size:0.82rem;">📦 Archiver</button>
         <button class="btn btn-outline" id="attestation-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">📋 Attestation</button>
+        <button class="btn btn-primary" id="generer-facture-btn" style="display:none;font-size:0.82rem;">🧾 Générer la facture</button>
+        <button class="btn btn-outline" id="voir-facture-btn" style="display:none;font-size:0.82rem;">🧾 Voir la facture</button>
+        <button class="btn btn-outline" id="envoyer-facture-btn" style="display:none;font-size:0.82rem;">📧 Envoyer la facture</button>
+        <button class="btn btn-primary" id="generer-devis-btn" style="display:none;font-size:0.82rem;">📝 Générer un devis</button>
+        <button class="btn btn-outline" id="voir-devis-btn" style="display:none;font-size:0.82rem;">📝 Voir le devis</button>
+        <button class="btn btn-outline" id="envoyer-devis-btn" style="display:none;font-size:0.82rem;">📧 Envoyer le devis</button>
       </div>
       <div id="detail-content"></div>
     </div>
@@ -1521,6 +1527,18 @@
         </div>
       </div>
 
+      <!-- NUMÉROTATION -->
+      <div class="settings-section" data-section="numerotation">
+        <div class="settings-section-header"><h3>🔢 Numérotation factures & devis</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Prochain numéro de facture (ex : 33)</label>
+          <input type="number" id="p-numero-facture-override" min="1" step="1" placeholder="Laisser vide pour continuer automatiquement" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.8rem;">
+          <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Prochain numéro de devis (ex : 5)</label>
+          <input type="number" id="p-numero-devis-override" min="1" step="1" placeholder="Laisser vide pour continuer automatiquement" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          <p style="font-size:0.75rem;color:var(--text-muted);margin:0.5rem 0 0;">À utiliser une seule fois pour reprendre la continuité d'une numérotation existante (ex : Qonto). Le champ se vide automatiquement après utilisation et la numérotation continue ensuite toute seule.</p>
+        </div>
+      </div>
+
       <!-- TARIFS ÉLECTROMÉNAGER -->
       <div class="settings-section" data-section="tarifs-em">
         <div class="settings-section-header"><h3>🔧 Tarifs électroménager</h3><span class="settings-section-chevron">▼</span></div>
@@ -1603,6 +1621,26 @@
       <button class="btn btn-outline" id="pose-piece-cancel-btn">Annuler</button>
       <button class="btn btn-primary" id="pose-piece-save-btn">Valider ✓</button>
     </div>
+  </div>
+</div>
+
+<!-- Éditeur de devis -->
+<div id="devis-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+      <h3 style="margin:0;color:var(--orange);">📝 Éditeur de devis</h3>
+      <button id="devis-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
+    </div>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 1rem;">Pré-rempli depuis le compte-rendu — modifiez librement avant de générer.</p>
+
+    <div id="devis-rows" style="margin-bottom:0.6rem;"></div>
+    <button type="button" class="btn btn-outline" id="devis-add-row-btn" style="width:100%;margin-bottom:1rem;">+ Ajouter une ligne</button>
+
+    <div style="display:flex;justify-content:space-between;font-size:1.1rem;font-weight:700;color:var(--orange);border-top:1px solid var(--border);padding-top:0.8rem;margin-bottom:1rem;">
+      <span>Total estimé</span><span id="devis-total-affiche">0,00 €</span>
+    </div>
+
+    <button class="btn btn-primary" id="devis-generer-final-btn" style="width:100%;">Générer le devis PDF</button>
   </div>
 </div>
 
@@ -1708,6 +1746,8 @@ async function initAuth(){
 function onAuthenticated(){
   document.getElementById('login-overlay').style.display = 'none';
   if(typeof loadReportsFromSupabase === 'function') loadReportsFromSupabase();
+  if(typeof loadFacturesLight === 'function') loadFacturesLight();
+  if(typeof loadDevisLight === 'function') loadDevisLight();
 }
 
 document.getElementById('login-submit-btn').addEventListener('click', async () => {
@@ -3022,6 +3062,593 @@ function generateRecuRemisePdf(depot, signatureDataUrl, dateVal, heureVal){
   const filename = `recu-remise-${(depot.nom||'client').replace(/[^a-z0-9]/gi,'')}.pdf`;
   doc.save(filename);
 }
+
+async function getNextDevisNumero(){
+  const annee = new Date().getFullYear();
+  if(!_agendaConfigCache){ try{ await getAgendaParams(); }catch(e){} }
+  const override = _agendaConfigCache && _agendaConfigCache.numeroDevisOverride;
+  if(override != null && override !== ''){
+    const nextSeq = parseInt(override);
+    try{
+      await sb.from('agenda_config').update({ numero_devis_override: null }).eq('id', 1);
+      _agendaConfigCache.numeroDevisOverride = null;
+    }catch(e){ console.error('Erreur reset override devis :', e); }
+    return { annee, sequence: nextSeq, numero: `DEVIS-${annee}-${String(nextSeq).padStart(4,'0')}` };
+  }
+  try{
+    const { data, error } = await sb.from('devis').select('sequence').eq('annee', annee).order('sequence', { ascending: false }).limit(1);
+    if(error) throw error;
+    const nextSeq = (data && data.length) ? data[0].sequence + 1 : 1;
+    return { annee, sequence: nextSeq, numero: `DEVIS-${annee}-${String(nextSeq).padStart(4,'0')}` };
+  }catch(e){
+    console.error('Erreur numérotation devis :', e);
+    throw e;
+  }
+}
+
+// ==================== FACTURATION ====================
+let facturesLight = [];
+
+// ==================== DEVIS ====================
+let devisLight = [];
+
+async function loadDevisLight(){
+  try{
+    const { data, error } = await sb.from('devis').select('app_id,numero,rapport_app_id,annee,sequence').order('sequence', { ascending: false });
+    if(error) throw error;
+    devisLight = data || [];
+  }catch(e){
+    console.error('Erreur chargement devis :', e);
+    devisLight = [];
+  }
+}
+
+async function loadFacturesLight(){
+  try{
+    const { data, error } = await sb.from('factures').select('app_id,numero,rapport_app_id,annee,sequence').order('sequence', { ascending: false });
+    if(error) throw error;
+    facturesLight = data || [];
+  }catch(e){
+    console.error('Erreur chargement factures :', e);
+    facturesLight = [];
+  }
+}
+
+async function getNextFactureNumero(){
+  const annee = new Date().getFullYear();
+  if(!_agendaConfigCache){ try{ await getAgendaParams(); }catch(e){} }
+  const override = _agendaConfigCache && _agendaConfigCache.numeroFactureOverride;
+  if(override != null && override !== ''){
+    const nextSeq = parseInt(override);
+    // Consommer l'override : il ne s'applique qu'une seule fois
+    try{
+      await sb.from('agenda_config').update({ numero_facture_override: null }).eq('id', 1);
+      _agendaConfigCache.numeroFactureOverride = null;
+    }catch(e){ console.error('Erreur reset override facture :', e); }
+    return { annee, sequence: nextSeq, numero: `FACT-${annee}-${String(nextSeq).padStart(4,'0')}` };
+  }
+  try{
+    const { data, error } = await sb.from('factures').select('sequence').eq('annee', annee).order('sequence', { ascending: false }).limit(1);
+    if(error) throw error;
+    const nextSeq = (data && data.length) ? data[0].sequence + 1 : 1;
+    return { annee, sequence: nextSeq, numero: `FACT-${annee}-${String(nextSeq).padStart(4,'0')}` };
+  }catch(e){
+    console.error('Erreur numérotation facture :', e);
+    throw e;
+  }
+}
+
+function buildFactureLignes(r){
+  const lignes = [];
+  const mo = parseFloat(r['cout-mo']) || 0;
+  if(mo > 0){
+    lignes.push({ designation: `Main d'œuvre — ${r.appareil || ''}`.trim(), quantite: 1, prix_unitaire: mo, total: mo });
+  }
+  const pieces = (Array.isArray(r.piecesPosees) && r.piecesPosees.length)
+    ? r.piecesPosees
+    : (r.pieceDeposeNom ? [{ nom: r.pieceDeposeNom }] : []);
+  const coutPieces = parseFloat(r['cout-pieces']) || 0;
+  if(pieces.length){
+    const prixParPiece = coutPieces / pieces.length;
+    pieces.forEach(p => {
+      lignes.push({ designation: `Pièce — ${p.nom || 'Pièce détachée'} (fournie et posée)`, quantite: 1, prix_unitaire: prixParPiece, total: prixParPiece });
+    });
+  } else if(coutPieces > 0){
+    lignes.push({ designation: 'Pièces détachées', quantite: 1, prix_unitaire: coutPieces, total: coutPieces });
+  }
+  const depl = parseFloat(r['cout-deplacement']) || 0;
+  if(depl > 0){
+    lignes.push({ designation: 'Déplacement', quantite: 1, prix_unitaire: depl, total: depl });
+  }
+  return lignes;
+}
+
+function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W = 210, margin = 20;
+  let y = 20;
+
+  try{ doc.addImage('data:image/png;base64,' + LOGO_BASE64, 'PNG', margin, y, 26, 26); }catch(e){}
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(13,27,42);
+  doc.text('TECHNIK-HOME', 54, y+6);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(80,80,80);
+  doc.text('Jonathan Waeytens — Entrepreneur Individuel (EI)', 54, y+11);
+  doc.text('165 rue Emile Zola, App. 1, Bât. A — 62300 Lens', 54, y+16);
+  doc.text('SIRET : 795 114 263 00036 — SIREN : 795 114 263', 54, y+21);
+  doc.text('Tél : 07 59 70 54 97', 54, y+26);
+
+  y += 34;
+  doc.setDrawColor(245,166,35); doc.setLineWidth(0.8);
+  doc.line(margin, y, W-margin, y);
+  y += 8;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(13,27,42);
+  doc.text(`FACTURE N° ${numero}`, margin, y);
+  y += 6;
+  const dateFr = new Date(dateEmission + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(80,80,80);
+  doc.text(`Date d'émission : ${dateFr}`, margin, y);
+  y += 5;
+  if(r.date){
+    const datePrestFr = new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'});
+    doc.text(`Date de la prestation : ${datePrestFr}`, margin, y);
+    y += 5;
+  }
+  y += 4;
+
+  doc.setFillColor(245,247,250);
+  doc.roundedRect(margin, y, W-margin*2, 20, 3, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(245,166,35);
+  doc.text('CLIENT', margin+4, y+6);
+  doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40); doc.setFontSize(9.5);
+  doc.text(`${r.prenom||''} ${r.nom||''}`.trim(), margin+4, y+12);
+  doc.text(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim(), margin+4, y+17);
+  y += 28;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(245,166,35);
+  doc.text('Nature de l\'opération : Prestation de services et vente de biens', margin, y);
+  y += 8;
+
+  // Tableau des lignes
+  doc.setFillColor(13,27,42);
+  doc.rect(margin, y, W-margin*2, 8, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+  doc.text('Désignation', margin+3, y+5.5);
+  doc.text('Qté', W-margin-45, y+5.5);
+  doc.text('Prix unit.', W-margin-32, y+5.5);
+  doc.text('Total', W-margin-12, y+5.5, {align:'right'});
+  y += 8;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
+  lignes.forEach((l, i) => {
+    if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, 7, 'F'); }
+    const desLines = doc.splitTextToSize(l.designation, 95);
+    doc.text(desLines[0], margin+3, y+5);
+    doc.text(String(l.quantite), W-margin-45, y+5);
+    doc.text(l.prix_unitaire.toFixed(2)+' €', W-margin-32, y+5);
+    doc.text(l.total.toFixed(2)+' €', W-margin-3, y+5, {align:'right'});
+    y += 7;
+  });
+
+  y += 3;
+  doc.setDrawColor(220,220,220); doc.line(margin, y, W-margin, y);
+  y += 8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(13,27,42);
+  doc.text('TOTAL TTC À PAYER', margin, y);
+  doc.text(montantTotal.toFixed(2)+' €', W-margin-3, y, {align:'right'});
+  y += 10;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,90,90);
+  const tvaLines = doc.splitTextToSize("TVA non applicable, articles 293 B du Code général des impôts (CGI) et 223-21 du Code des impositions sur les biens et services (CIBS)", W-margin*2);
+  doc.text(tvaLines, margin, y);
+  y += tvaLines.length*4 + 4;
+
+  doc.text(`Mode de paiement : ${r['mode-paiement'] || 'Carte bancaire / Espèces'}`, margin, y);
+  y += 4;
+  doc.text('Conditions de règlement : Payable comptant à réception', margin, y);
+  y += 4;
+  doc.text("Pénalités de retard : taux BCE + 10 points — Indemnité forfaitaire de recouvrement : 40 €", margin, y);
+  y += 4;
+  doc.text('Escompte pour paiement anticipé : néant', margin, y);
+  y += 8;
+
+  doc.setDrawColor(245,166,35); doc.setLineWidth(0.5);
+  doc.line(margin, y, W-margin, y);
+  y += 6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(13,27,42);
+  doc.text('Garanties', margin, y);
+  y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,90,90);
+  const garLines = doc.splitTextToSize("Main d'œuvre garantie 15 jours à compter de la date d'intervention. Pièces posées : garantie légale de conformité et garantie des vices cachés applicables selon les conditions du fabricant. Conditions générales de vente complètes disponibles sur technikhome.fr/cgv.html", W-margin*2);
+  doc.text(garLines, margin, y);
+  y += garLines.length*4 + 6;
+
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(130,130,130);
+  doc.text('Réparer, c\'est notre nature.', W/2, 285, {align:'center'});
+
+  return doc;
+}
+
+document.getElementById('generer-facture-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  const btn = document.getElementById('generer-facture-btn');
+  btn.disabled = true;
+  btn.textContent = 'Génération…';
+
+  try{
+    const lignes = buildFactureLignes(r);
+    if(!lignes.length){
+      showToast('Aucun montant à facturer sur ce compte-rendu', true);
+      btn.disabled = false;
+      btn.textContent = '🧾 Générer la facture';
+      return;
+    }
+    const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
+    const { annee, sequence, numero } = await getNextFactureNumero();
+    const dateEmission = todayISO();
+
+    const doc = generateFacturePdf(r, numero, lignes, montantTotal, dateEmission);
+    const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+    const factureAppId = 'fact_' + Date.now();
+    const { error } = await sb.from('factures').insert({
+      app_id: factureAppId,
+      numero, annee, sequence,
+      date_emission: dateEmission,
+      date_prestation: r.date || null,
+      rapport_app_id: r.id,
+      client_nom: r.nom || '',
+      client_prenom: r.prenom || '',
+      client_adresse: r.adresse || '',
+      client_cp: r.cp || '',
+      client_ville: r.ville || '',
+      lignes: JSON.stringify(lignes),
+      montant_total: montantTotal,
+      mode_paiement: r['mode-paiement'] || '',
+      pdf_base64: pdfBase64
+    });
+    if(error) throw error;
+
+    facturesLight.push({ app_id: factureAppId, numero, rapport_app_id: r.id, annee, sequence });
+    doc.save(`${numero}.pdf`);
+    showToast(`Facture ${numero} générée et enregistrée ✓`);
+    updateFactureButtons(r);
+  }catch(e){
+    console.error('Erreur génération facture :', e);
+    showToast('Erreur lors de la génération de la facture', true);
+  }
+  btn.disabled = false;
+  btn.textContent = '🧾 Générer la facture';
+});
+
+document.getElementById('voir-facture-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const existante = facturesLight.find(f => f.rapport_app_id === currentDetailReport.id);
+  if(!existante){ showToast('Facture introuvable', true); return; }
+  try{
+    const { data, error } = await sb.from('factures').select('pdf_base64,numero').eq('app_id', existante.app_id).single();
+    if(error) throw error;
+    const link = document.createElement('a');
+    link.href = 'data:application/pdf;base64,' + data.pdf_base64;
+    link.download = `${data.numero}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }catch(e){
+    console.error('Erreur récupération facture :', e);
+    showToast('Erreur lors de la récupération de la facture', true);
+  }
+});
+
+function updateFactureButtons(r){
+  const genBtn = document.getElementById('generer-facture-btn');
+  const voirBtn = document.getElementById('voir-facture-btn');
+  const envoyerBtn = document.getElementById('envoyer-facture-btn');
+  const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
+  const existante = facturesLight.some(f => f.rapport_app_id === r.id);
+  genBtn.style.display = (isTermine && !existante) ? 'inline-flex' : 'none';
+  voirBtn.style.display = existante ? 'inline-flex' : 'none';
+  envoyerBtn.style.display = existante ? 'inline-flex' : 'none';
+}
+
+// ==================== ÉDITEUR DE DEVIS ====================
+let devisEditRows = [];
+
+function newDevisRow(prefill){
+  return Object.assign({ id: 'dv' + Date.now() + Math.random().toString(36).slice(2,7), designation: '', quantite: 1, prix_unitaire: 0 }, prefill || {});
+}
+
+function renderDevisRows(){
+  const container = document.getElementById('devis-rows');
+  if(!container) return;
+  container.innerHTML = devisEditRows.map(row => `
+    <div class="dv-row" data-row-id="${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:0.6rem;margin-bottom:0.5rem;">
+      <input type="text" class="dv-row-designation" placeholder="Désignation" value="${escapeHtml(row.designation)}"
+        style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;margin-bottom:0.4rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.5rem;align-items:center;">
+        <input type="number" class="dv-row-qte" min="1" step="1" value="${row.quantite}" placeholder="Qté"
+          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <input type="number" class="dv-row-prix" min="0" step="0.01" value="${row.prix_unitaire}" placeholder="Prix unit. (€)"
+          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <button type="button" class="dv-row-remove btn btn-outline" style="padding:0.5rem 0.6rem;color:var(--red,#e05252);">✕</button>
+      </div>
+    </div>`).join('');
+
+  container.querySelectorAll('.dv-row').forEach(rowEl => {
+    const id = rowEl.dataset.rowId;
+    const row = devisEditRows.find(r => r.id === id);
+    rowEl.querySelector('.dv-row-designation').addEventListener('input', e => { row.designation = e.target.value; });
+    rowEl.querySelector('.dv-row-qte').addEventListener('input', e => { row.quantite = parseFloat(e.target.value)||1; recalcDevisTotal(); });
+    rowEl.querySelector('.dv-row-prix').addEventListener('input', e => { row.prix_unitaire = parseFloat(e.target.value)||0; recalcDevisTotal(); });
+    rowEl.querySelector('.dv-row-remove').addEventListener('click', () => {
+      devisEditRows = devisEditRows.filter(r => r.id !== id);
+      renderDevisRows();
+      recalcDevisTotal();
+    });
+  });
+  recalcDevisTotal();
+}
+
+function recalcDevisTotal(){
+  const total = devisEditRows.reduce((s,r) => s + (r.quantite * r.prix_unitaire), 0);
+  const el = document.getElementById('devis-total-affiche');
+  if(el) el.textContent = total.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+}
+
+document.getElementById('devis-add-row-btn').addEventListener('click', () => {
+  devisEditRows.push(newDevisRow());
+  renderDevisRows();
+});
+document.getElementById('devis-modal-close').addEventListener('click', () => {
+  document.getElementById('devis-modal').style.display = 'none';
+});
+
+document.getElementById('generer-devis-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const lignesInit = buildFactureLignes(currentDetailReport);
+  devisEditRows = lignesInit.length
+    ? lignesInit.map(l => newDevisRow({ designation: l.designation, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
+    : [newDevisRow()];
+  renderDevisRows();
+  document.getElementById('devis-modal').style.display = 'flex';
+});
+
+function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W = 210, margin = 20;
+  let y = 20;
+
+  try{ doc.addImage('data:image/png;base64,' + LOGO_BASE64, 'PNG', margin, y, 26, 26); }catch(e){}
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(13,27,42);
+  doc.text('TECHNIK-HOME', 54, y+6);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(80,80,80);
+  doc.text('Jonathan Waeytens — Entrepreneur Individuel (EI)', 54, y+11);
+  doc.text('165 rue Emile Zola, App. 1, Bât. A — 62300 Lens', 54, y+16);
+  doc.text('SIRET : 795 114 263 00036 — SIREN : 795 114 263', 54, y+21);
+  doc.text('Tél : 07 59 70 54 97', 54, y+26);
+
+  y += 34;
+  doc.setDrawColor(26,115,200); doc.setLineWidth(0.8);
+  doc.line(margin, y, W-margin, y);
+  y += 8;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(13,27,42);
+  doc.text(`DEVIS N° ${numero}`, margin, y);
+  y += 6;
+  const dateFr = new Date(dateEmission + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'});
+  const dateValidite = new Date(dateEmission + 'T00:00:00');
+  dateValidite.setDate(dateValidite.getDate() + 30);
+  const dateValiditeFr = dateValidite.toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(80,80,80);
+  doc.text(`Date d'émission : ${dateFr}`, margin, y);
+  y += 5;
+  doc.text(`Devis valable jusqu'au : ${dateValiditeFr} (30 jours)`, margin, y);
+  y += 9;
+
+  doc.setFillColor(245,247,250);
+  doc.roundedRect(margin, y, W-margin*2, 20, 3, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,115,200);
+  doc.text('CLIENT', margin+4, y+6);
+  doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40); doc.setFontSize(9.5);
+  doc.text(`${r.prenom||''} ${r.nom||''}`.trim(), margin+4, y+12);
+  doc.text(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim(), margin+4, y+17);
+  y += 30;
+
+  doc.setFillColor(13,27,42);
+  doc.rect(margin, y, W-margin*2, 8, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+  doc.text('Désignation', margin+3, y+5.5);
+  doc.text('Qté', W-margin-45, y+5.5);
+  doc.text('Prix unit.', W-margin-32, y+5.5);
+  doc.text('Total', W-margin-12, y+5.5, {align:'right'});
+  y += 8;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
+  lignes.forEach((l, i) => {
+    if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, 7, 'F'); }
+    const desLines = doc.splitTextToSize(l.designation, 95);
+    doc.text(desLines[0], margin+3, y+5);
+    doc.text(String(l.quantite), W-margin-45, y+5);
+    doc.text(l.prix_unitaire.toFixed(2)+' €', W-margin-32, y+5);
+    doc.text((l.quantite*l.prix_unitaire).toFixed(2)+' €', W-margin-3, y+5, {align:'right'});
+    y += 7;
+  });
+
+  y += 3;
+  doc.setDrawColor(220,220,220); doc.line(margin, y, W-margin, y);
+  y += 8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(13,27,42);
+  doc.text('MONTANT ESTIMÉ', margin, y);
+  doc.text(montantTotal.toFixed(2)+' €', W-margin-3, y, {align:'right'});
+  y += 10;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,90,90);
+  const tvaLines = doc.splitTextToSize("TVA non applicable, articles 293 B du Code général des impôts (CGI) et 223-21 du Code des impositions sur les biens et services (CIBS)", W-margin*2);
+  doc.text(tvaLines, margin, y);
+  y += tvaLines.length*4 + 8;
+
+  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(90,90,90);
+  const infoLines = doc.splitTextToSize("Ce devis est une estimation et ne constitue pas une facture. Il devient définitif après acceptation écrite du client. Conditions générales de vente complètes disponibles sur technikhome.fr/cgv.html", W-margin*2);
+  doc.text(infoLines, margin, y);
+  y += infoLines.length*4 + 6;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(130,130,130);
+  doc.text('Réparer, c\'est notre nature.', W/2, 285, {align:'center'});
+
+  return doc;
+}
+
+document.getElementById('devis-generer-final-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  const validRows = devisEditRows.filter(row => row.designation.trim());
+  if(!validRows.length){ showToast('Ajoutez au moins une ligne au devis', true); return; }
+
+  const btn = document.getElementById('devis-generer-final-btn');
+  btn.disabled = true;
+  btn.textContent = 'Génération…';
+
+  try{
+    const lignes = validRows.map(row => ({ designation: row.designation.trim(), quantite: row.quantite, prix_unitaire: row.prix_unitaire, total: row.quantite * row.prix_unitaire }));
+    const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
+    const { annee, sequence, numero } = await getNextDevisNumero();
+    const dateEmission = todayISO();
+
+    const doc = generateDevisPdf(r, numero, lignes, montantTotal, dateEmission);
+    const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+    const devisAppId = 'devis_' + Date.now();
+    const { error } = await sb.from('devis').insert({
+      app_id: devisAppId,
+      numero, annee, sequence,
+      date_emission: dateEmission,
+      rapport_app_id: r.id,
+      client_nom: r.nom || '',
+      client_prenom: r.prenom || '',
+      client_adresse: r.adresse || '',
+      client_cp: r.cp || '',
+      client_ville: r.ville || '',
+      lignes: JSON.stringify(lignes),
+      montant_total: montantTotal,
+      pdf_base64: pdfBase64,
+      statut: 'envoye'
+    });
+    if(error) throw error;
+
+    devisLight.push({ app_id: devisAppId, numero, rapport_app_id: r.id, annee, sequence });
+    doc.save(`${numero}.pdf`);
+    showToast(`Devis ${numero} généré et enregistré ✓`);
+    document.getElementById('devis-modal').style.display = 'none';
+    updateDevisButtons(r);
+  }catch(e){
+    console.error('Erreur génération devis :', e);
+    showToast('Erreur lors de la génération du devis', true);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Générer le devis PDF';
+});
+
+document.getElementById('voir-devis-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const existant = devisLight.find(d => d.rapport_app_id === currentDetailReport.id);
+  if(!existant){ showToast('Devis introuvable', true); return; }
+  try{
+    const { data, error } = await sb.from('devis').select('pdf_base64,numero').eq('app_id', existant.app_id).single();
+    if(error) throw error;
+    const link = document.createElement('a');
+    link.href = 'data:application/pdf;base64,' + data.pdf_base64;
+    link.download = `${data.numero}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }catch(e){
+    console.error('Erreur récupération devis :', e);
+    showToast('Erreur lors de la récupération du devis', true);
+  }
+});
+
+function updateDevisButtons(r){
+  const genBtn = document.getElementById('generer-devis-btn');
+  const voirBtn = document.getElementById('voir-devis-btn');
+  const envoyerBtn = document.getElementById('envoyer-devis-btn');
+  const existant = devisLight.some(d => d.rapport_app_id === r.id);
+  genBtn.style.display = !existant ? 'inline-flex' : 'none';
+  voirBtn.style.display = existant ? 'inline-flex' : 'none';
+  envoyerBtn.style.display = existant ? 'inline-flex' : 'none';
+}
+
+document.getElementById('envoyer-facture-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  if(!r.email){ showToast('Email du client manquant', true); return; }
+  const existante = facturesLight.find(f => f.rapport_app_id === r.id);
+  if(!existante){ showToast('Générez d\'abord la facture', true); return; }
+
+  const btn = document.getElementById('envoyer-facture-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi en cours…';
+
+  try{
+    const { data, error } = await sb.from('factures').select('pdf_base64,numero,montant_total').eq('app_id', existante.app_id).single();
+    if(error) throw error;
+
+    const { error: sendError } = await sb.functions.invoke('send-facture', {
+      body: {
+        email: r.email,
+        nom: r.nom,
+        prenom: r.prenom,
+        numero: data.numero,
+        montant: data.montant_total,
+        pdf_base64: data.pdf_base64
+      }
+    });
+    if(sendError) throw sendError;
+    showToast('Facture envoyée au client par email ✓');
+  }catch(e){
+    console.error('Erreur envoi facture :', e);
+    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
+  }
+  btn.disabled = false;
+  btn.textContent = '📧 Envoyer la facture';
+});
+
+document.getElementById('envoyer-devis-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  if(!r.email){ showToast('Email du client manquant', true); return; }
+  const existant = devisLight.find(d => d.rapport_app_id === r.id);
+  if(!existant){ showToast('Générez d\'abord le devis', true); return; }
+
+  const btn = document.getElementById('envoyer-devis-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi en cours…';
+
+  try{
+    const { data, error } = await sb.from('devis').select('pdf_base64,numero,montant_total').eq('app_id', existant.app_id).single();
+    if(error) throw error;
+
+    const { error: sendError } = await sb.functions.invoke('send-devis', {
+      body: {
+        email: r.email,
+        nom: r.nom,
+        prenom: r.prenom,
+        numero: data.numero,
+        montant: data.montant_total,
+        pdf_base64: data.pdf_base64
+      }
+    });
+    if(sendError) throw sendError;
+    showToast('Devis envoyé au client par email ✓');
+  }catch(e){
+    console.error('Erreur envoi devis :', e);
+    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
+  }
+  btn.disabled = false;
+  btn.textContent = '📧 Envoyer le devis';
+});
 
 document.getElementById('rendre-appareil-confirm')?.addEventListener('click', async () => {
   if(!currentDepot) return;
@@ -5574,6 +6201,8 @@ async function showDetail(r){
   document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
   document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
   document.getElementById('attestation-btn').style.display = r.statut === 'Non_reparable' ? 'inline-flex' : 'none';
+  updateFactureButtons(r);
+  updateDevisButtons(r);
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -6406,6 +7035,8 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-alerte-avis-active').checked = params.alerteFauxAvisActive || false;
   document.getElementById('p-alerte-avis-texte').value    = params.alerteFauxAvisTexte || '';
   document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
+  document.getElementById('p-numero-facture-override').value = params.numeroFactureOverride ?? '';
+  document.getElementById('p-numero-devis-override').value = params.numeroDevisOverride ?? '';
   // Jours bloqués
   renderPJoursBloques(params);
   // Tarifs électroménager
@@ -6485,6 +7116,8 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     alerteFauxAvisActive: document.getElementById('p-alerte-avis-active').checked,
     alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
     urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
+    numeroFactureOverride: document.getElementById('p-numero-facture-override').value ? parseInt(document.getElementById('p-numero-facture-override').value) : null,
+    numeroDevisOverride: document.getElementById('p-numero-devis-override').value ? parseInt(document.getElementById('p-numero-devis-override').value) : null,
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
     tarifLavage:       parseInt(document.getElementById('p-tarif-lavage').value)       || 65,
     tarifFroid:        parseInt(document.getElementById('p-tarif-froid').value)        || 70,
@@ -6534,6 +7167,8 @@ async function getAgendaParams(){
       alerteFauxAvisActive: data.alerte_faux_avis_active ?? false,
       alerteFauxAvisTexte:  data.alerte_faux_avis_texte  ?? '',
       urssafTaux: data.urssaf_taux ?? 20,
+      numeroFactureOverride: data.numero_facture_override ?? null,
+      numeroDevisOverride: data.numero_devis_override ?? null,
       joursBlockes:  data.jours_bloques  || [],
       tarifCuisson:      data.tarif_cuisson      ?? 60,
       tarifLavage:       data.tarif_lavage       ?? 65,
@@ -6582,6 +7217,8 @@ async function saveAgendaParams(params){
     alerte_faux_avis_active: params.alerteFauxAvisActive ?? false,
     alerte_faux_avis_texte:  params.alerteFauxAvisTexte  || null,
     urssaf_taux: params.urssafTaux ?? 20,
+    numero_facture_override: params.numeroFactureOverride ?? null,
+    numero_devis_override: params.numeroDevisOverride ?? null,
     jours_bloques:     params.joursBlockes,
     tarif_cuisson:      params.tarifCuisson      ?? 60,
     tarif_lavage:       params.tarifLavage       ?? 65,
