@@ -1640,6 +1640,18 @@
 
     <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
 
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
+
+    <div id="pose-piece-solder-block" style="display:none;background:rgba(245,166,35,0.1);border:1px solid var(--orange);border-radius:10px;padding:1rem;margin-bottom:1rem;">
+      <p id="pose-piece-solder-texte" style="font-size:0.85rem;margin:0 0 0.8rem;color:var(--text);"></p>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" id="pose-piece-solder-especes-btn" style="flex:1;min-width:120px;">💶 Solder en espèces</button>
+        <button type="button" class="btn btn-primary" id="pose-piece-solder-carte-btn" style="flex:1;min-width:120px;">💳 Solder en carte</button>
+      </div>
+      <button type="button" class="btn btn-outline" id="pose-piece-solder-autre-btn" style="width:100%;margin-top:0.5rem;font-size:0.8rem;">Autre répartition…</button>
+    </div>
+
+    <div id="pose-piece-paiement-classique">
     <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">💰 Statut de paiement</label>
     <select id="pose-piece-paiement-statut" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
       <option value="Paye_total">Payé en totalité</option>
@@ -1672,6 +1684,8 @@
       <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;"><strong>Reste à encaisser (€)</strong></label>
       <input type="number" id="pose-piece-reste-encaisser" placeholder="0.00" step="0.01" readonly style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--orange);font-weight:600;box-sizing:border-box;">
     </div>
+    </div>
+
 
     <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
       <button class="btn btn-outline" id="pose-piece-cancel-btn">Annuler</button>
@@ -7024,7 +7038,61 @@ function prefillPosePiecePaiement(r){
   document.getElementById('pose-piece-acompte-field').style.display = (r['paiement-statut'] === 'Acompte') ? 'block' : 'none';
   document.getElementById('pose-piece-mixte-fields').style.display = (r['paiement-moyen'] === 'Mixte') ? 'grid' : 'none';
   updatePosePieceResteAEncaisser();
+
+  // Détection d'un acompte déjà versé -> proposer le solde rapide
+  const total = parseFloat(r['cout-total']) || 0;
+  const acompte = parseFloat(r['acompte-montant']) || 0;
+  const solderBlock = document.getElementById('pose-piece-solder-block');
+  const classique = document.getElementById('pose-piece-paiement-classique');
+  if(r['paiement-statut'] === 'Acompte' && acompte > 0 && total > acompte){
+    const reste = total - acompte;
+    const moyenPrecedent = r['paiement-moyen'] || 'Espèces';
+    document.getElementById('pose-piece-solder-texte').innerHTML =
+      `Déjà versé : <strong>${acompte.toFixed(2)} €</strong> (${moyenPrecedent}). Il reste <strong>${reste.toFixed(2)} €</strong> à encaisser.`;
+    solderBlock.dataset.acompte = acompte;
+    solderBlock.dataset.moyenPrecedent = moyenPrecedent;
+    solderBlock.dataset.reste = reste;
+    solderBlock.style.display = 'block';
+    classique.style.display = 'none';
+  } else {
+    solderBlock.style.display = 'none';
+    classique.style.display = 'block';
+  }
 }
+
+function appliquerSolde(moyenChoisi){
+  const solderBlock = document.getElementById('pose-piece-solder-block');
+  const acompte = parseFloat(solderBlock.dataset.acompte) || 0;
+  const reste = parseFloat(solderBlock.dataset.reste) || 0;
+  const moyenPrecedent = solderBlock.dataset.moyenPrecedent || 'Espèces';
+
+  let especes = 0, carte = 0;
+  if(moyenPrecedent === 'Espèces') especes += acompte; else if(moyenPrecedent === 'Carte bancaire') carte += acompte;
+  if(moyenChoisi === 'Espèces') especes += reste; else if(moyenChoisi === 'Carte bancaire') carte += reste;
+
+  document.getElementById('pose-piece-paiement-statut').value = 'Paye_total';
+  document.getElementById('pose-piece-acompte-field').style.display = 'none';
+
+  if(especes > 0 && carte > 0){
+    document.getElementById('pose-piece-paiement-moyen').value = 'Mixte';
+    document.getElementById('pose-piece-paiement-especes').value = especes.toFixed(2);
+    document.getElementById('pose-piece-paiement-carte').value = carte.toFixed(2);
+    document.getElementById('pose-piece-mixte-fields').style.display = 'grid';
+  } else {
+    document.getElementById('pose-piece-paiement-moyen').value = especes > 0 ? 'Espèces' : 'Carte bancaire';
+    document.getElementById('pose-piece-mixte-fields').style.display = 'none';
+  }
+  updatePosePieceResteAEncaisser();
+  document.getElementById('pose-piece-solder-block').style.display = 'none';
+  showToast('Paiement soldé — vérifiez et validez la pièce');
+}
+
+document.getElementById('pose-piece-solder-especes-btn').addEventListener('click', () => appliquerSolde('Espèces'));
+document.getElementById('pose-piece-solder-carte-btn').addEventListener('click', () => appliquerSolde('Carte bancaire'));
+document.getElementById('pose-piece-solder-autre-btn').addEventListener('click', () => {
+  document.getElementById('pose-piece-solder-block').style.display = 'none';
+  document.getElementById('pose-piece-paiement-classique').style.display = 'block';
+});
 
 function updatePosePieceResteAEncaisser(){
   const total = parseFloat(currentDetailReport && currentDetailReport['cout-total']) || 0;
