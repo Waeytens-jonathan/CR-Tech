@@ -861,6 +861,10 @@
         <input type="text" id="stock-edit-ref" placeholder="ex : REF-1234">
       </div>
       <div class="field">
+        <label>Quantité en stock</label>
+        <input type="number" id="stock-edit-quantite" min="0" step="1" value="1">
+      </div>
+      <div class="field">
         <label>Prix de vente client (€)</label>
         <input type="number" id="stock-edit-prix" placeholder="0.00" step="0.01" min="0">
       </div>
@@ -2570,9 +2574,10 @@ function renderStockEmbarqueList(){
   emptyEl.style.display = 'none';
 
   listEl.innerHTML = stockEmbarque.map(p => {
-    const badge = p.statut === 'en_stock'
-      ? '<span class="badge green">En stock</span>'
-      : '<span class="badge red">Hors stock</span>';
+    const qte = p.quantite ?? 1;
+    const badge = qte > 0
+      ? `<span class="badge green">En stock ×${qte}</span>`
+      : '<span class="badge red">Rupture</span>';
     return `
       <div class="list-item" data-stock-id="${escapeHtml(p.app_id)}" data-stock-type="embarque" style="cursor:pointer;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
@@ -2605,6 +2610,7 @@ function renderStockPiecesList(){
     <div class="list-item" data-stock-id="${escapeHtml(p.app_id)}" data-stock-type="pieces" style="cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
         <strong>${escapeHtml(p.nom || '')}</strong>
+        <span class="badge ${(p.quantite ?? 1) > 0 ? 'green' : 'red'}">${(p.quantite ?? 1) > 0 ? '×'+(p.quantite ?? 1) : 'Rupture'}</span>
       </div>
       <div style="color:#778;font-size:0.88rem;margin-top:0.2rem;">
         ${escapeHtml(p.ref || '')} — ${p.prix_vente ? parseFloat(p.prix_vente).toFixed(2) + ' €' : ''}
@@ -2641,6 +2647,7 @@ function openStockEdit(type, appId){
     document.getElementById('stock-edit-title').textContent = 'Modifier la pièce';
     document.getElementById('stock-edit-nom').value = item.nom || '';
     document.getElementById('stock-edit-ref').value = item.ref || '';
+    document.getElementById('stock-edit-quantite').value = item.quantite ?? 1;
     document.getElementById('stock-edit-prix').value = item.prix_vente || '';
     const garantieVal = item.garantie || '3 mois';
     if(isGarantiePreset(garantieVal)){
@@ -2658,6 +2665,7 @@ function openStockEdit(type, appId){
     document.getElementById('stock-edit-title').textContent = type === 'embarque' ? 'Ajouter au stock embarqué' : 'Ajouter au stock pièces';
     document.getElementById('stock-edit-nom').value = '';
     document.getElementById('stock-edit-ref').value = '';
+    document.getElementById('stock-edit-quantite').value = 1;
     document.getElementById('stock-edit-prix').value = '';
     document.getElementById('stock-edit-garantie').value = '3 mois';
     document.getElementById('stock-edit-garantie-autre').style.display = 'none';
@@ -2696,6 +2704,7 @@ document.getElementById('stock-edit-save-btn').addEventListener('click', async (
   const row = {
     nom: nom,
     ref: document.getElementById('stock-edit-ref').value.trim(),
+    quantite: parseInt(document.getElementById('stock-edit-quantite').value) || 0,
     prix_vente: document.getElementById('stock-edit-prix').value,
     garantie: garantieFinale
   };
@@ -2753,10 +2762,11 @@ function renderStockPickerList(filterText){
   const listEl = document.getElementById('stock-picker-list');
   const search = (filterText || '').toLowerCase().trim();
 
-  const embarqueDispo = stockEmbarque.filter(p => p.statut === 'en_stock');
+  const embarqueDispo = stockEmbarque.filter(p => p.statut === 'en_stock' && (p.quantite ?? 1) > 0);
+  const piecesDispo = stockPieces.filter(p => (p.quantite ?? 1) > 0);
   let allItems = [
     ...embarqueDispo.map(p => ({ ...p, _type: 'embarque' })),
-    ...stockPieces.map(p => ({ ...p, _type: 'pieces' }))
+    ...piecesDispo.map(p => ({ ...p, _type: 'pieces' }))
   ];
 
   if(stockPickerFilter !== 'all'){
@@ -5875,6 +5885,17 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   if(data) showToast('Compte-rendu enregistré');
 });
 
+// Décrémente la quantité en stock d'une pièce consommée (jamais sous 0, jamais supprimée)
+async function decrementStockQuantite(table, appId){
+  const { data: current, error: fetchErr } = await sb.from(table).select('quantite').eq('app_id', appId).single();
+  if(fetchErr) throw fetchErr;
+  const nouvelleQte = Math.max(0, (current.quantite ?? 1) - 1);
+  const updates = { quantite: nouvelleQte };
+  if(table === 'stock_embarque') updates.statut = nouvelleQte > 0 ? 'en_stock' : 'hors_stock';
+  const { error } = await sb.from(table).update(updates).eq('app_id', appId);
+  if(error) throw error;
+}
+
 // Met à jour/supprime les pièces de stock consommées par ce compte-rendu
 async function consumeStockPiecesIfAny(stockPieces){
   if(!Array.isArray(stockPieces) || !stockPieces.length) return;
@@ -5882,11 +5903,9 @@ async function consumeStockPiecesIfAny(stockPieces){
     if(!stockPiece || !stockPiece.app_id) continue;
     try{
       if(stockPiece.type === 'embarque'){
-        const { error } = await sb.from('stock_embarque').update({ statut: 'hors_stock' }).eq('app_id', stockPiece.app_id);
-        if(error) throw error;
+        await decrementStockQuantite('stock_embarque', stockPiece.app_id);
       } else if(stockPiece.type === 'pieces'){
-        const { error } = await sb.from('stock_pieces').delete().eq('app_id', stockPiece.app_id);
-        if(error) throw error;
+        await decrementStockQuantite('stock_pieces', stockPiece.app_id);
       }
     }catch(e){
       console.error('Erreur mise à jour stock après pose pièce :', e);
@@ -7212,9 +7231,9 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
     if(!row.stockAppId || !row.stockType) continue;
     try{
       if(row.stockType === 'embarque'){
-        await sb.from('stock_embarque').update({ statut: 'hors_stock' }).eq('app_id', row.stockAppId);
+        await decrementStockQuantite('stock_embarque', row.stockAppId);
       } else {
-        await sb.from('stock_pieces').delete().eq('app_id', row.stockAppId);
+        await decrementStockQuantite('stock_pieces', row.stockAppId);
       }
     }catch(e){
       console.error('Erreur mise à jour stock :', e);
@@ -7641,8 +7660,8 @@ function isDateBlocked(dateISO){
       stockPieces   = await loadStockPieces();
     }
 
-    const embarque = (stockEmbarque || []).filter(p => p.statut === 'en_stock');
-    const pieces   = (stockPieces   || []);
+    const embarque = (stockEmbarque || []).filter(p => p.statut === 'en_stock' && (p.quantite ?? 1) > 0);
+    const pieces   = (stockPieces   || []).filter(p => (p.quantite ?? 1) > 0);
     const all = [
       ...embarque.map(p => ({ ...p, _type: 'embarque' })),
       ...pieces.map(p   => ({ ...p, _type: 'pieces'   }))
