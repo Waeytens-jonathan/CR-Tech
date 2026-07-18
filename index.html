@@ -7253,6 +7253,27 @@ function formatAvisDate(nombre, unite){
   return `Il y a ${n} ${pluralUnite(n, unite)}`;
 }
 
+// Convertit un nombre + une unité (ex: "5 jours") en vraie date calendaire (aujourd'hui - X)
+function computeDateReference(nombre, unite){
+  const n = parseInt(nombre) || 1;
+  const joursParUnite = { jour: 1, semaine: 7, mois: 30, an: 365 };
+  const joursTotal = n * (joursParUnite[unite] || 1);
+  const d = new Date();
+  d.setDate(d.getDate() - joursTotal);
+  return d.toISOString().slice(0, 10);
+}
+
+// Reconstruit un nombre + une unité approximatifs à partir d'une date de référence,
+// pour réafficher quelque chose de cohérent dans l'éditeur au moment de rouvrir un avis existant
+function dateReferenceVersNombreUnite(dateReference){
+  const d = new Date(dateReference + 'T00:00:00');
+  const joursEcoules = Math.max(1, Math.round((new Date() - d) / 86400000));
+  if(joursEcoules < 7) return { nombre: joursEcoules, unite: 'jour' };
+  if(joursEcoules < 30) return { nombre: Math.round(joursEcoules / 7), unite: 'semaine' };
+  if(joursEcoules < 365) return { nombre: Math.round(joursEcoules / 30), unite: 'mois' };
+  return { nombre: Math.round(joursEcoules / 365), unite: 'an' };
+}
+
 // Retrouve nombre/unité à partir d'une ancienne valeur texte libre (rétrocompatibilité)
 function parseAvisDate(str){
   if(!str) return { nombre: 1, unite: 'jour' };
@@ -7264,7 +7285,11 @@ function parseAvisDate(str){
 function newAvisRow(prefill){
   const base = { id: 'a' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', note: 5, dateNombre: 1, dateUnite: 'jour', texte: '' };
   const p = prefill || {};
-  if(p.date && p.dateNombre === undefined){
+  if(p.dateReference && p.dateNombre === undefined){
+    const reconstruit = dateReferenceVersNombreUnite(p.dateReference);
+    p.dateNombre = reconstruit.nombre;
+    p.dateUnite = reconstruit.unite;
+  } else if(p.date && p.dateNombre === undefined){
     const parsed = parseAvisDate(p.date);
     p.dateNombre = parsed.nombre;
     p.dateUnite = parsed.unite;
@@ -7454,7 +7479,7 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     banniereDateDebut:  document.getElementById('p-banniere-date-debut').value || null,
     banniereDateFin:    document.getElementById('p-banniere-date-fin').value   || null,
     avisNoteGlobale:    parseFloat(document.getElementById('p-avis-note').value) || 5.0,
-    avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, date: formatAvisDate(r.dateNombre, r.dateUnite), texte: r.texte.trim() })),
+    avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, dateReference: computeDateReference(r.dateNombre, r.dateUnite), texte: r.texte.trim() })),
     alerteFauxAvisActive: document.getElementById('p-alerte-avis-active').checked,
     alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
     urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
