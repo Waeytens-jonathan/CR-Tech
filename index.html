@@ -1054,7 +1054,7 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
         <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;font-size:0.82rem;">🔧 Poser la pièce</button>
         <button class="btn btn-outline" id="detail-rdv-pose-btn" style="display:none;font-size:0.82rem;">📅 RDV pose pièce</button>
-        <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">🛠️ Rouvrir en SAV</button>
+        <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">🛠️ Ouvrir un SAV</button>
         <button class="btn btn-outline" id="detail-archiver-btn" style="display:none;font-size:0.82rem;">📦 Archiver</button>
         <button class="btn btn-outline" id="attestation-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">📋 Attestation</button>
         <button class="btn btn-primary" id="generer-facture-btn" style="display:none;font-size:0.82rem;">🧾 Générer la facture</button>
@@ -1702,6 +1702,34 @@
   </div>
 </div>
 
+<!-- Ouvrir un SAV -->
+<div id="sav-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+      <h3 style="margin:0;color:#e0584f;">🛠️ Ouvrir un SAV</h3>
+      <button id="sav-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
+    </div>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 1rem;">L'historique de l'intervention d'origine est conservé, rien n'est écrasé.</p>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Motif du SAV</label>
+    <select id="sav-motif-select" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.8rem;">
+      <option value="piece_defectueuse">Pièce défectueuse</option>
+      <option value="panne_non_resolue">Panne non résolue</option>
+      <option value="nouvelle_panne">Nouvelle panne</option>
+      <option value="autre">Autre…</option>
+    </select>
+    <div id="sav-motif-autre-field" style="display:none;margin-bottom:1rem;">
+      <input type="text" id="sav-motif-autre" placeholder="Précisez le motif" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+    </div>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.5rem;">Comment récupérer l'appareil ?</label>
+    <div style="display:flex;flex-direction:column;gap:0.6rem;">
+      <button class="btn btn-outline" id="sav-choix-depot-btn" style="width:100%;padding:0.8rem;text-align:left;">📥 Le client me le ramène (bon de dépôt)</button>
+      <button class="btn btn-outline" id="sav-choix-rdv-btn" style="width:100%;padding:0.8rem;text-align:left;">🚗 J'y retourne (prendre RDV)</button>
+    </div>
+  </div>
+</div>
+
 <!-- Éditeur de devis -->
 <div id="devis-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
@@ -1919,6 +1947,9 @@ function reportToRow(r){
     client_id: r.client_id || null,
     dossier_id: r.dossier_id || null,
     rdv_app_id: r.rdv_app_id || null,
+    is_sav: !!r.is_sav,
+    parent_app_id: r.parent_app_id || null,
+    sav_raison: r.sav_raison || null,
     date_termine: r.date_termine || null,
     _is_draft: false
   };
@@ -2013,6 +2044,7 @@ function rowToReport(row){
     date_archivage: row.date_archivage || null,
     is_sav: !!row.is_sav,
     parent_app_id: row.parent_app_id || null,
+    sav_raison: row.sav_raison || null,
     created_at: row.created_at || null,
     _isDraft: !!row._is_draft,
     _draftStep: extra._draftStep,
@@ -2028,7 +2060,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -3944,11 +3976,16 @@ document.getElementById('depot-detail-create-cr').addEventListener('click', () =
   autoFillMainOeuvre(document.getElementById('f-appareil').value);
   document.getElementById('f-panne').value = d.description || '';
 
+  if(d.is_sav && d.sav_parent_app_id){
+    window._creatingSavParentAppId = d.sav_parent_app_id;
+    window._creatingSavRaison = d.sav_raison || '';
+  }
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
-  showToast('Infos client pré-remplies depuis le bon de dépôt');
+  showToast(d.is_sav ? 'Infos pré-remplies — compte-rendu SAV lié au dossier d\'origine' : 'Infos client pré-remplies depuis le bon de dépôt');
 });
 
 // ---------- Ajout/édition d'un bon de dépôt ----------
@@ -4063,6 +4100,13 @@ document.getElementById('depot-edit-save-btn').addEventListener('click', async (
     row.date_depot = todayISO();
     row.heure_depot = new Date().toTimeString().slice(0,5);
     row.statut = 'depose';
+    if(window._depotSavParentAppId){
+      row.is_sav = true;
+      row.sav_parent_app_id = window._depotSavParentAppId;
+      row.sav_raison = window._depotSavRaison || '';
+      window._depotSavParentAppId = null;
+      window._depotSavRaison = null;
+    }
   }
 
   try{
@@ -4212,6 +4256,10 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
   resetForm();
   clearDraft();
   window._creatingFromRdvAppId = r.app_id;
+  if(r.is_sav && r.sav_parent_app_id){
+    window._creatingSavParentAppId = r.sav_parent_app_id;
+    window._creatingSavRaison = r.sav_raison || '';
+  }
   document.getElementById('f-nom').value = r.nom || '';
   document.getElementById('f-prenom').value = r.prenom || '';
   document.getElementById('f-adresse').value = r.adresse || '';
@@ -4227,7 +4275,7 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
-  showToast('Infos client pré-remplies depuis le RDV');
+  showToast(r.is_sav ? 'Infos pré-remplies — compte-rendu SAV lié au dossier d\'origine' : 'Infos client pré-remplies depuis le RDV');
 });
 
 document.getElementById('agenda-detail-sms-arrival-btn').addEventListener('click', () => {
@@ -4591,6 +4639,14 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
   if(!editingRdvAppId){
     row.app_id = 'rdv_' + Date.now();
     row.statut = 'en_attente';
+    if(window._rdvSavParentAppId){
+      row.is_sav = true;
+      row.sav_parent_app_id = window._rdvSavParentAppId;
+      row.sav_raison = window._rdvSavRaison || '';
+      row.type_rdv = 'sav';
+      window._rdvSavParentAppId = null;
+      window._rdvSavRaison = null;
+    }
   }
 
   try{
@@ -5830,6 +5886,13 @@ async function saveCurrentReport(){
     data.rdv_app_id = window._creatingFromRdvAppId;
     window._creatingFromRdvAppId = null;
   }
+  if(window._creatingSavParentAppId){
+    data.is_sav = true;
+    data.parent_app_id = window._creatingSavParentAppId;
+    data.sav_raison = window._creatingSavRaison || '';
+    window._creatingSavParentAppId = null;
+    window._creatingSavRaison = null;
+  }
   if(currentId){
     const idx = reports.findIndex(r => r.id === currentId);
     data.id = currentId;
@@ -6244,6 +6307,29 @@ function renderDetailContent(r, container){
   html += `<div class="detail-title">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')}</div>`;
   html += `<div class="detail-sub">${escapeHtml(r.ref||'')} · ${dateFmt}${r.heure ? ' à ' + escapeHtml(r.heure) : ''}</div>`;
 
+  // ---------- Bandeau SAV (côté intervention de suivi) ----------
+  if(r.is_sav && r.parent_app_id){
+    const parent = reports.find(x => (x.app_id||x.id) === r.parent_app_id);
+    const parentDateFmt = parent && parent.date ? new Date(parent.date).toLocaleDateString('fr-FR') : '';
+    html += `<div style="background:rgba(224,88,79,0.1);border:1px solid #e0584f;border-radius:10px;padding:0.8rem 1rem;margin:0.8rem 0;font-size:0.85rem;">
+      <strong style="color:#e0584f;">🛠️ SAV${r.sav_raison ? ' — ' + escapeHtml(r.sav_raison) : ''}</strong><br>
+      ${parent ? `Suite de l'intervention du ${parentDateFmt}` : 'Intervention d\'origine introuvable'}
+      ${parent ? `<button class="btn btn-outline" id="voir-dossier-origine-btn" data-parent-id="${escapeHtml(r.parent_app_id)}" style="margin-left:0.6rem;padding:0.2rem 0.6rem;font-size:0.78rem;">Voir le dossier d'origine</button>` : ''}
+    </div>`;
+  }
+
+  // ---------- Interventions SAV liées (côté dossier d'origine) ----------
+  const savEnfants = reports.filter(x => x.parent_app_id === (r.app_id || r.id));
+  if(savEnfants.length){
+    html += `<div style="background:rgba(224,88,79,0.06);border:1px solid rgba(224,88,79,0.4);border-radius:10px;padding:0.8rem 1rem;margin:0.8rem 0;font-size:0.85rem;">
+      <strong style="color:#e0584f;">🛠️ ${savEnfants.length} intervention${savEnfants.length>1?'s':''} SAV liée${savEnfants.length>1?'s':''}</strong>`;
+    savEnfants.forEach(enfant => {
+      const enfantDateFmt = enfant.date ? new Date(enfant.date).toLocaleDateString('fr-FR') : '';
+      html += `<div style="margin-top:0.4rem;"><button class="btn btn-outline voir-sav-enfant-btn" data-enfant-id="${escapeHtml(enfant.app_id||enfant.id)}" style="padding:0.2rem 0.6rem;font-size:0.78rem;">${enfantDateFmt} — ${escapeHtml(enfant.sav_raison||'SAV')}</button></div>`;
+    });
+    html += `</div>`;
+  }
+
   // ---------- Suivi rapide (éditable) ----------
   html += '<div class="detail-section"><h3>Suivi du dossier</h3>';
   html += '<div class="grid">';
@@ -6386,6 +6472,19 @@ function renderDetailContent(r, container){
 
   c.innerHTML = html;
 
+  document.getElementById('voir-dossier-origine-btn')?.addEventListener('click', (e) => {
+    const parentId = e.target.dataset.parentId;
+    const parent = reports.find(x => (x.app_id||x.id) === parentId);
+    if(parent) showDetail(parent);
+  });
+  c.querySelectorAll('.voir-sav-enfant-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const enfantId = e.target.dataset.enfantId;
+      const enfant = reports.find(x => (x.app_id||x.id) === enfantId);
+      if(enfant) showDetail(enfant);
+    });
+  });
+
   const quickBtn = document.getElementById('quick-update-btn');
   if(quickBtn){
     quickBtn.addEventListener('click', () => {
@@ -6439,7 +6538,7 @@ async function showDetail(r){
   document.getElementById('detail-rdv-pose-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
   document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
-  document.getElementById('detail-rouvrir-sav-btn').style.display = r.statut === 'archivé' ? 'inline-flex' : 'none';
+  document.getElementById('detail-rouvrir-sav-btn').style.display = ['Terminée','Non_reparable','archivé'].includes(r.statut) ? 'inline-flex' : 'none';
   document.getElementById('attestation-btn').style.display = r.statut === 'Non_reparable' ? 'inline-flex' : 'none';
   updateFactureButtons(r);
   updateDevisButtons(r);
@@ -7989,14 +8088,11 @@ async function archiverCR(r){
 }
 
 async function rouvrirSAV(r){
-  if(!confirm('Rouvrir en SAV ?')) return;
-  const updates = { statue: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
-  try{
-    await sb.from(TABLE).update(updates).eq('app_id', r.app_id||r.id);
-    Object.assign(r, { statut: 'En cours', is_sav: true });
-    showToast('Rouvert en SAV 🛠️');
-    renderList();
-  }catch(e){ showToast('Erreur', true); }
+  savOriginReport = r;
+  document.getElementById('sav-motif-select').value = 'piece_defectueuse';
+  document.getElementById('sav-motif-autre-field').style.display = 'none';
+  document.getElementById('sav-motif-autre').value = '';
+  document.getElementById('sav-modal').style.display = 'flex';
 }
 
 // Bouton retour depuis vue dossier
@@ -8048,20 +8144,89 @@ document.getElementById('detail-archiver-btn').addEventListener('click', async (
 });
 
 // Rouvrir en SAV
-document.getElementById('detail-rouvrir-sav-btn').addEventListener('click', async () => {
+let savOriginReport = null;
+
+document.getElementById('detail-rouvrir-sav-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
-  const r = currentDetailReport;
-  if(!confirm(`Rouvrir le dossier de ${r.prenom||''} ${r.nom||''} en SAV ?`)) return;
-  const updates = { statue: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
-  try{
-    const { error } = await sb.from(TABLE).update(updates).eq('app_id', r.app_id || r.id);
-    if(error) throw error;
-    const idx = reports.findIndex(x => (x.app_id||x.id) === (r.app_id||r.id));
-    if(idx !== -1){ Object.assign(reports[idx], updates); }
-    showToast('Dossier rouvert en SAV 🛠️');
-    showView('list');
-    renderList();
-  }catch(e){ console.error('Erreur réouverture SAV :', e); showToast('Erreur réouverture', true); }
+  savOriginReport = currentDetailReport;
+  document.getElementById('sav-motif-select').value = 'piece_defectueuse';
+  document.getElementById('sav-motif-autre-field').style.display = 'none';
+  document.getElementById('sav-motif-autre').value = '';
+  document.getElementById('sav-modal').style.display = 'flex';
+});
+
+document.getElementById('sav-modal-close').addEventListener('click', () => {
+  document.getElementById('sav-modal').style.display = 'none';
+});
+
+document.getElementById('sav-motif-select').addEventListener('change', (e) => {
+  document.getElementById('sav-motif-autre-field').style.display = e.target.value === 'autre' ? 'block' : 'none';
+});
+
+const SAV_MOTIF_LABELS = {
+  piece_defectueuse: 'Pièce défectueuse',
+  panne_non_resolue: 'Panne non résolue',
+  nouvelle_panne: 'Nouvelle panne'
+};
+
+function getSavMotifFinal(){
+  const select = document.getElementById('sav-motif-select').value;
+  if(select === 'autre'){
+    return document.getElementById('sav-motif-autre').value.trim() || 'Autre';
+  }
+  return SAV_MOTIF_LABELS[select] || select;
+}
+
+document.getElementById('sav-choix-depot-btn').addEventListener('click', () => {
+  if(!savOriginReport) return;
+  const r = savOriginReport;
+  const motif = getSavMotifFinal();
+  document.getElementById('sav-modal').style.display = 'none';
+
+  openDepotEdit(null);
+  document.getElementById('depot-edit-nom').value = r.nom || '';
+  document.getElementById('depot-edit-prenom').value = r.prenom || '';
+  document.getElementById('depot-edit-adresse').value = r.adresse || '';
+  document.getElementById('depot-edit-cp').value = r.cp || '';
+  document.getElementById('depot-edit-ville').value = r.ville || '';
+  document.getElementById('depot-edit-tel').value = r.tel || '';
+  document.getElementById('depot-edit-email').value = r.email || '';
+  document.getElementById('depot-edit-appareil').value = r.appareil || '';
+  document.getElementById('depot-edit-description').value = `SAV — ${motif}`;
+
+  window._depotSavParentAppId = r.app_id || r.id;
+  window._depotSavRaison = motif;
+  showToast('Bon de dépôt pré-rempli — motif SAV : ' + motif);
+});
+
+document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
+  if(!savOriginReport) return;
+  const r = savOriginReport;
+  const motif = getSavMotifFinal();
+  document.getElementById('sav-modal').style.display = 'none';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-agenda-new').classList.add('active');
+  editingRdvAppId = null;
+  editingRdvOriginal = null;
+  populateNewRdvAppareilOptions();
+
+  document.getElementById('newrdv-nom').value = r.nom || '';
+  document.getElementById('newrdv-prenom').value = r.prenom || '';
+  document.getElementById('newrdv-adresse').value = r.adresse || '';
+  document.getElementById('newrdv-cp').value = r.cp || '';
+  document.getElementById('newrdv-ville').value = r.ville || '';
+  document.getElementById('newrdv-tel').value = r.tel || '';
+  document.getElementById('newrdv-email').value = r.email || '';
+  document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
+  document.getElementById('newrdv-panne').value = `SAV — ${motif}`;
+  const typeSelect = document.getElementById('newrdv-type');
+  if(typeSelect) typeSelect.value = 'sav';
+
+  window._rdvSavParentAppId = r.app_id || r.id;
+  window._rdvSavRaison = motif;
+  showToast('RDV pré-rempli — motif SAV : ' + motif);
 });
 
 // Archivage automatique au chargement : CR Terminé ou Non_reparable depuis +24h
@@ -8237,15 +8402,8 @@ async function showClientDetail(appId){
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const r = reports.find(x => (x.app_id||x.id) == btn.dataset.id);
-        if(!r || !confirm(`Rouvrir le dossier ${r.appareil||''} en SAV ?`)) return;
-        const updates = { statue: 'En cours', is_sav: true, parent_app_id: r.app_id||r.id, date_archivage: null };
-        try{
-          await sb.from(TABLE).update(updates).eq('app_id', r.app_id||r.id);
-          Object.assign(r, updates);
-          showToast('Dossier rouvert en SAV 🛠️');
-          showClientDetail(appId);
-          renderList();
-        }catch(e){ showToast('Erreur réouverture', true); }
+        if(!r) return;
+        await rouvrirSAV(r);
       });
     });
   }
