@@ -1047,34 +1047,60 @@
   <!-- ===================== VUE DÉTAIL (RAPPORT COMPLET) ===================== -->
   <div class="view" id="view-detail">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;">
         <button class="btn btn-outline" id="detail-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
-        <button class="btn btn-danger" id="detail-delete-btn" style="padding:0.4rem 0.8rem;font-size:0.8rem;">🗑️</button>
+        <button class="btn btn-outline" id="detail-more-btn" style="padding:0.45rem 0.7rem;font-size:1rem;border-radius:50%;">⋯</button>
       </div>
+
+      <div id="detail-header"></div>
 
       <!-- Actions principales -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
         <button class="btn btn-primary" id="detail-edit" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✏️ Modifier</button>
+        <button class="btn btn-outline" id="detail-documents-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">📄 Documents</button>
         <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">📧 Email</button>
-        <button class="btn btn-secondary" id="detail-avis-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">⭐ Avis</button>
-        <button class="btn btn-outline" id="detail-add-appareil-btn" style="border-color:var(--blue);color:var(--blue);font-size:0.82rem;padding:0.5rem 0.4rem;">➕ Appareil</button>
       </div>
 
-      <!-- Actions contextuelles -->
+      <!-- Actions contextuelles (visibles seulement quand pertinentes) -->
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
         <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;font-size:0.82rem;">🔧 Poser la pièce</button>
         <button class="btn btn-outline" id="detail-rdv-pose-btn" style="display:none;font-size:0.82rem;">📅 RDV pose pièce</button>
-        <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">🛠️ Ouvrir un SAV</button>
-        <button class="btn btn-outline" id="detail-archiver-btn" style="display:none;font-size:0.82rem;">📦 Archiver</button>
-        <button class="btn btn-outline" id="attestation-btn" style="display:none;border-color:#e0584f;color:#e0584f;font-size:0.82rem;">📋 Attestation</button>
-        <button class="btn btn-primary" id="generer-facture-btn" style="display:none;font-size:0.82rem;">🧾 Générer la facture</button>
-        <button class="btn btn-outline" id="voir-facture-btn" style="display:none;font-size:0.82rem;">🧾 Voir la facture</button>
-        <button class="btn btn-outline" id="envoyer-facture-btn" style="display:none;font-size:0.82rem;">📧 Envoyer la facture</button>
-        <button class="btn btn-primary" id="generer-devis-btn" style="display:none;font-size:0.82rem;">📝 Générer un devis</button>
-        <button class="btn btn-outline" id="voir-devis-btn" style="display:none;font-size:0.82rem;">📝 Voir le devis</button>
-        <button class="btn btn-outline" id="envoyer-devis-btn" style="display:none;font-size:0.82rem;">📧 Envoyer le devis</button>
       </div>
+
       <div id="detail-content"></div>
+    </div>
+  </div>
+
+  <!-- Panneau "Documents" (facture / devis) -->
+  <div id="documents-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
+    <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h3 style="margin:0;color:var(--orange);">📄 Documents</h3>
+        <button id="documents-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        <button class="btn btn-primary" id="generer-facture-btn" style="display:none;width:100%;">🧾 Générer la facture</button>
+        <button class="btn btn-outline" id="voir-facture-btn" style="display:none;width:100%;">🧾 Voir la facture</button>
+        <button class="btn btn-outline" id="envoyer-facture-btn" style="display:none;width:100%;">📧 Envoyer la facture</button>
+        <hr style="border:none;border-top:1px solid var(--border);width:100%;margin:0.3rem 0;">
+        <button class="btn btn-primary" id="generer-devis-btn" style="display:none;width:100%;">📝 Générer un devis</button>
+        <button class="btn btn-outline" id="voir-devis-btn" style="display:none;width:100%;">📝 Voir le devis</button>
+        <button class="btn btn-outline" id="envoyer-devis-btn" style="display:none;width:100%;">📧 Envoyer le devis</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu "Plus d'actions" -->
+  <div id="more-actions-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10001;align-items:flex-end;justify-content:center;">
+    <div style="background:var(--card-bg);border-radius:20px 20px 0 0;padding:1.2rem;width:100%;max-width:480px;">
+      <button class="btn btn-secondary" id="detail-avis-btn" style="width:100%;text-align:left;margin-bottom:0.5rem;">⭐ Avis</button>
+      <button class="btn btn-outline" id="detail-add-appareil-btn" style="width:100%;text-align:left;border-color:var(--blue);color:var(--blue);margin-bottom:0.5rem;">➕ Ajouter un appareil</button>
+      <button class="btn btn-outline" id="detail-rouvrir-sav-btn" style="display:none;width:100%;text-align:left;border-color:#e0584f;color:#e0584f;margin-bottom:0.5rem;">🛠️ Ouvrir un SAV</button>
+      <button class="btn btn-outline" id="detail-archiver-btn" style="display:none;width:100%;text-align:left;margin-bottom:0.5rem;">📦 Archiver</button>
+      <button class="btn btn-outline" id="attestation-btn" style="display:none;width:100%;text-align:left;border-color:#e0584f;color:#e0584f;margin-bottom:0.5rem;">📋 Attestation</button>
+      <hr style="border:none;border-top:1px solid var(--border);margin:0.5rem 0;">
+      <button class="btn btn-danger" id="detail-delete-btn" style="width:100%;text-align:left;">🗑️ Supprimer le dossier</button>
+      <button class="btn btn-outline" id="more-actions-close" style="width:100%;margin-top:0.8rem;">Fermer</button>
     </div>
   </div>
 
@@ -6387,9 +6413,25 @@ function renderDetailContent(r, container){
   const c = container || document.getElementById('detail-content');
   const dateFmt = r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '—';
 
+  const statutColors = { 'Terminée': '#4ade80', 'Attente_piece': '#f5a623', 'Non_reparable': '#e05252', 'archivé': '#778899' };
+  const statutColor = statutColors[r.statut] || '#778899';
+  const statutLabel = STATUT_LABELS[r.statut] || r.statut || '';
+
+  const headerHtml = `
+    <div class="detail-title">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')}</div>
+    <div class="detail-sub">${escapeHtml(r.ref||'')} · ${dateFmt}${r.heure ? ' à ' + escapeHtml(r.heure) : ''}</div>
+    ${statutLabel ? `<div style="display:inline-flex;align-items:center;gap:0.3rem;background:${statutColor}22;color:${statutColor};font-size:0.72rem;font-weight:700;padding:0.25rem 0.7rem;border-radius:20px;margin-top:0.5rem;">${escapeHtml(statutLabel)}</div>` : ''}
+  `;
+
+  if(!container){
+    const headerEl = document.getElementById('detail-header');
+    if(headerEl) headerEl.innerHTML = headerHtml;
+  }
+
   let html = '';
-  html += `<div class="detail-title">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')}</div>`;
-  html += `<div class="detail-sub">${escapeHtml(r.ref||'')} · ${dateFmt}${r.heure ? ' à ' + escapeHtml(r.heure) : ''}</div>`;
+  if(container){
+    html += headerHtml;
+  }
 
   // ---------- Bandeau SAV (côté intervention de suivi) ----------
   if(r.is_sav && r.parent_app_id){
@@ -6634,6 +6676,34 @@ document.getElementById('detail-back').addEventListener('click', () => {
   document.querySelector('.tab-btn[data-view="list"]').classList.add('active');
   document.getElementById('view-list').classList.add('active');
   renderList();
+});
+
+// ---------- Panneau "Documents" (facture / devis) ----------
+document.getElementById('detail-documents-btn').addEventListener('click', () => {
+  document.getElementById('documents-modal').style.display = 'flex';
+});
+document.getElementById('documents-modal-close').addEventListener('click', () => {
+  document.getElementById('documents-modal').style.display = 'none';
+});
+document.getElementById('documents-modal').addEventListener('click', (e) => {
+  if(e.target.id === 'documents-modal') document.getElementById('documents-modal').style.display = 'none';
+  if(e.target.tagName === 'BUTTON' && e.target.id !== 'documents-modal-close'){
+    document.getElementById('documents-modal').style.display = 'none';
+  }
+});
+
+// ---------- Menu "Plus d'actions" ----------
+document.getElementById('detail-more-btn').addEventListener('click', () => {
+  document.getElementById('more-actions-modal').style.display = 'flex';
+});
+document.getElementById('more-actions-close').addEventListener('click', () => {
+  document.getElementById('more-actions-modal').style.display = 'none';
+});
+document.getElementById('more-actions-modal').addEventListener('click', (e) => {
+  if(e.target.id === 'more-actions-modal') document.getElementById('more-actions-modal').style.display = 'none';
+  if(e.target.tagName === 'BUTTON' && e.target.id !== 'more-actions-close'){
+    document.getElementById('more-actions-modal').style.display = 'none';
+  }
 });
 
 document.getElementById('detail-edit').addEventListener('click', () => {
