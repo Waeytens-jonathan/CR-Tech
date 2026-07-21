@@ -6436,7 +6436,7 @@ function renderDetailContent(r, container){
 
   if(r.plaquePhoto){
     html += '<div class="detail-section"><h3>Plaque signalétique</h3>';
-    html += `<img src="${r.plaquePhoto}" alt="Plaque signalétique" style="max-width:240px; border-radius:8px; border:1px solid var(--border);">`;
+    html += `<img src="${r.plaquePhoto}" alt="Plaque signalétique" class="zoomable-photo" style="max-width:240px; border-radius:8px; border:1px solid var(--border); cursor:pointer;">`;
     html += '</div>';
   }
 
