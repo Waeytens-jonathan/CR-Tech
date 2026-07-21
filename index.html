@@ -396,7 +396,7 @@
   }
   .detail-sub{color:var(--text-muted); font-size:0.85rem; margin-bottom:1.2rem;}
   .detail-photos{display:grid; grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:0.6rem;}
-  .detail-photos img{width:100%; border-radius:8px; border:1px solid var(--border); object-fit:cover; aspect-ratio:1; cursor:pointer;}
+  .detail-photos img{width:100%; height:100%; aspect-ratio:1; border-radius:8px; border:1px solid var(--border); object-fit:contain; background:rgba(0,0,0,0.35); cursor:pointer;}
   .detail-photo-wrap{position:relative; display:inline-block; width:100%;}
   .detail-photo-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:14px;line-height:24px;text-align:center;cursor:pointer;padding:0;z-index:2;}
   .detail-sig img{max-width:240px; border-radius:8px; background:#fff;}
@@ -407,7 +407,7 @@
     overflow:hidden;
     border:1px solid var(--border);
   }
-  .photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-thumb img{width:100%; height:100%; object-fit:contain; display:block; background:rgba(0,0,0,0.35); cursor:pointer;}
   .photo-thumb .remove-photo{
     position:absolute; top:4px; right:4px;
     width:22px; height:22px;
@@ -1712,6 +1712,11 @@
   </div>
 </div>
 
+<!-- Zoom photo (clic = agrandir, reclic = réduire) -->
+<div id="photo-zoom-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:10050;align-items:center;justify-content:center;padding:1.5rem;cursor:zoom-out;">
+  <img id="photo-zoom-img" src="" alt="Photo agrandie" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;">
+</div>
+
 <!-- Ouvrir un SAV -->
 <div id="sav-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
@@ -1839,6 +1844,30 @@
 </div>
 
 <script>
+
+// ---------- Zoom photo global (clic = agrandir, reclic = réduire) ----------
+// S'applique à toute photo affichée dans l'app : compte-rendu, plaque signalétique,
+// dépôt, pose de pièce, reçu de remise... peu importe où elle apparaît.
+(function initPhotoZoom(){
+  const overlay = document.getElementById('photo-zoom-overlay');
+  const zoomImg = document.getElementById('photo-zoom-img');
+  if(!overlay || !zoomImg) return;
+
+  const ZOOMABLE_SELECTOR = '.photo-thumb img, .detail-photos img, #plaque-thumb-img, .detail-sig img, .zoomable-photo';
+
+  document.addEventListener('click', (e) => {
+    const img = e.target.closest(ZOOMABLE_SELECTOR);
+    if(img && img.src){
+      zoomImg.src = img.src;
+      overlay.style.display = 'flex';
+    }
+  });
+
+  overlay.addEventListener('click', () => {
+    overlay.style.display = 'none';
+    zoomImg.src = '';
+  });
+})();
 
 // ---------- Données ----------
 const STORAGE_KEY = 'technikhome_reports';
@@ -3023,7 +3052,7 @@ function showDepotDetail(appId){
     html += '<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);margin-bottom:0.4rem;">Photos</div>';
     html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">';
     depotPhotosArr.forEach(src => {
-      html += `<img src="${src}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">`;
+      html += `<img src="${src}" class="zoomable-photo" style="width:90px;height:90px;object-fit:contain;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid var(--border);cursor:pointer;">`;
     });
     html += '</div></div>';
   }
@@ -4186,7 +4215,7 @@ function showAgendaDetail(appId){
     html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${displayValue}</div></div>`;
   });
   if(r.plaque_photo){
-    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">Photo de la plaque signalétique</div><img src="${r.plaque_photo}" style="max-width:180px;border-radius:8px;margin-top:0.4rem;border:1px solid var(--border);"></div>`;
+    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">Photo de la plaque signalétique</div><img src="${r.plaque_photo}" class="zoomable-photo" style="max-width:180px;border-radius:8px;margin-top:0.4rem;border:1px solid var(--border);cursor:pointer;"></div>`;
   }
 
   // Boutons Waze / Copier adresse
@@ -6450,7 +6479,7 @@ function renderDetailContent(r, container){
     if(Array.isArray(r.pieceDeposePhotos) && r.pieceDeposePhotos.length){
       html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.4rem;">';
       r.pieceDeposePhotos.forEach(src => {
-        html += `<img src="${src}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">`;
+        html += `<img src="${src}" class="zoomable-photo" style="width:80px;height:80px;object-fit:contain;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid var(--border);cursor:pointer;">`;
       });
       html += '</div>';
     }
