@@ -1326,6 +1326,7 @@
             <option>Espèces</option>
             <option>Carte bancaire</option>
             <option value="Mixte">Mixte (espèces + carte)</option>
+            <option value="Virement">Virement bancaire</option>
           </select>
         </div>
         <div class="grid" id="paiement-mixte-fields" style="display:none;">
@@ -1578,6 +1579,20 @@
         </div>
       </div>
 
+      <!-- RIB -->
+      <div class="settings-section" data-section="rib">
+        <div class="settings-section-header"><h3>🏦 Coordonnées bancaires (RIB)</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <p style="font-size:0.75rem;color:var(--text-muted);margin:0 0 0.8rem;">Affichées en bas de vos factures pour les règlements par virement. Laissez vide pour ne rien afficher.</p>
+          <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Titulaire du compte</label>
+          <input type="text" id="p-rib-titulaire" placeholder="ex : Jonathan Waeytens" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.8rem;">
+          <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">IBAN</label>
+          <input type="text" id="p-rib-iban" placeholder="ex : FR76 1234 5678 9012 3456 7890 123" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.8rem;">
+          <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">BIC / SWIFT</label>
+          <input type="text" id="p-rib-bic" placeholder="ex : ABCDEFGHXXX" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+        </div>
+      </div>
+
       <!-- TARIFS ÉLECTROMÉNAGER -->
       <div class="settings-section" data-section="tarifs-em">
         <div class="settings-section-header"><h3>🔧 Tarifs électroménager</h3><span class="settings-section-chevron">▼</span></div>
@@ -1687,6 +1702,7 @@
       <option>Espèces</option>
       <option>Carte bancaire</option>
       <option value="Mixte">Mixte (espèces + carte)</option>
+      <option value="Virement">Virement bancaire</option>
     </select>
     <div class="grid" id="pose-piece-mixte-fields" style="display:none;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">
       <div>
@@ -3544,6 +3560,20 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   const garLines = doc.splitTextToSize("Main d'œuvre garantie 15 jours à compter de la date d'intervention. Pièces posées : garantie légale de conformité et garantie des vices cachés applicables selon les conditions du fabricant. Conditions générales de vente complètes disponibles sur technikhome.fr/cgv.html", W-margin*2);
   doc.text(garLines, margin, y);
   y += garLines.length*4 + 6;
+
+  const ribIban = (_agendaConfigCache && _agendaConfigCache.ribIban) || '';
+  if(ribIban){
+    doc.setDrawColor(220,220,220); doc.line(margin, y, W-margin, y);
+    y += 6;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(13,27,42);
+    doc.text('Coordonnées bancaires (règlement par virement)', margin, y);
+    y += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90,90,90);
+    if(_agendaConfigCache.ribTitulaire){ doc.text(`Titulaire : ${_agendaConfigCache.ribTitulaire}`, margin, y); y += 4.5; }
+    doc.text(`IBAN : ${ribIban}`, margin, y); y += 4.5;
+    if(_agendaConfigCache.ribBic){ doc.text(`BIC : ${_agendaConfigCache.ribBic}`, margin, y); y += 4.5; }
+    y += 2;
+  }
 
   doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(130,130,130);
   doc.text('Réparer, c\'est notre nature.', W/2, 285, {align:'center'});
@@ -7575,6 +7605,9 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
   document.getElementById('p-numero-facture-override').value = params.numeroFactureOverride ?? '';
   document.getElementById('p-numero-devis-override').value = params.numeroDevisOverride ?? '';
+  document.getElementById('p-rib-titulaire').value = params.ribTitulaire ?? '';
+  document.getElementById('p-rib-iban').value = params.ribIban ?? '';
+  document.getElementById('p-rib-bic').value = params.ribBic ?? '';
   previewProchainsNumeros(params);
   // Jours bloqués
   renderPJoursBloques(params);
@@ -7657,6 +7690,9 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
     numeroFactureOverride: document.getElementById('p-numero-facture-override').value ? parseInt(document.getElementById('p-numero-facture-override').value) : null,
     numeroDevisOverride: document.getElementById('p-numero-devis-override').value ? parseInt(document.getElementById('p-numero-devis-override').value) : null,
+    ribTitulaire: document.getElementById('p-rib-titulaire').value.trim(),
+    ribIban: document.getElementById('p-rib-iban').value.trim(),
+    ribBic: document.getElementById('p-rib-bic').value.trim(),
     tarifCuisson:      parseInt(document.getElementById('p-tarif-cuisson').value)      || 60,
     tarifLavage:       parseInt(document.getElementById('p-tarif-lavage').value)       || 65,
     tarifFroid:        parseInt(document.getElementById('p-tarif-froid').value)        || 70,
@@ -7708,6 +7744,9 @@ async function getAgendaParams(){
       urssafTaux: data.urssaf_taux ?? 20,
       numeroFactureOverride: data.numero_facture_override ?? null,
       numeroDevisOverride: data.numero_devis_override ?? null,
+      ribTitulaire: data.rib_titulaire ?? '',
+      ribIban: data.rib_iban ?? '',
+      ribBic: data.rib_bic ?? '',
       joursBlockes:  data.jours_bloques  || [],
       tarifCuisson:      data.tarif_cuisson      ?? 60,
       tarifLavage:       data.tarif_lavage       ?? 65,
@@ -7758,6 +7797,9 @@ async function saveAgendaParams(params){
     urssaf_taux: params.urssafTaux ?? 20,
     numero_facture_override: params.numeroFactureOverride ?? null,
     numero_devis_override: params.numeroDevisOverride ?? null,
+    rib_titulaire: params.ribTitulaire || null,
+    rib_iban: params.ribIban || null,
+    rib_bic: params.ribBic || null,
     jours_bloques:     params.joursBlockes,
     tarif_cuisson:      params.tarifCuisson      ?? 60,
     tarif_lavage:       params.tarifLavage       ?? 65,
