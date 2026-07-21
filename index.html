@@ -6511,7 +6511,7 @@ function renderDetailContent(r, container){
     html += '<div class="detail-section"><h3>Photos de l\'intervention</h3>';
     html += '<div class="detail-photos">';
     r.photos.forEach((src, idx) => {
-      html += `<div class="detail-photo-wrap"><img src="${src}" alt="Photo intervention" onclick="deleteDetailPhoto(${idx})" title="Appuyer pour supprimer"><button class="detail-photo-del" onclick="deleteDetailPhoto(${idx})">×</button></div>`;
+      html += `<div class="detail-photo-wrap"><img src="${src}" alt="Photo intervention"></div>`;
     });
     html += '</div>';
     html += '<p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;">Appuyez sur une photo pour la supprimer</p>';
