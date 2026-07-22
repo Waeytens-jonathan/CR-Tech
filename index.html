@@ -6427,7 +6427,7 @@ function renderDetailContent(r, container){
   const headerHtml = `
     <div class="detail-title">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')}</div>
     <div class="detail-sub">${escapeHtml(r.ref||'')} · ${dateFmt}${r.heure ? ' à ' + escapeHtml(r.heure) : ''}</div>
-    ${statutLabel ? `<div style="display:inline-flex;align-items:center;gap:0.3rem;background:${statutColor}22;color:${statutColor};font-size:0.72rem;font-weight:700;padding:0.25rem 0.7rem;border-radius:20px;margin-top:0.5rem;">${escapeHtml(statutLabel)}</div>` : ''}
+    ${statutLabel ? `<div style="display:inline-flex;align-items:center;gap:0.3rem;background:${statutColor}22;color:${statutColor};font-size:0.72rem;font-weight:700;padding:0.25rem 0.7rem;border-radius:20px;margin-top:0.5rem;margin-bottom:1rem;">${escapeHtml(statutLabel)}</div>` : ''}
   `;
 
   if(!container){
@@ -9231,9 +9231,22 @@ document.getElementById('attestation-generate').addEventListener('click', async 
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
     <h3 style="margin:0 0 0.8rem;color:var(--orange);">💬 SMS — J'arrive</h3>
     <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1rem;">Le message sera pré-rempli dans votre app SMS. Modifiez le délai si besoin :</p>
-    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Temps d'arrivée (minutes) :</label>
-    <input id="sms-arrival-minutes" type="number" value="10" min="1" max="120"
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Temps d'arrivée :</label>
+    <select id="sms-arrival-minutes"
       style="width:100%;padding:0.5rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1rem;box-sizing:border-box;margin-bottom:1rem;">
+      <option value="5">5 minutes</option>
+      <option value="10" selected>10 minutes</option>
+      <option value="15">15 minutes</option>
+      <option value="20">20 minutes</option>
+      <option value="25">25 minutes</option>
+      <option value="30">30 minutes</option>
+      <option value="35">35 minutes</option>
+      <option value="40">40 minutes</option>
+      <option value="45">45 minutes</option>
+      <option value="50">50 minutes</option>
+      <option value="55">55 minutes</option>
+      <option value="60">1 heure</option>
+    </select>
     <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
       <button class="btn btn-outline" onclick="document.getElementById('sms-arrival-modal').style.display='none'">Annuler</button>
       <button class="btn btn-primary" onclick="sendSmsArrival()">Envoyer 💬</button>
