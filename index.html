@@ -6012,6 +6012,9 @@ async function saveCurrentReport(){
     data.id = currentId;
     delete data._isDraft;
     reports[idx] = data;
+    if(currentDetailReport && currentDetailReport.id === data.id){
+      currentDetailReport = data;
+    }
   } else {
     data.id = 'r_' + Date.now();
     currentId = data.id;
