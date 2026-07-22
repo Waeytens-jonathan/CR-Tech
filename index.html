@@ -4633,7 +4633,11 @@ document.getElementById('agenda-new-btn').addEventListener('click', () => {
     const el = document.getElementById('newrdv-' + id);
     if(el) el.value = '';
   });
-  document.getElementById('newrdv-date').value = todayISO();
+  const d = getDisplayDate(agendaDayOffset);
+  const dYear = d.getFullYear();
+  const dMonth = String(d.getMonth() + 1).padStart(2, '0');
+  const dDay = String(d.getDate()).padStart(2, '0');
+  document.getElementById('newrdv-date').value = `${dYear}-${dMonth}-${dDay}`;
   document.getElementById('newrdv-creneau').value = 'matin';
   document.getElementById('newrdv-type').value = '';
   window._newRdvDistanceKm = null;
