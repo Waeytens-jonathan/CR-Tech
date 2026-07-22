@@ -8503,16 +8503,20 @@ function renderClientsList(filter){
     el.innerHTML = '<div class="empty">' + (q ? 'Aucun client trouvé' : 'Aucun client') + '</div>';
     return;
   }
-  el.innerHTML = list.map(c => `
+  el.innerHTML = list.map(c => {
+    const couleurs = { vert:'#4ade80', orange:'#f5a623', rouge:'#e05252' };
+    const dot = couleurs[c.couleur] ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${couleurs[c.couleur]};margin-right:0.4rem;flex-shrink:0;"></span>` : '';
+    return `
     <div class="list-item" data-client-id="${escapeHtml(c.app_id)}" style="cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <strong>${escapeHtml(clientDisplayName(c))}</strong>
+        <strong style="display:flex;align-items:center;">${dot}${escapeHtml(clientDisplayName(c))}</strong>
         <span style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(c.ville||'')}</span>
       </div>
       <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">
         ${c.tel ? '📞 '+escapeHtml(c.tel) : ''}${c.tel && c.email ? ' · ' : ''}${c.email ? escapeHtml(c.email) : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   el.querySelectorAll('.list-item').forEach(item => {
     item.addEventListener('click', () => showClientDetail(item.dataset.clientId));
   });
@@ -8527,12 +8531,33 @@ async function showClientDetail(appId){
   const content = document.getElementById('client-detail-content');
   content.innerHTML = `
     <h2 style="margin:0 0 0.8rem;">${escapeHtml(clientDisplayName(c))}</h2>
+    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+      <button class="client-couleur-btn" data-couleur="vert" style="flex:1;padding:0.5rem;border-radius:8px;border:2px solid ${c.couleur==='vert'?'#4ade80':'transparent'};background:rgba(74,222,128,0.15);color:#4ade80;font-size:0.82rem;cursor:pointer;">🟢</button>
+      <button class="client-couleur-btn" data-couleur="orange" style="flex:1;padding:0.5rem;border-radius:8px;border:2px solid ${c.couleur==='orange'?'#f5a623':'transparent'};background:rgba(245,166,35,0.15);color:#f5a623;font-size:0.82rem;cursor:pointer;">🟠</button>
+      <button class="client-couleur-btn" data-couleur="rouge" style="flex:1;padding:0.5rem;border-radius:8px;border:2px solid ${c.couleur==='rouge'?'#e05252':'transparent'};background:rgba(224,82,82,0.15);color:#e05252;font-size:0.82rem;cursor:pointer;">🔴</button>
+    </div>
     <div class="detail-rows">
       ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(c.tel)}</a> <a href="tel:${escapeHtml(c.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(c.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a></span></div>` : ''}
       ${c.email  ? `<div class="detail-row"><span>Email</span><span><a href="mailto:${escapeHtml(c.email)}" style="color:var(--blue);">${escapeHtml(c.email)}</a></span></div>` : ''}
       ${c.adresse? `<div class="detail-row"><span>Adresse</span><span>${escapeHtml(c.adresse)}, ${escapeHtml(c.cp||'')} ${escapeHtml(c.ville||'')}</span></div>` : ''}
       ${c.note   ? `<div class="detail-row"><span>Note</span><span>${escapeHtml(c.note)}</span></div>` : ''}
     </div>`;
+
+  content.querySelectorAll('.client-couleur-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const nouvelleCouleur = c.couleur === btn.dataset.couleur ? null : btn.dataset.couleur;
+      try{
+        const { error } = await sb.from(CLIENTS_TABLE).update({ couleur: nouvelleCouleur }).eq('app_id', c.app_id);
+        if(error) throw error;
+        c.couleur = nouvelleCouleur;
+        showToast(nouvelleCouleur ? 'Couleur mise à jour' : 'Couleur retirée');
+        showClientDetail(appId);
+      }catch(e){
+        console.error('Erreur mise à jour couleur client :', e);
+        showToast('Erreur lors de la mise à jour', true);
+      }
+    });
+  });
 
   // Interventions liées
   const interList = document.getElementById('client-interventions-list');
