@@ -7757,6 +7757,33 @@ document.getElementById('p-bloc-add-btn') && document.getElementById('p-bloc-add
 
 document.getElementById('p-save-btn') && document.getElementById('p-save-btn').addEventListener('click', async () => {
   const btn = document.getElementById('p-save-btn');
+
+  // Vérification de sécurité : empêcher un numéro de départ inférieur à ce qui existe déjà
+  const factureOverrideVal = document.getElementById('p-numero-facture-override').value;
+  const devisOverrideVal = document.getElementById('p-numero-devis-override').value;
+  const anneeCourante = new Date().getFullYear();
+
+  if(factureOverrideVal){
+    try{
+      const { data } = await sb.from('factures').select('sequence').eq('annee', anneeCourante).order('sequence', { ascending: false }).limit(1);
+      const maxExistant = (data && data.length) ? data[0].sequence : 0;
+      if(parseInt(factureOverrideVal) <= maxExistant){
+        const ok = confirm(`⚠️ Attention : le numéro ${factureOverrideVal} est inférieur ou égal à des factures qui existent déjà cette année (jusqu'à ${maxExistant}). Continuer risque de créer un doublon ou un désordre dans la numérotation. Enregistrer quand même ?`);
+        if(!ok){ return; }
+      }
+    }catch(e){ console.error('Erreur vérification numéro facture :', e); }
+  }
+  if(devisOverrideVal){
+    try{
+      const { data } = await sb.from('devis').select('sequence').eq('annee', anneeCourante).order('sequence', { ascending: false }).limit(1);
+      const maxExistant = (data && data.length) ? data[0].sequence : 0;
+      if(parseInt(devisOverrideVal) <= maxExistant){
+        const ok = confirm(`⚠️ Attention : le numéro ${devisOverrideVal} est inférieur ou égal à des devis qui existent déjà cette année (jusqu'à ${maxExistant}). Continuer risque de créer un doublon ou un désordre dans la numérotation. Enregistrer quand même ?`);
+        if(!ok){ return; }
+      }
+    }catch(e){ console.error('Erreur vérification numéro devis :', e); }
+  }
+
   btn.disabled = true; btn.textContent = 'Enregistrement…';
   const params = {
     ...(_agendaConfigCache || {}),
