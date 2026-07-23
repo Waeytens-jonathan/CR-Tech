@@ -2926,7 +2926,7 @@ function renderStockPickerList(filterText){
         showToast('Cette pièce est déjà ajoutée', true);
         return;
       }
-      selectedStockPieces.push({ type, app_id: item.app_id, nom: item.nom, ref: item.ref, prix_vente: item.prix_vente });
+      selectedStockPieces.push({ type, app_id: item.app_id, nom: item.nom, ref: item.ref, prix_vente: item.prix_vente, garantie: item.garantie || '3 mois' });
       renderStockPiecesSelectedList();
       recalcPieceCoutFromStock();
       document.getElementById('stock-picker-overlay').style.display = 'none';
@@ -3414,13 +3414,20 @@ function buildFactureLignes(r){
   }
   const pieces = (Array.isArray(r.piecesPosees) && r.piecesPosees.length)
     ? r.piecesPosees
-    : (r.pieceDeposeNom ? [{ nom: r.pieceDeposeNom, ref: r.pieceDeposeRef, garantie: '3 mois' }] : []);
+    : (r.pieceDeposeNom
+        ? [{ nom: r.pieceDeposeNom, ref: r.pieceDeposeRef, garantie: '3 mois' }]
+        : (Array.isArray(r.stockPieces) && r.stockPieces.length
+            ? r.stockPieces.map(p => ({ nom: p.nom, ref: p.ref, garantie: p.garantie || '3 mois' }))
+            : []));
   const coutPieces = parseFloat(r['cout-pieces']) || 0;
   if(pieces.length){
-    const prixParPiece = coutPieces / pieces.length;
-    pieces.forEach(p => {
+    // Si les pièces viennent du stock, chacune a déjà son propre prix (prix_vente) ;
+    // sinon (pose-pièce, garantie), on répartit le total également entre les lignes.
+    const stockAvecPrix = Array.isArray(r.stockPieces) && r.stockPieces.length === pieces.length && r.stockPieces.every(p => p.prix_vente);
+    pieces.forEach((p, i) => {
       const desc = p.nom || 'Pièce détachée';
-      lignes.push({ designation: 'Pièce', description: desc + (p.ref ? ` (Réf. ${p.ref})` : ''), garantie: p.garantie || '3 mois', quantite: 1, prix_unitaire: prixParPiece, total: prixParPiece });
+      const prixLigne = stockAvecPrix ? (parseFloat(r.stockPieces[i].prix_vente) || 0) : (coutPieces / pieces.length);
+      lignes.push({ designation: 'Pièce', description: desc + (p.ref ? ` (Réf. ${p.ref})` : ''), garantie: p.garantie || '3 mois', quantite: 1, prix_unitaire: prixLigne, total: prixLigne });
     });
   } else if(coutPieces > 0){
     const descCommande = (r['piece-desc'] || '').trim();
