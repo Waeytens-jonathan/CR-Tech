@@ -3595,14 +3595,18 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
     doc.text('Coordonnées bancaires (règlement par virement)', margin, y);
     y += 5;
     doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90,90,90);
-    if(_agendaConfigCache.ribTitulaire){ doc.text(`Titulaire : ${_agendaConfigCache.ribTitulaire}`, margin, y); y += 4.5; }
+    if(_agendaConfigCache.ribTitulaire){
+      const titulaireLines = doc.splitTextToSize(`Titulaire : ${_agendaConfigCache.ribTitulaire}`, W - margin*2);
+      doc.text(titulaireLines, margin, y);
+      y += titulaireLines.length * 4.5;
+    }
     doc.text(`IBAN : ${ribIban}`, margin, y); y += 4.5;
     if(_agendaConfigCache.ribBic){ doc.text(`BIC : ${_agendaConfigCache.ribBic}`, margin, y); y += 4.5; }
     y += 2;
   }
 
   doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(130,130,130);
-  doc.text('Réparer, c\'est notre nature.', W/2, 285, {align:'center'});
+  doc.text('Réparer, c\'est notre nature.', W/2, Math.max(y + 8, 285), {align:'center'});
 
   return doc;
 }
@@ -3844,7 +3848,7 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
   y += infoLines.length*4 + 6;
 
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(130,130,130);
-  doc.text('Réparer, c\'est notre nature.', W/2, 285, {align:'center'});
+  doc.text('Réparer, c\'est notre nature.', W/2, Math.max(y + 4, 285), {align:'center'});
 
   return doc;
 }
@@ -6070,6 +6074,14 @@ async function decrementStockQuantite(table, appId){
   const { data: current, error: fetchErr } = await sb.from(table).select('quantite').eq('app_id', appId).single();
   if(fetchErr) throw fetchErr;
   const nouvelleQte = Math.max(0, (current.quantite ?? 1) - 1);
+
+  if(table === 'stock_pieces' && nouvelleQte === 0){
+    // Pièce commandée entièrement consommée -> on supprime la fiche
+    const { error } = await sb.from(table).delete().eq('app_id', appId);
+    if(error) throw error;
+    return;
+  }
+
   const updates = { quantite: nouvelleQte };
   if(table === 'stock_embarque') updates.statut = nouvelleQte > 0 ? 'en_stock' : 'hors_stock';
   const { error } = await sb.from(table).update(updates).eq('app_id', appId);
