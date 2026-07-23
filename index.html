@@ -1086,6 +1086,8 @@
         <button class="btn btn-primary" id="generer-devis-btn" style="display:none;width:100%;">📝 Générer un devis</button>
         <button class="btn btn-outline" id="voir-devis-btn" style="display:none;width:100%;">📝 Voir le devis</button>
         <button class="btn btn-outline" id="envoyer-devis-btn" style="display:none;width:100%;">📧 Envoyer le devis</button>
+        <hr style="border:none;border-top:1px solid var(--border);width:100%;margin:0.3rem 0;">
+        <button class="btn btn-outline" id="apercu-test-facture-btn" style="width:100%;border-color:#778;color:#aab;font-size:0.85rem;">🧪 Aperçu test (rien n'est enregistré)</button>
       </div>
     </div>
   </div>
@@ -3661,6 +3663,30 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
   }
   btn.disabled = false;
   btn.textContent = '🧾 Générer la facture';
+});
+
+document.getElementById('apercu-test-facture-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  const btn = document.getElementById('apercu-test-facture-btn');
+
+  try{
+    const lignes = buildFactureLignes(r);
+    if(!lignes.length){
+      showToast('Aucun montant à facturer sur ce compte-rendu', true);
+      return;
+    }
+    const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
+    const dateEmission = todayISO();
+
+    // Numéro factice, aucune écriture en base : rien n'est consommé ni enregistré
+    const doc = generateFacturePdf(r, 'APERÇU-TEST', lignes, montantTotal, dateEmission);
+    doc.save('apercu-test-facture.pdf');
+    showToast('Aperçu généré — non enregistré, la numérotation n\'a pas bougé');
+  }catch(e){
+    console.error('Erreur aperçu test facture :', e);
+    showToast('Erreur lors de la génération de l\'aperçu', true);
+  }
 });
 
 document.getElementById('voir-facture-btn').addEventListener('click', async () => {
