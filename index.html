@@ -5555,7 +5555,7 @@ document.getElementById('calc-modal-close').addEventListener('click', () => {
 let commandePieceRows = [];
 
 function newCommandePieceRow(prefill){
-  return Object.assign({ id: 'cp' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', prixFournisseur: '' }, prefill || {});
+  return Object.assign({ id: 'cp' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', ref: '', prixFournisseur: '' }, prefill || {});
 }
 
 function renderCommandePieceRows(){
@@ -5564,7 +5564,9 @@ function renderCommandePieceRows(){
   container.innerHTML = commandePieceRows.map((row, i) => `
     <div class="cp-row" data-row-id="${row.id}" style="display:flex;gap:0.5rem;margin-bottom:0.5rem;align-items:flex-start;">
       <div style="flex:1;">
-        <input type="text" class="cp-row-nom" placeholder="Désignation / référence" value="${escapeHtml(row.nom)}"
+        <input type="text" class="cp-row-nom" placeholder="Désignation" value="${escapeHtml(row.nom)}"
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
+        <input type="text" class="cp-row-ref" placeholder="Référence (optionnel)" value="${escapeHtml(row.ref||'')}"
           style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
         <input type="number" class="cp-row-prix" placeholder="Prix d'achat fournisseur (€)" step="0.01" min="0" value="${row.prixFournisseur}"
           style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
@@ -5576,6 +5578,7 @@ function renderCommandePieceRows(){
     const id = rowEl.dataset.rowId;
     const row = commandePieceRows.find(r => r.id === id);
     rowEl.querySelector('.cp-row-nom').addEventListener('input', e => { row.nom = e.target.value; recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-ref').addEventListener('input', e => { row.ref = e.target.value; recalculerPrixPiece(); });
     rowEl.querySelector('.cp-row-prix').addEventListener('input', e => { row.prixFournisseur = e.target.value; recalculerPrixPiece(); });
     rowEl.querySelector('.cp-row-remove')?.addEventListener('click', () => {
       commandePieceRows = commandePieceRows.filter(r => r.id !== id);
@@ -5603,7 +5606,9 @@ function recalculerPrixPiece(){
   document.getElementById('f-prix-fournisseur').value = totalFournisseur > 0 ? totalFournisseur.toFixed(2) : '';
   document.getElementById('f-piece-cout').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
   document.getElementById('f-cout-pieces').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
-  document.getElementById('f-piece-desc').value = validRows.map(r => r.nom.trim()).filter(Boolean).join(', ');
+  document.getElementById('f-piece-desc').value = validRows
+    .map(r => r.nom.trim() ? (r.nom.trim() + (r.ref && r.ref.trim() ? ` (Réf. ${r.ref.trim()})` : '')) : '')
+    .filter(Boolean).join(', ');
   recalcTotal();
 }
 
