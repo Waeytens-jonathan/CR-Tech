@@ -642,6 +642,7 @@
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
         <button class="btn btn-primary" id="agenda-detail-create-cr" style="flex:1;min-width:200px;">📝 Faire le compte-rendu</button>
+        <button class="btn btn-primary" id="agenda-detail-view-cr" style="display:none;flex:1;min-width:200px;background:var(--green);color:#0d1b2a;">📂 Voir le compte-rendu</button>
       </div>
       <div id="agenda-detail-content"></div>
     </div>
@@ -1061,9 +1062,11 @@
         <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✅ Envoyer CR+Facture</button>
       </div>
 
+      <!-- Action "Poser la pièce" — mise en avant -->
+      <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;width:100%;font-size:1rem;font-weight:700;padding:0.85rem 1rem;margin-bottom:0.6rem;box-shadow:0 4px 14px rgba(26,115,200,0.35);letter-spacing:0.01em;">🔧 Poser la pièce</button>
+
       <!-- Actions contextuelles (visibles seulement quand pertinentes) -->
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="detail-extra-actions">
-        <button class="btn btn-secondary" id="detail-pose-piece-btn" style="display:none;font-size:0.82rem;">🔧 Poser la pièce</button>
         <button class="btn btn-outline" id="detail-rdv-pose-btn" style="display:none;font-size:0.82rem;">📅 RDV pose pièce</button>
       </div>
 
@@ -4378,6 +4381,28 @@ document.getElementById('depot-edit-save-btn').addEventListener('click', async (
   btn.textContent = 'Enregistrer le dépôt';
 });
 
+// Retrouve le compte-rendu lié à un RDV : d'abord via le marqueur caché ou le lien direct,
+// sinon par repli (client + appareil) pour les RDV créés avant l'ajout de ce lien.
+function findLinkedReport(r){
+  const crLinkMatch = (r.note_technicien || '').match(/\[\[cr:([^\]]+)\]\]/);
+  const linkedReportId = crLinkMatch ? crLinkMatch[1] : null;
+
+  let rep = reports.find(rep => !rep._isDraft && (
+    rep.rdv_app_id === r.app_id || (linkedReportId && rep.id === linkedReportId)
+  ));
+  if(rep) return rep;
+
+  // Repli pour les RDV pose pièce / SAV créés avant l'ajout du lien direct :
+  // on cherche un dossier du même client, même appareil, encore en attente de pièce.
+  if(['pose_piece','sav'].includes(r.type_rdv)){
+    const memeClient = rep2 => (r.client_id && rep2.client_id === r.client_id) || (r.tel && rep2.tel === r.tel);
+    const memeAppareil = rep2 => (rep2.appareil || '') === (r.appareil || '');
+    const candidats = reports.filter(rep2 => !rep2._isDraft && memeClient(rep2) && memeAppareil(rep2));
+    rep = candidats.find(rep2 => rep2.statut === 'Attente_piece') || candidats[0];
+  }
+  return rep || null;
+}
+
 function showAgendaDetail(appId){
   const r = agendaRdvs.find(x => x.app_id === appId);
   if(!r) return;
@@ -4389,6 +4414,9 @@ function showAgendaDetail(appId){
   else statutLabel = '<span class="badge orange">En attente</span>';
 
   const TYPE_RDV_LABELS = { pose_piece: '🔧 Pose pièce', diagnostic: '🔍 Diagnostic', sav: '🛠️ SAV' };
+  const linkedReport = findLinkedReport(r);
+  currentAgendaRdv._linkedReportFound = linkedReport;
+  const noteAffichee = (r.note_technicien || '').replace(/\[\[cr:[^\]]+\]\]/, '').trim();
   const telValue = r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(r.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a>` : '';
   const rows = [
     ['Statut', statutLabel],
@@ -4403,7 +4431,7 @@ function showAgendaDetail(appId){
     ['Marque', r.marque],
     ['Modèle', r.modele],
     ['Panne décrite', r.panne],
-    ['Note pour le technicien', r.note_technicien],
+    ['Note pour le technicien', noteAffichee],
     ['Distance depuis Lens', r.distance_km ? `${r.distance_km} km` : null],
   ];
   let html = '';
@@ -4437,10 +4465,12 @@ function showAgendaDetail(appId){
   cancelBtn.textContent = '🚫 Annuler le RDV';
   doneBtn.textContent = r.statut === 'effectue' ? '↩️ Annuler le statut effectué' : '✅ Marquer effectué';
 
-  // Cacher "Faire le compte-rendu" si un CR existe déjà pour ce RDV
+  // Cacher "Faire le compte-rendu" si un CR existe déjà pour ce RDV, afficher "Voir le compte-rendu" à la place
   const createCrBtn = document.getElementById('agenda-detail-create-cr');
-  const crExiste = reports.some(rep => !rep._isDraft && rep.rdv_app_id === r.app_id);
+  const viewCrBtn = document.getElementById('agenda-detail-view-cr');
+  const crExiste = !!linkedReport;
   createCrBtn.style.display = crExiste ? 'none' : 'inline-flex';
+  viewCrBtn.style.display = crExiste ? 'inline-flex' : 'none';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -4483,6 +4513,13 @@ function matchAppareilOption(rawValue){
   const partial = options.find(o => lower.includes(o.toLowerCase()) || o.toLowerCase().includes(lower.split(' / ')[0]));
   return partial || '';
 }
+
+document.getElementById('agenda-detail-view-cr').addEventListener('click', async () => {
+  if(!currentAgendaRdv) return;
+  const rep = currentAgendaRdv._linkedReportFound || findLinkedReport(currentAgendaRdv);
+  if(!rep){ showToast('Compte-rendu introuvable', true); return; }
+  await showDetail(rep);
+});
 
 document.getElementById('agenda-detail-create-cr').addEventListener('click', async () => {
   if(!currentAgendaRdv) return;
@@ -6576,8 +6613,10 @@ function renderDetailContent(r, container){
   const statutColor = statutColors[r.statut] || '#778899';
   const statutLabel = STATUT_LABELS[r.statut] || r.statut || '';
 
+  // Dans la vue dossier (onglets), le nom du client est déjà affiché au-dessus des onglets :
+  // on n'affiche ici que la référence, la date et le statut pour éviter la répétition.
   const headerHtml = `
-    <div class="detail-title">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')}</div>
+    ${container ? '' : `<div class="detail-title">${escapeHtml(r.prenom||'')} ${escapeHtml(r.nom||'')}</div>`}
     <div class="detail-sub">${escapeHtml(r.ref||'')} · ${dateFmt}${r.heure ? ' à ' + escapeHtml(r.heure) : ''}</div>
     ${statutLabel ? `<div style="display:inline-flex;align-items:center;gap:0.3rem;background:${statutColor}22;color:${statutColor};font-size:0.72rem;font-weight:700;padding:0.25rem 0.7rem;border-radius:20px;margin-top:0.5rem;margin-bottom:1rem;">${escapeHtml(statutLabel)}</div>` : ''}
   `;
@@ -6814,13 +6853,32 @@ function renderDetailContent(r, container){
   }
 }
 
+// Un dossier a-t-il déjà un RDV "pose pièce" programmé (non annulé) ?
+async function hasScheduledPosePieceRdv(r){
+  if(!agendaRdvs.length){ try{ agendaRdvs = await loadAgendaFromSupabase(); }catch(e){} }
+  return agendaRdvs.some(rdv => {
+    if(rdv.type_rdv !== 'pose_piece' || rdv.statut === 'annule') return false;
+    const crLinkMatch = (rdv.note_technicien || '').match(/\[\[cr:([^\]]+)\]\]/);
+    if(crLinkMatch) return crLinkMatch[1] === r.id;
+    const memeClient = (r.client_id && rdv.client_id === r.client_id) || (r.tel && rdv.tel === r.tel);
+    const memeAppareil = (rdv.appareil || '') === (r.appareil || '');
+    return memeClient && memeAppareil;
+  });
+}
+
 async function showDetail(r){
   await ensureFullReportLoaded(r);
   currentDetailReport = r;
   renderDetailContent(r);
   showView('detail');
   document.getElementById('detail-pose-piece-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
-  document.getElementById('detail-rdv-pose-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
+  const rdvPoseBtn = document.getElementById('detail-rdv-pose-btn');
+  if(r.statut === 'Attente_piece'){
+    const dejaProgramme = await hasScheduledPosePieceRdv(r);
+    rdvPoseBtn.style.display = dejaProgramme ? 'none' : 'inline-flex';
+  } else {
+    rdvPoseBtn.style.display = 'none';
+  }
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
   document.getElementById('detail-email-btn').style.display = isTermine ? 'inline-flex' : 'none';
   document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
@@ -6833,7 +6891,11 @@ async function showDetail(r){
 }
 
 function updateTerminerButton(r){
-  const btn = document.getElementById('detail-email-btn');
+  applyTerminerStyle(document.getElementById('detail-email-btn'), r);
+}
+
+function applyTerminerStyle(btn, r){
+  if(!btn) return;
   if(r.documents_envoyes){
     btn.style.background = 'var(--green)';
     btn.style.borderColor = 'var(--green)';
@@ -6933,13 +6995,9 @@ document.getElementById('detail-avis-btn').addEventListener('click', () => {
   window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
 });
 
-document.getElementById('detail-email-btn').addEventListener('click', async () => {
-  if(!currentDetailReport) return;
-  const r = currentDetailReport;
-
+async function envoyerCrEtFacture(r, btn){
   if(!confirm('Confirmer l\'envoi du compte-rendu et de la facture au client ?')) return;
 
-  const btn = document.getElementById('detail-email-btn');
   const originalText = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Envoi…';
@@ -6953,6 +7011,7 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
       if(idx !== -1) reports[idx].documents_envoyes = true;
       saveReportToSupabase(r);
       updateTerminerButton(r);
+      applyTerminerStyle(btn, r);
     }
   }catch(e){
     console.error('Erreur envoi compte-rendu/facture :', e);
@@ -6960,6 +7019,11 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
   }
   btn.disabled = false;
   btn.textContent = originalText;
+}
+
+document.getElementById('detail-email-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  await envoyerCrEtFacture(currentDetailReport, document.getElementById('detail-email-btn'));
 });
 
 // Brouillon auto-sauvegardé en local uniquement (localStorage), au départ du formulaire
@@ -7601,6 +7665,7 @@ document.getElementById('pose-piece-paiement-especes').addEventListener('input',
 
 document.getElementById('detail-pose-piece-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
+  window._posePieceReturnToDossier = false;
   posePieceRows = (Array.isArray(currentDetailReport.piecesPosees) && currentDetailReport.piecesPosees.length)
     ? currentDetailReport.piecesPosees.map(p => newPosePieceRow(p))
     : (currentDetailReport.pieceDeposeNom
@@ -7675,7 +7740,12 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   document.getElementById('pose-piece-modal').style.display = 'none';
   btn.disabled = false;
   btn.textContent = 'Valider ✓';
-  showDetail(currentDetailReport);
+  if(window._posePieceReturnToDossier && currentDossierRapports.length){
+    showView('dossier');
+    renderDossierView();
+  } else {
+    showDetail(currentDetailReport);
+  }
 });
 
 // ==================== AVIS CLIENTS — LIGNES MULTIPLES ====================
@@ -8375,17 +8445,29 @@ async function renderDossierAppareilContent(r){
   el.innerHTML = '';
   // Boutons actions
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
+  const dejaProgrammePose = r.statut === 'Attente_piece' ? await hasScheduledPosePieceRdv(r) : false;
   const actionsDiv = document.createElement('div');
   actionsDiv.style.cssText = 'display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.8rem;';
   actionsDiv.innerHTML = `
     <button class="btn btn-primary doss-edit-btn" style="flex:1;min-width:120px;">✏️ Modifier</button>
+    <button class="btn btn-outline doss-documents-btn" style="flex:1;min-width:120px;">📄 Documents</button>
+    <button class="btn btn-outline doss-email-btn" style="flex:1;min-width:160px;">✅ Envoyer CR+Facture</button>
     <button class="btn btn-secondary doss-sms-btn">💬 J'arrive</button>
     <button class="btn btn-secondary doss-avis-btn">⭐ Avis</button>
-    ${r.statut === 'Attente_piece' ? '<button class="btn btn-secondary doss-pose-btn">🔧 Poser la pièce</button>' : ''}
     ${isTermine ? '<button class="btn btn-outline doss-archiver-btn" style="font-size:0.82rem;">📦 Archiver</button>' : ''}
     ${r.statut === 'archivé' ? '<button class="btn btn-outline doss-sav-btn" style="border-color:#e0584f;color:#e0584f;">🛠️ Rouvrir SAV</button>' : ''}
   `;
   el.appendChild(actionsDiv);
+
+  if(r.statut === 'Attente_piece'){
+    const posePieceDiv = document.createElement('div');
+    posePieceDiv.style.cssText = 'display:flex;flex-direction:column;gap:0.6rem;margin-bottom:0.8rem;';
+    posePieceDiv.innerHTML = `
+      <button class="btn btn-secondary doss-pose-btn" style="width:100%;font-size:1rem;font-weight:700;padding:0.85rem 1rem;box-shadow:0 4px 14px rgba(26,115,200,0.35);letter-spacing:0.01em;">🔧 Poser la pièce</button>
+      ${!dejaProgrammePose ? '<button class="btn btn-outline doss-rdv-pose-btn" style="font-size:0.82rem;">📅 RDV pose pièce</button>' : ''}
+    `;
+    el.appendChild(posePieceDiv);
+  }
 
   // Attacher les events
   actionsDiv.querySelector('.doss-edit-btn')?.addEventListener('click', () => {
@@ -8396,6 +8478,17 @@ async function renderDossierAppareilContent(r){
     loadIntoForm(r);
     goToStep(1);
   });
+  actionsDiv.querySelector('.doss-documents-btn')?.addEventListener('click', () => {
+    currentDetailReport = r;
+    updateFactureButtons(r);
+    updateDevisButtons(r);
+    document.getElementById('documents-modal').style.display = 'flex';
+  });
+  actionsDiv.querySelector('.doss-email-btn')?.addEventListener('click', async (e) => {
+    currentDetailReport = r;
+    await envoyerCrEtFacture(r, e.currentTarget);
+  });
+  applyTerminerStyle(actionsDiv.querySelector('.doss-email-btn'), r);
   actionsDiv.querySelector('.doss-sms-btn')?.addEventListener('click', () => {
     currentDetailReport = r; sendSMSArrivee(r);
   });
@@ -8405,8 +8498,9 @@ async function renderDossierAppareilContent(r){
     const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
     window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
   });
-  actionsDiv.querySelector('.doss-pose-btn')?.addEventListener('click', () => {
+  el.querySelector('.doss-pose-btn')?.addEventListener('click', () => {
     currentDetailReport = r;
+    window._posePieceReturnToDossier = true;
     posePieceRows = (Array.isArray(r.piecesPosees) && r.piecesPosees.length)
       ? r.piecesPosees.map(p => newPosePieceRow(p))
       : (r.pieceDeposeNom ? [newPosePieceRow({ nom: r.pieceDeposeNom, ref: r.pieceDeposeRef || '' })] : [newPosePieceRow()]);
@@ -8415,6 +8509,10 @@ async function renderDossierAppareilContent(r){
     posePiecePhotos = [];
     renderPosePiecePhotoGrid();
     document.getElementById('pose-piece-modal').style.display = 'flex';
+  });
+  el.querySelector('.doss-rdv-pose-btn')?.addEventListener('click', () => {
+    currentDetailReport = r;
+    document.getElementById('detail-rdv-pose-btn').click();
   });
   actionsDiv.querySelector('.doss-archiver-btn')?.addEventListener('click', async () => {
     currentDetailReport = r;
@@ -8641,7 +8739,8 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
   document.getElementById('newrdv-panne').value = r.panne || '';
-  document.getElementById('newrdv-note').value = `Référence dossier : ${r.reference||r.app_id||''}. Pose pièce.`;
+  document.getElementById('newrdv-note').value = `Référence dossier : ${r.ref||''}. Pose pièce.[[cr:${r.id}]]`;
+  window._newRdvLinkedReportId = r.id;
 
   document.querySelector('#view-agenda-new h2').textContent = 'RDV Pose pièce';
   document.getElementById('newrdv-save-btn').textContent = 'Enregistrer le rendez-vous';
