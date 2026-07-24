@@ -1058,7 +1058,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
         <button class="btn btn-primary" id="detail-edit" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✏️ Modifier</button>
         <button class="btn btn-outline" id="detail-documents-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">📄 Documents</button>
-        <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">📧 Email</button>
+        <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✅ Terminer</button>
       </div>
 
       <!-- Actions contextuelles (visibles seulement quand pertinentes) -->
@@ -1434,7 +1434,7 @@
       <div class="actions">
         <button class="btn btn-primary" id="save-btn" style="display:none;">Enregistrer</button>
         <button class="btn btn-secondary" id="pdf-btn">📄 Exporter en PDF</button>
-        <button class="btn btn-outline" id="email-btn">📧 Envoyer au client par email</button>
+        <button class="btn btn-outline" id="email-btn">✅ Terminer et envoyer (CR + facture)</button>
       </div>
     </div>
 
@@ -3618,6 +3618,83 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   doc.text('Réparer, c\'est notre nature.', W/2, Math.max(y + 8, 285), {align:'center'});
 
   return doc;
+}
+
+// Génère et enregistre une facture pour ce dossier. Retourne {numero, montant_total, pdf_base64, app_id} ou null si aucun montant.
+async function genererFacturePourDossier(r){
+  const lignes = buildFactureLignes(r);
+  if(!lignes.length) return null;
+  const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
+  const { annee, sequence, numero } = await getNextFactureNumero();
+  const dateEmission = todayISO();
+
+  const doc = generateFacturePdf(r, numero, lignes, montantTotal, dateEmission);
+  const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+  const factureAppId = 'fact_' + Date.now();
+  const { error } = await sb.from('factures').insert({
+    app_id: factureAppId,
+    numero, annee, sequence,
+    date_emission: dateEmission,
+    date_prestation: r.date || null,
+    rapport_app_id: r.id,
+    client_nom: r.nom || '',
+    client_prenom: r.prenom || '',
+    client_adresse: r.adresse || '',
+    client_cp: r.cp || '',
+    client_ville: r.ville || '',
+    lignes: JSON.stringify(lignes),
+    montant_total: montantTotal,
+    mode_paiement: r['paiement-moyen'] || '',
+    pdf_base64: pdfBase64
+  });
+  if(error) throw error;
+
+  facturesLight.push({ app_id: factureAppId, numero, rapport_app_id: r.id, annee, sequence });
+  return { app_id: factureAppId, numero, montant_total: montantTotal, pdf_base64: pdfBase64 };
+}
+
+// Récupère la facture existante d'un dossier, ou en génère une nouvelle si aucune n'existe encore.
+async function getOuGenererFacture(r){
+  const existante = facturesLight.find(f => f.rapport_app_id === r.id);
+  if(existante){
+    const { data, error } = await sb.from('factures').select('app_id,numero,montant_total,pdf_base64').eq('app_id', existante.app_id).single();
+    if(error) throw error;
+    return data;
+  }
+  return await genererFacturePourDossier(r);
+}
+
+// Envoie le compte-rendu ET la facture au client, l'un après l'autre.
+// Génère la facture si elle n'existe pas encore. Ne fait rien tant que le dossier n'est pas terminé.
+async function terminerEtEnvoyer(r){
+  if(!['Terminée','Non_reparable'].includes(r.statut)){
+    showToast('Le dossier doit être marqué "Terminée" avant de pouvoir envoyer', true);
+    return false;
+  }
+  const emailCible = await getEmailAJour(r);
+  if(!emailCible){ showToast('Email du client manquant', true); return false; }
+
+  // 1. Compte-rendu
+  const pdfBytes = await generatePdfFor(r, 'email');
+  const pdfBase64Cr = arrayBufferToBase64(pdfBytes);
+  const { error: crError } = await sb.functions.invoke('send-compte-rendu', {
+    body: {
+      email: emailCible, nom: r.nom, prenom: r.prenom, appareil: r.appareil, ref: r.ref,
+      pdf_base64: pdfBase64Cr, include_conseils: !!r['conseils-entretien']
+    }
+  });
+  if(crError) throw crError;
+
+  // 2. Facture (génère si besoin)
+  const facture = await getOuGenererFacture(r);
+  if(facture){
+    const { error: factError } = await sb.functions.invoke('send-facture', {
+      body: { email: emailCible, nom: r.nom, prenom: r.prenom, numero: facture.numero, montant: facture.montant_total, pdf_base64: facture.pdf_base64 }
+    });
+    if(factError) throw factError;
+  }
+  return true;
 }
 
 document.getElementById('generer-facture-btn').addEventListener('click', async () => {
@@ -5953,6 +6030,13 @@ const fieldIds = [
 ];
 const checkboxIds = ['f-besoin-piece','f-commande-piece','f-garantie','f-conseils-entretien'];
 
+function updateEmailBtnVisibility(){
+  const statut = document.getElementById('f-statut').value;
+  const emailBtn = document.getElementById('email-btn');
+  if(emailBtn) emailBtn.style.display = ['Terminée','Non_reparable'].includes(statut) ? 'inline-flex' : 'none';
+}
+document.getElementById('f-statut').addEventListener('change', updateEmailBtnVisibility);
+
 function resetForm(){
   fieldIds.forEach(id => document.getElementById(id).value = '');
   checkboxIds.forEach(id => document.getElementById(id).checked = false);
@@ -5981,6 +6065,7 @@ function resetForm(){
   renderCommandePieceRows();
   currentId = null;
   document.getElementById('ref-display').textContent = generateRef();
+  updateEmailBtnVisibility();
 }
 
 async function loadIntoForm(report){
@@ -6027,6 +6112,7 @@ async function loadIntoForm(report){
   renderStockPiecesSelectedList();
   setPieceMode((report['commande-piece'] || selectedStockPieces.length) ? (report['commande-piece'] ? 'commande' : 'stock') : 'stock');
   document.getElementById('f-paiement-statut').disabled = !!report.garantie;
+  updateEmailBtnVisibility();
 }
 
 function collectFormData(){
@@ -6174,8 +6260,8 @@ function buildMessage(data){
 
 document.getElementById('email-btn').addEventListener('click', async () => {
   const formData = collectFormData();
-  if(!formData.email){
-    showToast('Email du client manquant', true);
+  if(!['Terminée','Non_reparable'].includes(formData.statut)){
+    showToast('Le dossier doit être marqué "Terminée" avant de pouvoir envoyer', true);
     return;
   }
 
@@ -6184,35 +6270,19 @@ document.getElementById('email-btn').addEventListener('click', async () => {
   btn.textContent = 'Enregistrement…';
 
   const data = await saveCurrentReport();
-  if(!data){ btn.disabled = false; btn.textContent = '📧 Envoyer au client par email'; return; }
+  if(!data){ btn.disabled = false; btn.textContent = '✅ Terminer et envoyer (CR + facture)'; return; }
 
   btn.textContent = 'Envoi en cours…';
 
   try{
-    const emailCible = await getEmailAJour(data);
-    if(!emailCible){ showToast('Email du client manquant', true); btn.disabled = false; btn.textContent = '📧 Envoyer au client par email'; return; }
-    const pdfBytes = await generatePdfFor(data, 'email');
-    const pdfBase64 = arrayBufferToBase64(pdfBytes);
-
-    const { error } = await sb.functions.invoke('send-compte-rendu', {
-      body: {
-        email: emailCible,
-        nom: data.nom,
-        prenom: data.prenom,
-        appareil: data.appareil,
-        ref: data.ref,
-        pdf_base64: pdfBase64,
-        include_conseils: !!data['conseils-entretien']
-      }
-    });
-    if(error) throw error;
-    showToast('Compte-rendu enregistré et envoyé au client ✓');
+    const ok = await terminerEtEnvoyer(data);
+    if(ok) showToast('Compte-rendu et facture enregistrés et envoyés au client ✓');
   }catch(e){
-    console.error('Erreur envoi compte-rendu :', e);
+    console.error('Erreur envoi compte-rendu/facture :', e);
     showToast('Enregistré, mais échec de l\'envoi : ' + (e.message || 'voir console'), true);
   }
   btn.disabled = false;
-  btn.textContent = '📧 Envoyer au client par email';
+  btn.textContent = '✅ Terminer et envoyer (CR + facture)';
 });
 
 
@@ -6738,6 +6808,7 @@ async function showDetail(r){
   document.getElementById('detail-pose-piece-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
   document.getElementById('detail-rdv-pose-btn').style.display = (r.statut === 'Attente_piece') ? 'inline-flex' : 'none';
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
+  document.getElementById('detail-email-btn').style.display = isTermine ? 'inline-flex' : 'none';
   document.getElementById('detail-archiver-btn').style.display = isTermine ? 'inline-flex' : 'none';
   document.getElementById('detail-rouvrir-sav-btn').style.display = ['Terminée','Non_reparable','archivé'].includes(r.statut) ? 'inline-flex' : 'none';
   document.getElementById('attestation-btn').style.display = r.statut === 'Non_reparable' ? 'inline-flex' : 'none';
@@ -6837,33 +6908,17 @@ document.getElementById('detail-avis-btn').addEventListener('click', () => {
 document.getElementById('detail-email-btn').addEventListener('click', async () => {
   if(!currentDetailReport) return;
   const r = currentDetailReport;
-  const emailCible = await getEmailAJour(r);
-  if(!emailCible){ showToast('Email du client manquant', true); return; }
 
   const btn = document.getElementById('detail-email-btn');
   const originalText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Envoi en cours…';
+  btn.textContent = 'Envoi…';
 
   try{
-    const pdfBytes = await generatePdfFor(r, 'email');
-    const pdfBase64 = arrayBufferToBase64(pdfBytes);
-
-    const { error } = await sb.functions.invoke('send-compte-rendu', {
-      body: {
-        email: emailCible,
-        nom: r.nom,
-        prenom: r.prenom,
-        appareil: r.appareil,
-        ref: r.ref,
-        pdf_base64: pdfBase64,
-        include_conseils: !!r['conseils-entretien']
-      }
-    });
-    if(error) throw error;
-    showToast('Compte-rendu envoyé au client par email ✓');
+    const ok = await terminerEtEnvoyer(r);
+    if(ok) showToast('Compte-rendu et facture envoyés au client ✓');
   }catch(e){
-    console.error('Erreur envoi compte-rendu :', e);
+    console.error('Erreur envoi compte-rendu/facture :', e);
     showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
   }
   btn.disabled = false;
