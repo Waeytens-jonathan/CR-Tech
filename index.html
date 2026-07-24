@@ -3964,10 +3964,25 @@ function updateDevisButtons(r){
   envoyerBtn.style.display = existant ? 'inline-flex' : 'none';
 }
 
+// Récupère l'email le plus à jour : celui de la fiche client si le dossier y est lié,
+// sinon celui enregistré directement sur le compte-rendu (repli).
+async function getEmailAJour(r){
+  if(r.client_id){
+    try{
+      const { data, error } = await sb.from(CLIENTS_TABLE).select('email').eq('app_id', r.client_id).single();
+      if(!error && data && data.email) return data.email;
+    }catch(e){
+      console.error('Erreur récupération email client :', e);
+    }
+  }
+  return r.email || '';
+}
+
 document.getElementById('envoyer-facture-btn').addEventListener('click', async () => {
   if(!currentDetailReport) return;
   const r = currentDetailReport;
-  if(!r.email){ showToast('Email du client manquant', true); return; }
+  const emailCible = await getEmailAJour(r);
+  if(!emailCible){ showToast('Email du client manquant', true); return; }
   const existante = facturesLight.find(f => f.rapport_app_id === r.id);
   if(!existante){ showToast('Générez d\'abord la facture', true); return; }
 
@@ -3981,7 +3996,7 @@ document.getElementById('envoyer-facture-btn').addEventListener('click', async (
 
     const { error: sendError } = await sb.functions.invoke('send-facture', {
       body: {
-        email: r.email,
+        email: emailCible,
         nom: r.nom,
         prenom: r.prenom,
         numero: data.numero,
@@ -4002,7 +4017,8 @@ document.getElementById('envoyer-facture-btn').addEventListener('click', async (
 document.getElementById('envoyer-devis-btn').addEventListener('click', async () => {
   if(!currentDetailReport) return;
   const r = currentDetailReport;
-  if(!r.email){ showToast('Email du client manquant', true); return; }
+  const emailCible = await getEmailAJour(r);
+  if(!emailCible){ showToast('Email du client manquant', true); return; }
   const existant = devisLight.find(d => d.rapport_app_id === r.id);
   if(!existant){ showToast('Générez d\'abord le devis', true); return; }
 
@@ -4016,7 +4032,7 @@ document.getElementById('envoyer-devis-btn').addEventListener('click', async () 
 
     const { error: sendError } = await sb.functions.invoke('send-devis', {
       body: {
-        email: r.email,
+        email: emailCible,
         nom: r.nom,
         prenom: r.prenom,
         numero: data.numero,
@@ -6173,12 +6189,14 @@ document.getElementById('email-btn').addEventListener('click', async () => {
   btn.textContent = 'Envoi en cours…';
 
   try{
+    const emailCible = await getEmailAJour(data);
+    if(!emailCible){ showToast('Email du client manquant', true); btn.disabled = false; btn.textContent = '📧 Envoyer au client par email'; return; }
     const pdfBytes = await generatePdfFor(data, 'email');
     const pdfBase64 = arrayBufferToBase64(pdfBytes);
 
     const { error } = await sb.functions.invoke('send-compte-rendu', {
       body: {
-        email: data.email,
+        email: emailCible,
         nom: data.nom,
         prenom: data.prenom,
         appareil: data.appareil,
@@ -6819,7 +6837,8 @@ document.getElementById('detail-avis-btn').addEventListener('click', () => {
 document.getElementById('detail-email-btn').addEventListener('click', async () => {
   if(!currentDetailReport) return;
   const r = currentDetailReport;
-  if(!r.email){ showToast('Email du client manquant', true); return; }
+  const emailCible = await getEmailAJour(r);
+  if(!emailCible){ showToast('Email du client manquant', true); return; }
 
   const btn = document.getElementById('detail-email-btn');
   const originalText = btn.textContent;
@@ -6832,7 +6851,7 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
 
     const { error } = await sb.functions.invoke('send-compte-rendu', {
       body: {
-        email: r.email,
+        email: emailCible,
         nom: r.nom,
         prenom: r.prenom,
         appareil: r.appareil,
