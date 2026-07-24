@@ -1058,7 +1058,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
         <button class="btn btn-primary" id="detail-edit" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✏️ Modifier</button>
         <button class="btn btn-outline" id="detail-documents-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">📄 Documents</button>
-        <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✅ Terminer</button>
+        <button class="btn btn-outline" id="detail-email-btn" style="font-size:0.82rem;padding:0.5rem 0.4rem;">✅ Envoyer CR+Facture</button>
       </div>
 
       <!-- Actions contextuelles (visibles seulement quand pertinentes) -->
@@ -1079,6 +1079,8 @@
         <button id="documents-modal-close" class="btn btn-outline" style="padding:0.3rem 0.7rem;">✕</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        <button class="btn btn-outline" id="telecharger-cr-btn" style="width:100%;">📋 Télécharger le compte-rendu</button>
+        <hr style="border:none;border-top:1px solid var(--border);width:100%;margin:0.3rem 0;">
         <button class="btn btn-primary" id="generer-facture-btn" style="display:none;width:100%;">🧾 Générer la facture</button>
         <button class="btn btn-outline" id="voir-facture-btn" style="display:none;width:100%;">🧾 Voir la facture</button>
         <button class="btn btn-outline" id="envoyer-facture-btn" style="display:none;width:100%;">📧 Envoyer la facture</button>
@@ -2042,6 +2044,7 @@ function reportToRow(r){
   if(r['livraison']) extra.livraison = r['livraison'];
   if(r['acompte-montant']) extra.acompte_montant = r['acompte-montant'];
   if(r._draftStep !== undefined) extra._draftStep = r._draftStep;
+  if(r.documents_envoyes) extra.documents_envoyes = true;
   if(Object.keys(extra).length){
     row.notes = (row.notes ? row.notes + '\n' : '') + '[meta]' + JSON.stringify(extra);
   }
@@ -2100,6 +2103,7 @@ function rowToReport(row){
     'paiement-statut': row.paiement_statue,
     'reste-encaisser': row.reste_encaisser,
     'acompte-montant': extra.acompte_montant || '',
+    documents_envoyes: !!extra.documents_envoyes,
     'paiement-moyen': row.mode_paiement,
     'paiement-especes': row.paiement_especes || '',
     'paiement-carte': row.paiement_carte || '',
@@ -3770,6 +3774,16 @@ document.getElementById('apercu-test-facture-btn').addEventListener('click', () 
   }catch(e){
     console.error('Erreur aperçu test facture :', e);
     showToast('Erreur lors de la génération de l\'aperçu', true);
+  }
+});
+
+document.getElementById('telecharger-cr-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  try{
+    await generatePdfFor(currentDetailReport);
+  }catch(e){
+    console.error('Erreur génération PDF compte-rendu :', e);
+    showToast('Erreur lors de la génération du compte-rendu', true);
   }
 });
 
@@ -6814,7 +6828,21 @@ async function showDetail(r){
   document.getElementById('attestation-btn').style.display = r.statut === 'Non_reparable' ? 'inline-flex' : 'none';
   updateFactureButtons(r);
   updateDevisButtons(r);
+  updateTerminerButton(r);
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function updateTerminerButton(r){
+  const btn = document.getElementById('detail-email-btn');
+  if(r.documents_envoyes){
+    btn.style.background = 'var(--green)';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = '#0d1b2a';
+  } else {
+    btn.style.background = 'var(--orange)';
+    btn.style.borderColor = 'var(--orange)';
+    btn.style.color = 'var(--navy)';
+  }
 }
 
 document.getElementById('detail-back').addEventListener('click', () => {
@@ -6909,6 +6937,8 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
   if(!currentDetailReport) return;
   const r = currentDetailReport;
 
+  if(!confirm('Confirmer l\'envoi du compte-rendu et de la facture au client ?')) return;
+
   const btn = document.getElementById('detail-email-btn');
   const originalText = btn.textContent;
   btn.disabled = true;
@@ -6916,7 +6946,14 @@ document.getElementById('detail-email-btn').addEventListener('click', async () =
 
   try{
     const ok = await terminerEtEnvoyer(r);
-    if(ok) showToast('Compte-rendu et facture envoyés au client ✓');
+    if(ok){
+      showToast('Compte-rendu et facture envoyés au client ✓');
+      r.documents_envoyes = true;
+      const idx = reports.findIndex(rep => rep.id === r.id);
+      if(idx !== -1) reports[idx].documents_envoyes = true;
+      saveReportToSupabase(r);
+      updateTerminerButton(r);
+    }
   }catch(e){
     console.error('Erreur envoi compte-rendu/facture :', e);
     showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
