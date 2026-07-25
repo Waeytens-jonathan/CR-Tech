@@ -1786,6 +1786,9 @@
       <input type="text" id="sav-motif-autre" placeholder="Précisez le motif" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
     </div>
 
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Problème signalé par le client</label>
+    <textarea id="sav-probleme-text" rows="3" placeholder="Ex : le lave-linge s'arrête en plein cycle depuis hier…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:1rem;resize:vertical;"></textarea>
+
     <label style="font-size:0.85rem;display:block;margin-bottom:0.5rem;">Comment récupérer l'appareil ?</label>
     <div style="display:flex;flex-direction:column;gap:0.6rem;">
       <button class="btn btn-outline" id="sav-choix-depot-btn" style="width:100%;padding:0.8rem;text-align:left;">📥 Le client me le ramène (bon de dépôt)</button>
@@ -2048,6 +2051,9 @@ function reportToRow(r){
   if(r['acompte-montant']) extra.acompte_montant = r['acompte-montant'];
   if(r._draftStep !== undefined) extra._draftStep = r._draftStep;
   if(r.documents_envoyes) extra.documents_envoyes = true;
+  if(r.sav_probleme) extra.sav_probleme = r.sav_probleme;
+  if(r.sav_resolution) extra.sav_resolution = r.sav_resolution;
+  if(r.sav_piece) extra.sav_piece = r.sav_piece;
   if(Object.keys(extra).length){
     row.notes = (row.notes ? row.notes + '\n' : '') + '[meta]' + JSON.stringify(extra);
   }
@@ -2107,6 +2113,9 @@ function rowToReport(row){
     'reste-encaisser': row.reste_encaisser,
     'acompte-montant': extra.acompte_montant || '',
     documents_envoyes: !!extra.documents_envoyes,
+    sav_probleme: extra.sav_probleme || '',
+    sav_resolution: extra.sav_resolution || '',
+    sav_piece: extra.sav_piece || null,
     'paiement-moyen': row.mode_paiement,
     'paiement-especes': row.paiement_especes || '',
     'paiement-carte': row.paiement_carte || '',
@@ -4201,6 +4210,12 @@ document.getElementById('depot-detail-sms-btn').addEventListener('click', () => 
   window.location.href = `sms:${tel}?body=${encodeURIComponent(message)}`;
 });
 
+// Extrait le texte "Problème signalé par le client" du champ description/panne combiné
+function extractSavProbleme(texte){
+  const m = (texte || '').match(/Problème signalé par le client\s*:\s*([\s\S]*)$/);
+  return m ? m[1].trim() : '';
+}
+
 document.getElementById('depot-detail-create-cr').addEventListener('click', () => {
   if(!currentDepot) return;
   const d = currentDepot;
@@ -4221,6 +4236,7 @@ document.getElementById('depot-detail-create-cr').addEventListener('click', () =
   if(d.is_sav && d.sav_parent_app_id){
     window._creatingSavParentAppId = d.sav_parent_app_id;
     window._creatingSavRaison = d.sav_raison || '';
+    window._creatingSavProbleme = extractSavProbleme(d.description);
   }
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -4403,6 +4419,25 @@ function findLinkedReport(r){
   return rep || null;
 }
 
+// Ouvre la vue simple si le dossier n'a qu'un appareil, sinon la vue à onglets
+// (multi-appareils), directement sur l'onglet correspondant à ce rapport.
+async function openReportOrDossier(rep){
+  if(rep.dossier_id){
+    const group = reports.filter(r2 => !r2._isDraft && r2.dossier_id === rep.dossier_id);
+    if(group.length > 1){
+      await Promise.all(group.map(r2 => ensureFullReportLoaded(r2)));
+      showDossier(group);
+      const idx = group.findIndex(r2 => r2.id === rep.id);
+      if(idx > -1 && idx !== activeDossierTabIdx){
+        activeDossierTabIdx = idx;
+        renderDossierView();
+      }
+      return;
+    }
+  }
+  await showDetail(rep);
+}
+
 function showAgendaDetail(appId){
   const r = agendaRdvs.find(x => x.app_id === appId);
   if(!r) return;
@@ -4518,7 +4553,7 @@ document.getElementById('agenda-detail-view-cr').addEventListener('click', async
   if(!currentAgendaRdv) return;
   const rep = currentAgendaRdv._linkedReportFound || findLinkedReport(currentAgendaRdv);
   if(!rep){ showToast('Compte-rendu introuvable', true); return; }
-  await showDetail(rep);
+  await openReportOrDossier(rep);
 });
 
 document.getElementById('agenda-detail-create-cr').addEventListener('click', async () => {
@@ -4540,6 +4575,7 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
   if(r.is_sav && r.sav_parent_app_id){
     window._creatingSavParentAppId = r.sav_parent_app_id;
     window._creatingSavRaison = r.sav_raison || '';
+    window._creatingSavProbleme = extractSavProbleme(r.panne);
   }
   document.getElementById('f-nom').value = r.nom || '';
   document.getElementById('f-prenom').value = r.prenom || '';
@@ -6199,8 +6235,10 @@ async function saveCurrentReport(){
     data.is_sav = true;
     data.parent_app_id = window._creatingSavParentAppId;
     data.sav_raison = window._creatingSavRaison || '';
+    data.sav_probleme = window._creatingSavProbleme || '';
     window._creatingSavParentAppId = null;
     window._creatingSavRaison = null;
+    window._creatingSavProbleme = null;
   }
   if(currentId){
     const idx = reports.findIndex(r => r.id === currentId);
@@ -6631,14 +6669,44 @@ function renderDetailContent(r, container){
     html += headerHtml;
   }
 
-  // ---------- Bandeau SAV (côté intervention de suivi) ----------
+  // ---------- Fiche SAV (côté intervention de suivi) ----------
   if(r.is_sav && r.parent_app_id){
     const parent = reports.find(x => (x.app_id||x.id) === r.parent_app_id);
     const parentDateFmt = parent && parent.date ? new Date(parent.date).toLocaleDateString('fr-FR') : '';
-    html += `<div style="background:rgba(224,88,79,0.1);border:1px solid #e0584f;border-radius:10px;padding:0.8rem 1rem;margin:0.8rem 0;font-size:0.85rem;">
-      <strong style="color:#e0584f;">🛠️ SAV${r.sav_raison ? ' — ' + escapeHtml(r.sav_raison) : ''}</strong><br>
-      ${parent ? `Suite de l'intervention du ${parentDateFmt}` : 'Intervention d\'origine introuvable'}
-      ${parent ? `<button class="btn btn-outline" id="voir-dossier-origine-btn" data-parent-id="${escapeHtml(r.parent_app_id)}" style="margin-left:0.6rem;padding:0.2rem 0.6rem;font-size:0.78rem;">Voir le dossier d'origine</button>` : ''}
+    const sp = r.sav_piece || null;
+    html += `<div style="background:rgba(224,88,79,0.08);border:1px solid #e0584f;border-radius:10px;padding:1rem;margin:0.8rem 0;">
+      <h3 style="margin:0 0 0.5rem;color:#e0584f;">🛠️ Fiche SAV${r.sav_raison ? ' — ' + escapeHtml(r.sav_raison) : ''}</h3>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.8rem;">
+        ${parent ? `Suite de l'intervention du ${parentDateFmt}` : 'Intervention d\'origine introuvable'}
+        ${parent ? `<button class="btn btn-outline voir-dossier-origine-btn" data-parent-id="${escapeHtml(r.parent_app_id)}" style="margin-left:0.6rem;padding:0.2rem 0.6rem;font-size:0.78rem;">Voir le dossier d'origine</button>` : ''}
+      </div>
+
+      <div style="margin-bottom:0.8rem;">
+        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted);margin-bottom:0.25rem;">Problème signalé par le client</div>
+        <div style="white-space:pre-wrap;font-size:0.9rem;">${r.sav_probleme ? escapeHtml(r.sav_probleme) : '—'}</div>
+      </div>
+
+      <div class="field" style="margin-bottom:0.8rem;">
+        <label>Résolution apportée</label>
+        <textarea id="sav-resolution-text" rows="3" placeholder="Ce qui a été fait pour résoudre le problème…" style="width:100%;box-sizing:border-box;">${escapeHtml(r.sav_resolution||'')}</textarea>
+      </div>
+
+      <div style="margin-bottom:0.8rem;">
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.6rem;cursor:pointer;">
+          <input type="checkbox" id="sav-piece-toggle" ${sp ? 'checked' : ''}> Pièce remplacée sous SAV
+        </label>
+        <div id="sav-piece-fields" style="display:${sp ? 'flex' : 'none'};flex-direction:column;gap:0.5rem;">
+          <input id="sav-piece-nom" placeholder="Nom de la pièce" value="${escapeHtml(sp?.nom||'')}" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          <input id="sav-piece-ref" placeholder="Référence" value="${escapeHtml(sp?.ref||'')}" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          <select id="sav-piece-facturee" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+            <option value="non" ${!sp?.facturee ? 'selected' : ''}>Sous garantie (gratuit)</option>
+            <option value="oui" ${sp?.facturee ? 'selected' : ''}>Facturée</option>
+          </select>
+          <input id="sav-piece-cout" type="number" step="0.01" placeholder="Coût facturé (€)" value="${sp?.cout||''}" style="display:${sp?.facturee ? 'block' : 'none'};width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="sav-fiche-save-btn" style="width:100%;">Enregistrer la fiche SAV</button>
     </div>`;
   }
 
@@ -6649,7 +6717,13 @@ function renderDetailContent(r, container){
       <strong style="color:#e0584f;">🛠️ ${savEnfants.length} intervention${savEnfants.length>1?'s':''} SAV liée${savEnfants.length>1?'s':''}</strong>`;
     savEnfants.forEach(enfant => {
       const enfantDateFmt = enfant.date ? new Date(enfant.date).toLocaleDateString('fr-FR') : '';
-      html += `<div style="margin-top:0.4rem;"><button class="btn btn-outline voir-sav-enfant-btn" data-enfant-id="${escapeHtml(enfant.app_id||enfant.id)}" style="padding:0.2rem 0.6rem;font-size:0.78rem;">${enfantDateFmt} — ${escapeHtml(enfant.sav_raison||'SAV')}</button></div>`;
+      const enfantPieceLabel = enfant.sav_piece ? ` · 🔧 ${escapeHtml(enfant.sav_piece.nom||'pièce')}${enfant.sav_piece.facturee ? ' (facturée)' : ' (garantie)'}` : '';
+      html += `<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(224,88,79,0.25);">
+        <button class="btn btn-outline voir-sav-enfant-btn" data-enfant-id="${escapeHtml(enfant.app_id||enfant.id)}" style="padding:0.2rem 0.6rem;font-size:0.78rem;margin-bottom:0.35rem;">${enfantDateFmt} — ${escapeHtml(enfant.sav_raison||'SAV')}</button>
+        ${enfant.sav_probleme ? `<div style="font-size:0.8rem;margin-top:0.2rem;"><span style="color:var(--text-muted);">Problème :</span> ${escapeHtml(enfant.sav_probleme)}</div>` : ''}
+        ${enfant.sav_resolution ? `<div style="font-size:0.8rem;margin-top:0.15rem;"><span style="color:var(--text-muted);">Résolution :</span> ${escapeHtml(enfant.sav_resolution)}</div>` : ''}
+        ${enfantPieceLabel ? `<div style="font-size:0.8rem;margin-top:0.15rem;">${enfantPieceLabel}</div>` : ''}
+      </div>`;
     });
     html += `</div>`;
   }
@@ -6796,8 +6870,8 @@ function renderDetailContent(r, container){
 
   c.innerHTML = html;
 
-  document.getElementById('voir-dossier-origine-btn')?.addEventListener('click', (e) => {
-    const parentId = e.target.dataset.parentId;
+  c.querySelector('.voir-dossier-origine-btn')?.addEventListener('click', (e) => {
+    const parentId = e.currentTarget.dataset.parentId;
     const parent = reports.find(x => (x.app_id||x.id) === parentId);
     if(parent) showDetail(parent);
   });
@@ -6808,6 +6882,42 @@ function renderDetailContent(r, container){
       if(enfant) showDetail(enfant);
     });
   });
+
+  // ---------- Fiche SAV : toggles et sauvegarde ----------
+  const savPieceToggle = c.querySelector('#sav-piece-toggle');
+  if(savPieceToggle){
+    savPieceToggle.addEventListener('change', () => {
+      c.querySelector('#sav-piece-fields').style.display = savPieceToggle.checked ? 'flex' : 'none';
+    });
+    c.querySelector('#sav-piece-facturee')?.addEventListener('change', (e) => {
+      c.querySelector('#sav-piece-cout').style.display = e.target.value === 'oui' ? 'block' : 'none';
+    });
+  }
+  const savFicheSaveBtn = c.querySelector('#sav-fiche-save-btn');
+  if(savFicheSaveBtn){
+    savFicheSaveBtn.addEventListener('click', () => {
+      const idx = reports.findIndex(rep => rep.id === r.id);
+      if(idx === -1){ showToast('Compte-rendu introuvable', true); return; }
+      const resolution = c.querySelector('#sav-resolution-text').value.trim();
+      const pieceActive = c.querySelector('#sav-piece-toggle').checked;
+      let sav_piece = null;
+      if(pieceActive){
+        const facturee = c.querySelector('#sav-piece-facturee').value === 'oui';
+        sav_piece = {
+          nom: c.querySelector('#sav-piece-nom').value.trim(),
+          ref: c.querySelector('#sav-piece-ref').value.trim(),
+          facturee: facturee,
+          cout: facturee ? (c.querySelector('#sav-piece-cout').value || '') : ''
+        };
+      }
+      reports[idx].sav_resolution = resolution;
+      reports[idx].sav_piece = sav_piece;
+      r.sav_resolution = resolution;
+      r.sav_piece = sav_piece;
+      saveReportToSupabase(reports[idx]);
+      showToast('Fiche SAV enregistrée ✓');
+    });
+  }
 
   const quickBtn = document.getElementById('quick-update-btn');
   if(quickBtn){
@@ -8551,6 +8661,7 @@ async function rouvrirSAV(r){
   document.getElementById('sav-motif-select').value = 'piece_defectueuse';
   document.getElementById('sav-motif-autre-field').style.display = 'none';
   document.getElementById('sav-motif-autre').value = '';
+  document.getElementById('sav-probleme-text').value = '';
   document.getElementById('sav-modal').style.display = 'flex';
 }
 
@@ -8611,6 +8722,7 @@ document.getElementById('detail-rouvrir-sav-btn').addEventListener('click', () =
   document.getElementById('sav-motif-select').value = 'piece_defectueuse';
   document.getElementById('sav-motif-autre-field').style.display = 'none';
   document.getElementById('sav-motif-autre').value = '';
+  document.getElementById('sav-probleme-text').value = '';
   document.getElementById('sav-modal').style.display = 'flex';
 });
 
@@ -8640,6 +8752,8 @@ document.getElementById('sav-choix-depot-btn').addEventListener('click', () => {
   if(!savOriginReport) return;
   const r = savOriginReport;
   const motif = getSavMotifFinal();
+  const probleme = document.getElementById('sav-probleme-text').value.trim();
+  if(!probleme){ showToast('Merci de décrire le problème signalé par le client', true); return; }
   document.getElementById('sav-modal').style.display = 'none';
 
   openDepotEdit(null);
@@ -8651,7 +8765,7 @@ document.getElementById('sav-choix-depot-btn').addEventListener('click', () => {
   document.getElementById('depot-edit-tel').value = r.tel || '';
   document.getElementById('depot-edit-email').value = r.email || '';
   document.getElementById('depot-edit-appareil').value = r.appareil || '';
-  document.getElementById('depot-edit-description').value = `SAV — ${motif}`;
+  document.getElementById('depot-edit-description').value = `SAV — ${motif}\n\nProblème signalé par le client : ${probleme}`;
 
   window._depotSavParentAppId = r.app_id || r.id;
   window._depotSavRaison = motif;
@@ -8662,6 +8776,8 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   if(!savOriginReport) return;
   const r = savOriginReport;
   const motif = getSavMotifFinal();
+  const probleme = document.getElementById('sav-probleme-text').value.trim();
+  if(!probleme){ showToast('Merci de décrire le problème signalé par le client', true); return; }
   document.getElementById('sav-modal').style.display = 'none';
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -8679,7 +8795,7 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   document.getElementById('newrdv-tel').value = r.tel || '';
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
-  document.getElementById('newrdv-panne').value = `SAV — ${motif}`;
+  document.getElementById('newrdv-panne').value = `SAV — ${motif}\n\nProblème signalé par le client : ${probleme}`;
   const typeSelect = document.getElementById('newrdv-type');
   if(typeSelect) typeSelect.value = 'sav';
 
