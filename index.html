@@ -708,6 +708,10 @@
         <input type="tel" id="newrdv-tel">
       </div>
       <div class="field">
+        <label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui recevra le technicien)</span></label>
+        <input type="tel" id="newrdv-tel-interlocuteur" placeholder="Facultatif">
+      </div>
+      <div class="field">
         <label>Email</label>
         <input type="email" id="newrdv-email">
       </div>
@@ -1995,6 +1999,7 @@ function reportToRow(r){
     cp: r.cp || '',
     ville: r.ville || '',
     tel: r.tel || '',
+    tel_interlocuteur: r['tel-interlocuteur'] || null,
     email: r.email || '',
     appareil: r.appareil || '',
     marque: r.marque || '',
@@ -2085,6 +2090,7 @@ function rowToReport(row){
     cp: row.cp,
     ville: row.ville,
     tel: row.tel,
+    'tel-interlocuteur': row.tel_interlocuteur || '',
     email: row.email,
     appareil: row.appareil,
     marque: row.marque,
@@ -2159,7 +2165,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -4605,7 +4611,7 @@ document.getElementById('agenda-detail-sms-arrival-btn').addEventListener('click
   if(!currentAgendaRdv) return;
   const tel = (currentAgendaRdv.tel || '').replace(/[^\d+]/g, '');
   if(!tel){ showToast('Numéro manquant', true); return; }
-  showSmsArrival(tel);
+  showSmsArrival(tel, currentAgendaRdv.tel_interlocuteur || '');
 });
 
 document.getElementById('agenda-detail-sms-avis').addEventListener('click', () => {
@@ -4884,6 +4890,7 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
+  document.getElementById('newrdv-tel-interlocuteur').value = r.tel_interlocuteur || '';
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = r.appareil || '';
   document.getElementById('newrdv-marque').value = r.marque || '';
@@ -4958,6 +4965,7 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     cp: document.getElementById('newrdv-cp').value.trim(),
     ville: document.getElementById('newrdv-ville').value.trim(),
     tel: document.getElementById('newrdv-tel').value.trim(),
+    tel_interlocuteur: document.getElementById('newrdv-tel-interlocuteur').value.trim() || null,
     email: document.getElementById('newrdv-email').value.trim(),
     appareil: document.getElementById('newrdv-appareil').value,
     marque: document.getElementById('newrdv-marque').value.trim() || null,
@@ -6746,6 +6754,9 @@ function renderDetailContent(r, container){
 
   html += '</div>';
 
+  html += '<div class="field" style="margin-top:0.6rem;"><label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui recevra le technicien)</span></label>';
+  html += `<input type="tel" id="quick-tel-interlocuteur" placeholder="Facultatif" value="${escapeHtml(r['tel-interlocuteur']||'')}"></div>`;
+
   html += '<div class="checkbox-row" style="margin-top:0.4rem;">';
   html += `<input type="checkbox" id="quick-facture" ${r['facture-creee'] ? 'checked' : ''}>`;
   html += '<label for="quick-facture">Facture créée / envoyée</label></div>';
@@ -6930,10 +6941,12 @@ function renderDetailContent(r, container){
       const statutEl = document.getElementById('quick-statut');
       const paiementEl = document.getElementById('quick-paiement');
       const factureEl = document.getElementById('quick-facture');
+      const telInterlocuteurEl = document.getElementById('quick-tel-interlocuteur');
 
       reports[idx].statut = statutEl.value;
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
+      reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
 
       // Le délai d'archivage démarre uniquement quand le dossier est Terminé ET la facture créée
       const TERMINES = ['Terminée', 'Non_reparable'];
@@ -7160,8 +7173,27 @@ function copyAddr(addr){
 }
 
 let _smsArrivalTel = '';
-function showSmsArrival(tel){
-  _smsArrivalTel = tel;
+let _smsArrivalTelInterlocuteur = '';
+
+function showSmsArrival(tel, telInterlocuteur){
+  _smsArrivalTel = tel || '';
+  _smsArrivalTelInterlocuteur = telInterlocuteur || '';
+
+  const destField = document.getElementById('sms-arrival-destinataire-field');
+  const destSelect = document.getElementById('sms-arrival-destinataire');
+  const telInterlocClean = _smsArrivalTelInterlocuteur.replace(/[^\d+]/g, '');
+  const telClean = _smsArrivalTel.replace(/[^\d+]/g, '');
+  if(telInterlocClean && telInterlocClean !== telClean){
+    destSelect.innerHTML = `
+      <option value="interlocuteur">🙋 Interlocuteur — ${escapeHtml(_smsArrivalTelInterlocuteur)}</option>
+      <option value="client">👤 Client — ${escapeHtml(_smsArrivalTel)}</option>
+    `;
+    destSelect.value = 'interlocuteur';
+    destField.style.display = 'block';
+  } else {
+    destField.style.display = 'none';
+  }
+
   document.getElementById('sms-arrival-modal').style.display = 'flex';
   document.getElementById('sms-arrival-minutes').value = '10';
   document.getElementById('sms-arrival-minutes').focus();
@@ -7169,8 +7201,12 @@ function showSmsArrival(tel){
 
 function sendSmsArrival(){
   const minutes = parseInt(document.getElementById('sms-arrival-minutes').value, 10) || 10;
+  const destField = document.getElementById('sms-arrival-destinataire-field');
+  const useInterlocuteur = destField.style.display !== 'none'
+    && document.getElementById('sms-arrival-destinataire').value === 'interlocuteur';
   document.getElementById('sms-arrival-modal').style.display = 'none';
-  const tel = _smsArrivalTel.replace(/[^\d+]/g, '');
+  const rawTel = useInterlocuteur ? _smsArrivalTelInterlocuteur : _smsArrivalTel;
+  const tel = (rawTel || '').replace(/[^\d+]/g, '');
   if(!tel){ showToast('Numéro de téléphone manquant', true); return; }
   const msg = `Bonjour, c'est Jonathan Technik-home. Vous êtes mon prochain client(e) j'arrive chez vous dans ${minutes} minutes. Merci à tout de suite.`;
   window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(msg);
@@ -8600,7 +8636,10 @@ async function renderDossierAppareilContent(r){
   });
   applyTerminerStyle(actionsDiv.querySelector('.doss-email-btn'), r);
   actionsDiv.querySelector('.doss-sms-btn')?.addEventListener('click', () => {
-    currentDetailReport = r; sendSMSArrivee(r);
+    currentDetailReport = r;
+    const tel = (r.tel || '').replace(/[^\d+]/g, '');
+    if(!tel){ showToast('Numéro manquant', true); return; }
+    showSmsArrival(tel, r['tel-interlocuteur'] || '');
   });
   actionsDiv.querySelector('.doss-avis-btn')?.addEventListener('click', () => {
     const tel = (r.tel || '').replace(/[^\d+]/g, '');
@@ -8793,6 +8832,7 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
+  document.getElementById('newrdv-tel-interlocuteur').value = r['tel-interlocuteur'] || '';
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
   document.getElementById('newrdv-panne').value = `SAV — ${motif}\n\nProblème signalé par le client : ${probleme}`;
@@ -8839,7 +8879,7 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   populateNewRdvAppareilOptions();
 
   // Pré-remplir les champs client depuis le CR
-  ['date','prenom','nom','adresse','cp','ville','tel','email','panne','note'].forEach(id => {
+  ['date','prenom','nom','adresse','cp','ville','tel','tel-interlocuteur','email','panne','note'].forEach(id => {
     const el = document.getElementById('newrdv-' + id);
     if(el) el.value = '';
   });
@@ -8852,6 +8892,7 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
+  document.getElementById('newrdv-tel-interlocuteur').value = r['tel-interlocuteur'] || '';
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
   document.getElementById('newrdv-panne').value = r.panne || '';
@@ -8962,9 +9003,14 @@ async function showClientDetail(appId){
     });
   });
 
-  // Interventions liées
+  // Interventions liées : priorité au client_id exact ; le repli par tel/email
+  // ne s'applique qu'aux anciennes interventions sans client_id, et seulement
+  // si le tel/email n'est pas vide (sinon deux clients sans tel se mélangent).
   const interList = document.getElementById('client-interventions-list');
-  const linked = reports.filter(r => r.client_id === appId || r.tel === c.tel || r.email === c.email);
+  const linked = reports.filter(r => {
+    if(r.client_id) return r.client_id === appId;
+    return (!!c.tel && r.tel === c.tel) || (!!c.email && r.email === c.email);
+  });
   linked.sort((a,b) => (b.date||'').localeCompare(a.date||''));
   if(!linked.length){
     interList.innerHTML = '<div class="empty">Aucune intervention</div>';
@@ -9210,6 +9256,7 @@ document.getElementById('client-search') && document.getElementById('client-sear
         document.getElementById('newrdv-prenom').value  = c.prenom  || '';
         document.getElementById('newrdv-nom').value     = c.nom     || '';
         document.getElementById('newrdv-tel').value     = c.tel     || '';
+        document.getElementById('newrdv-tel-interlocuteur').value = '';
         document.getElementById('newrdv-email').value   = c.email   || '';
         document.getElementById('newrdv-adresse').value = c.adresse || '';
         document.getElementById('newrdv-cp').value      = c.cp      || '';
@@ -9659,6 +9706,10 @@ document.getElementById('attestation-generate').addEventListener('click', async 
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
     <h3 style="margin:0 0 0.8rem;color:var(--orange);">💬 SMS — J'arrive</h3>
     <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1rem;">Le message sera pré-rempli dans votre app SMS. Modifiez le délai si besoin :</p>
+    <div id="sms-arrival-destinataire-field" style="display:none;margin-bottom:1rem;">
+      <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Envoyer à :</label>
+      <select id="sms-arrival-destinataire" style="width:100%;padding:0.5rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;"></select>
+    </div>
     <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Temps d'arrivée :</label>
     <select id="sms-arrival-minutes"
       style="width:100%;padding:0.5rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1rem;box-sizing:border-box;margin-bottom:1rem;">
