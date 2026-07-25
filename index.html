@@ -1040,6 +1040,7 @@
       <div class="field"><label>Prénom</label><input type="text" id="cf-prenom" placeholder="Prénom"></div>
       <div class="field"><label>Nom</label><input type="text" id="cf-nom" placeholder="Nom"></div>
       <div class="field"><label>Téléphone</label><input type="tel" id="cf-tel" placeholder="06 12 34 56 78"></div>
+      <div class="field"><label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui reçoit habituellement le technicien)</span></label><input type="tel" id="cf-tel-interlocuteur" placeholder="Facultatif"></div>
       <div class="field"><label>Email</label><input type="email" id="cf-email" placeholder="client@email.fr"></div>
       <div class="field"><label>Adresse</label><input type="text" id="cf-adresse" placeholder="N° et rue" autocomplete="off"><div id="cf-adresse-suggestions" style="display:none;margin-top:0.4rem;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;position:relative;z-index:10;"></div></div>
       <div class="field"><label>Code postal</label><input type="text" id="cf-cp" placeholder="62300"></div>
@@ -9067,6 +9068,7 @@ function openClientForm(appId){
   document.getElementById('cf-prenom').value  = c ? (c.prenom||'') : '';
   document.getElementById('cf-nom').value     = c ? (c.nom||'')    : '';
   document.getElementById('cf-tel').value     = c ? (c.tel||'')    : '';
+  document.getElementById('cf-tel-interlocuteur').value = c ? (c.tel_interlocuteur||'') : '';
   document.getElementById('cf-email').value   = c ? (c.email||'')  : '';
   document.getElementById('cf-adresse').value = c ? (c.adresse||''): '';
   document.getElementById('cf-cp').value      = c ? (c.cp||'')     : '';
@@ -9085,6 +9087,7 @@ document.getElementById('client-form-save').addEventListener('click', async () =
   const row = {
     nom, prenom,
     tel:     document.getElementById('cf-tel').value.trim(),
+    tel_interlocuteur: document.getElementById('cf-tel-interlocuteur').value.trim() || null,
     email:   document.getElementById('cf-email').value.trim(),
     adresse: document.getElementById('cf-adresse').value.trim(),
     cp:      document.getElementById('cf-cp').value.trim(),
@@ -9256,7 +9259,7 @@ document.getElementById('client-search') && document.getElementById('client-sear
         document.getElementById('newrdv-prenom').value  = c.prenom  || '';
         document.getElementById('newrdv-nom').value     = c.nom     || '';
         document.getElementById('newrdv-tel').value     = c.tel     || '';
-        document.getElementById('newrdv-tel-interlocuteur').value = '';
+        document.getElementById('newrdv-tel-interlocuteur').value = c.tel_interlocuteur || '';
         document.getElementById('newrdv-email').value   = c.email   || '';
         document.getElementById('newrdv-adresse').value = c.adresse || '';
         document.getElementById('newrdv-cp').value      = c.cp      || '';
