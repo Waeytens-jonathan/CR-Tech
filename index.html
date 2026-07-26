@@ -2272,9 +2272,11 @@ function renderMemoWidget(iso){
           <input type="checkbox" class="memo-fait-checkbox" data-memo-id="${escapeHtml(m.app_id)}" ${m.fait?'checked':''} style="flex:0 0 auto;width:16px;height:16px;margin:0;">
           <div style="flex:1 1 auto;min-width:0;text-align:left;${m.fait?'opacity:0.5;text-decoration:line-through;':''}">
             <div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml([m.prenom,m.nom].filter(Boolean).join(' ')||'—')}${m.appareil ? ' <span style="font-weight:400;color:var(--text-muted);">— '+escapeHtml(m.appareil)+'</span>' : ''}</div>
-            ${m.horaire ? `<div style="font-size:0.75rem;color:var(--orange);margin-top:0.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🕐 ${escapeHtml(m.horaire)}</div>` : ''}
+            ${m.horaire ? `<div style="font-size:0.75rem;color:var(--orange);margin-top:0.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🕐 ${escapeHtml(m.horaire)} heures</div>` : ''}
           </div>
-          <span class="memo-delete-btn" data-memo-id="${escapeHtml(m.app_id)}" style="flex:0 0 auto;cursor:pointer;color:var(--text-muted);font-size:0.85rem;padding:0.1rem 0.2rem;">🗑️</span>
+          <span class="memo-delete-btn" data-memo-id="${escapeHtml(m.app_id)}" style="flex:0 0 auto;cursor:pointer;padding:0.2rem;display:flex;align-items:center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0584f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+          </span>
         </div>`;
       });
       html += '</div>';
@@ -2285,7 +2287,10 @@ function renderMemoWidget(iso){
         <input type="text" id="memo-add-nom" placeholder="Nom" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
         <input type="text" id="memo-add-prenom" placeholder="Prénom" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
         <input type="text" id="memo-add-appareil" placeholder="Appareil" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
-        <input type="text" id="memo-add-horaire" placeholder="Horaire (ex : vers 17h30, demain matin...)" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <select id="memo-add-horaire" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+          <option value="">Horaire non précisé</option>
+          ${Array.from({length:15}, (_,i) => i+7).map(h => `<option value="${h}">${h}h</option>`).join('')}
+        </select>
         <div style="display:flex;gap:0.4rem;">
           <button class="btn btn-outline" id="memo-add-cancel" style="flex:1;font-size:0.82rem;padding:0.4rem;">Annuler</button>
           <button class="btn btn-primary" id="memo-add-save" style="flex:1;font-size:0.82rem;padding:0.4rem;">Ajouter</button>
