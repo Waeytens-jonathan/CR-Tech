@@ -617,6 +617,9 @@
       </div>
       <button id="agenda-today-btn" class="btn btn-outline" style="width:100%;margin-bottom:0.7rem;font-size:0.85rem;padding:0.4rem;">📍 Aujourd'hui</button>
 
+      <!-- Mémo dépôts du jour -->
+      <div id="agenda-memo-widget" style="margin-bottom:0.7rem;"></div>
+
       <!-- Contenu du jour -->
       <div id="agenda-week-container" style="overflow:hidden;position:relative;touch-action:pan-y;">
         <div id="agenda-week-grid" style="min-height:150px;"></div>
@@ -2230,6 +2233,134 @@ async function deleteReportFromSupabase(id){
 
 // ---------- Agenda (RDV pris depuis le site) ----------
 const RDV_TABLE = 'rdv';
+const MEMOS_TABLE = 'memos_depot';
+let agendaMemos = [];
+let agendaMemoExpanded = true;
+let agendaMemoAdding = false;
+
+async function loadMemosFromSupabase(){
+  try{
+    const { data, error } = await sb.from(MEMOS_TABLE).select('*').order('created_at', { ascending: true });
+    if(error) throw error;
+    return data || [];
+  }catch(e){
+    console.error('Erreur chargement mémos dépôt :', e);
+    return [];
+  }
+}
+
+function renderMemoWidget(iso){
+  const el = document.getElementById('agenda-memo-widget');
+  if(!el) return;
+  const memosJour = agendaMemos.filter(m => m.date === iso);
+  const nonFaits = memosJour.filter(m => !m.fait).length;
+
+  let html = `<div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.3);border-radius:10px;padding:0.7rem 0.9rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" id="memo-widget-toggle">
+      <div style="display:flex;align-items:center;gap:0.4rem;">
+        <span style="font-weight:700;font-size:0.9rem;color:var(--orange);">📦 Mémo dépôts</span>
+        ${nonFaits ? `<span style="font-size:0.72rem;background:var(--orange);color:var(--navy);padding:0.1rem 0.5rem;border-radius:20px;font-weight:700;">${nonFaits}</span>` : ''}
+      </div>
+      <span style="font-size:0.85rem;color:var(--text-muted);">${agendaMemoExpanded ? '▲' : '▼'}</span>
+    </div>`;
+
+  if(agendaMemoExpanded){
+    if(memosJour.length){
+      html += '<div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.4rem;">';
+      memosJour.forEach(m => {
+        html += `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.6rem;display:flex;gap:0.5rem;align-items:flex-start;">
+          <input type="checkbox" class="memo-fait-checkbox" data-memo-id="${escapeHtml(m.app_id)}" ${m.fait?'checked':''} style="margin-top:0.2rem;">
+          <div style="flex:1;${m.fait?'opacity:0.5;text-decoration:line-through;':''}">
+            <div style="font-size:0.85rem;font-weight:600;">${escapeHtml([m.prenom,m.nom].filter(Boolean).join(' ')||'—')}</div>
+            ${m.appareil ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.1rem;">${escapeHtml(m.appareil)}</div>` : ''}
+            ${m.horaire ? `<div style="font-size:0.78rem;color:var(--orange);margin-top:0.1rem;">🕐 ${escapeHtml(m.horaire)}</div>` : ''}
+          </div>
+          <span class="memo-delete-btn" data-memo-id="${escapeHtml(m.app_id)}" style="cursor:pointer;color:var(--text-muted);font-size:0.9rem;padding:0.1rem 0.3rem;">🗑️</span>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    if(agendaMemoAdding){
+      html += `<div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.4rem;">
+        <input type="text" id="memo-add-nom" placeholder="Nom" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <input type="text" id="memo-add-prenom" placeholder="Prénom" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <input type="text" id="memo-add-appareil" placeholder="Appareil" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <input type="text" id="memo-add-horaire" placeholder="Horaire (ex : vers 17h30, demain matin...)" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+        <div style="display:flex;gap:0.4rem;">
+          <button class="btn btn-outline" id="memo-add-cancel" style="flex:1;font-size:0.82rem;padding:0.4rem;">Annuler</button>
+          <button class="btn btn-primary" id="memo-add-save" style="flex:1;font-size:0.82rem;padding:0.4rem;">Ajouter</button>
+        </div>
+      </div>`;
+    } else {
+      html += `<button class="btn btn-outline" id="memo-add-btn" style="width:100%;margin-top:0.6rem;font-size:0.82rem;padding:0.4rem;">+ Ajouter un mémo</button>`;
+    }
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+
+  document.getElementById('memo-widget-toggle').addEventListener('click', () => {
+    agendaMemoExpanded = !agendaMemoExpanded;
+    renderMemoWidget(iso);
+  });
+
+  el.querySelectorAll('.memo-fait-checkbox').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const id = cb.dataset.memoId;
+      const memo = agendaMemos.find(m => m.app_id === id);
+      if(!memo) return;
+      memo.fait = cb.checked;
+      renderMemoWidget(iso);
+      try{
+        await sb.from(MEMOS_TABLE).update({ fait: cb.checked }).eq('app_id', id);
+      }catch(e){ console.error('Erreur mise à jour mémo :', e); }
+    });
+  });
+
+  el.querySelectorAll('.memo-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.memoId;
+      agendaMemos = agendaMemos.filter(m => m.app_id !== id);
+      renderMemoWidget(iso);
+      try{
+        await sb.from(MEMOS_TABLE).delete().eq('app_id', id);
+      }catch(e){ console.error('Erreur suppression mémo :', e); }
+    });
+  });
+
+  const addBtn = document.getElementById('memo-add-btn');
+  if(addBtn) addBtn.addEventListener('click', () => {
+    agendaMemoAdding = true;
+    renderMemoWidget(iso);
+    document.getElementById('memo-add-nom').focus();
+  });
+
+  const cancelBtn = document.getElementById('memo-add-cancel');
+  if(cancelBtn) cancelBtn.addEventListener('click', () => {
+    agendaMemoAdding = false;
+    renderMemoWidget(iso);
+  });
+
+  const saveBtn = document.getElementById('memo-add-save');
+  if(saveBtn) saveBtn.addEventListener('click', async () => {
+    const nom = document.getElementById('memo-add-nom').value.trim();
+    const prenom = document.getElementById('memo-add-prenom').value.trim();
+    const appareil = document.getElementById('memo-add-appareil').value.trim();
+    const horaire = document.getElementById('memo-add-horaire').value.trim();
+    if(!nom && !prenom){ showToast('Merci de renseigner au moins un nom ou prénom', true); return; }
+    const nouveauMemo = { app_id: 'memo_' + Date.now(), date: iso, nom, prenom, appareil, horaire, fait: false };
+    agendaMemos.push(nouveauMemo);
+    agendaMemoAdding = false;
+    renderMemoWidget(iso);
+    try{
+      await sb.from(MEMOS_TABLE).insert(nouveauMemo);
+    }catch(e){
+      console.error('Erreur ajout mémo :', e);
+      showToast('Erreur lors de l\'enregistrement du mémo', true);
+    }
+  });
+}
 const AGENDA_CONFIG_TABLE = 'agenda_config';
 let _agendaConfigCache = null;
 const RDV_SLOT_LABELS = { matin: 'Matin · 10h-12h', apresmidi: 'Après-midi · 12h-18h' };
@@ -2271,6 +2402,7 @@ function getDisplayDate(offset){
 
 async function renderAgenda(){
   agendaRdvs = await loadAgendaFromSupabase();
+  agendaMemos = await loadMemosFromSupabase();
   renderAgendaList();
 }
 
@@ -2295,6 +2427,7 @@ function renderAgendaList(){
   sublabel.textContent = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 
   const isBlocked = isDateBlocked(iso);
+  renderMemoWidget(iso);
   const dayRdvs = agendaRdvs.filter(r => r.date === iso && r.statut !== 'annule');
   const sortByTournee = (a,b) => {
     const oa = a.ordre_tournee, ob = b.ordre_tournee;
@@ -3592,7 +3725,7 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   const dateFrPaiement = r.date ? new Date(r.date + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'}) : dateFr;
   if(r['paiement-statut'] === 'Paye_total' || r['paiement-statut'] === 'Gratuit'){
     doc.setFont('helvetica','bold'); doc.setTextColor(63,191,111);
-    doc.text(`✓ Payé le ${dateFrPaiement}`, margin, y);
+    doc.text(`Payé le ${dateFrPaiement}`, margin, y);
     doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
     y += 4;
   } else if(r['paiement-statut'] === 'Acompte'){
@@ -3606,7 +3739,7 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   doc.text("Pénalités de retard : taux BCE + 10 points — Indemnité forfaitaire de recouvrement : 40 €", margin, y);
   y += 4;
   doc.text('Escompte pour paiement anticipé : néant', margin, y);
-  y += 8;
+  y += 12;
 
   doc.setDrawColor(245,166,35); doc.setLineWidth(0.5);
   doc.line(margin, y, W-margin, y);
