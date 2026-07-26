@@ -3855,6 +3855,20 @@ async function terminerEtEnvoyer(r){
   });
   if(crError) throw crError;
 
+  // Sauvegarde du PDF du CR pour le récap hebdomadaire (même principe que factures/devis)
+  try{
+    await sb.from('comptes_rendus_pdf').upsert({
+      app_id: r.id,
+      ref: r.ref || '',
+      nom: r.nom || '',
+      prenom: r.prenom || '',
+      date_envoi: todayISO(),
+      pdf_base64: pdfBase64Cr
+    });
+  }catch(e){
+    console.error('Erreur sauvegarde PDF compte-rendu (récap hebdo) :', e);
+  }
+
   // 2. Facture (génère si besoin)
   const facture = await getOuGenererFacture(r);
   if(facture){
