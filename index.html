@@ -708,6 +708,17 @@
         <input type="text" id="newrdv-ville">
       </div>
       <div class="field">
+        <label>Type de client</label>
+        <select id="newrdv-type-client">
+          <option value="particulier">Particulier</option>
+          <option value="professionnel">Professionnel</option>
+        </select>
+      </div>
+      <div id="newrdv-entreprise-fields" style="display:none;">
+        <div class="field"><label>Nom de l'entreprise</label><input type="text" id="newrdv-entreprise-nom" placeholder="Raison sociale"></div>
+        <div class="field"><label>N° SIRET</label><input type="text" id="newrdv-entreprise-siret" placeholder="14 chiffres" maxlength="14"></div>
+      </div>
+      <div class="field">
         <label>Téléphone</label>
         <input type="tel" id="newrdv-tel">
       </div>
@@ -1043,6 +1054,17 @@
       </div>
       <div class="field"><label>Prénom</label><input type="text" id="cf-prenom" placeholder="Prénom"></div>
       <div class="field"><label>Nom</label><input type="text" id="cf-nom" placeholder="Nom"></div>
+      <div class="field">
+        <label>Type de client</label>
+        <select id="cf-type-client" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;">
+          <option value="particulier">Particulier</option>
+          <option value="professionnel">Professionnel</option>
+        </select>
+      </div>
+      <div id="cf-entreprise-fields" style="display:none;">
+        <div class="field"><label>Nom de l'entreprise</label><input type="text" id="cf-entreprise-nom" placeholder="Raison sociale"></div>
+        <div class="field"><label>N° SIRET</label><input type="text" id="cf-entreprise-siret" placeholder="14 chiffres" maxlength="14"></div>
+      </div>
       <div class="field"><label>Téléphone</label><input type="tel" id="cf-tel" placeholder="06 12 34 56 78"></div>
       <div class="field"><label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui reçoit habituellement le technicien)</span></label><input type="tel" id="cf-tel-interlocuteur" placeholder="Facultatif"></div>
       <div class="field"><label>Email</label><input type="email" id="cf-email" placeholder="client@email.fr"></div>
@@ -1140,6 +1162,9 @@
       <input type="text" id="f-ville">
       <input type="tel" id="f-tel">
       <input type="email" id="f-email">
+      <input type="text" id="f-type-client">
+      <input type="text" id="f-entreprise-nom">
+      <input type="text" id="f-entreprise-siret">
     </div>
 
     <div class="card step" data-step="1">
@@ -2015,6 +2040,9 @@ function reportToRow(r){
     ville: r.ville || '',
     tel: r.tel || '',
     tel_interlocuteur: r['tel-interlocuteur'] || null,
+    type_client: r['type-client'] || 'particulier',
+    entreprise_nom: r['type-client'] === 'professionnel' ? (r['entreprise-nom'] || null) : null,
+    entreprise_siret: r['type-client'] === 'professionnel' ? (r['entreprise-siret'] || null) : null,
     email: r.email || '',
     appareil: r.appareil || '',
     marque: r.marque || '',
@@ -2106,6 +2134,9 @@ function rowToReport(row){
     ville: row.ville,
     tel: row.tel,
     'tel-interlocuteur': row.tel_interlocuteur || '',
+    'type-client': row.type_client || 'particulier',
+    'entreprise-nom': row.entreprise_nom || '',
+    'entreprise-siret': row.entreprise_siret || '',
     email: row.email,
     appareil: row.appareil,
     marque: row.marque,
@@ -2180,7 +2211,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -3654,7 +3685,10 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   }
   y += 4;
 
-  const clientLignesFacture = [`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim()];
+  const clientLignesFacture = [];
+  if(r['type-client'] === 'professionnel' && r['entreprise-nom']) clientLignesFacture.push(`Entreprise : ${r['entreprise-nom']}`);
+  if(r['type-client'] === 'professionnel' && r['entreprise-siret']) clientLignesFacture.push(`SIRET : ${r['entreprise-siret']}`);
+  clientLignesFacture.push(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim());
   if(r.tel) clientLignesFacture.push(`Tél : ${r.tel}`);
   if(r.email) clientLignesFacture.push(`Email : ${r.email}`);
   const clientBoxHeightFacture = 20 + (clientLignesFacture.length - 1) * 5;
@@ -4145,7 +4179,10 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
   doc.text(`Devis valable jusqu'au : ${dateValiditeFr} (30 jours)`, margin, y);
   y += 9;
 
-  const clientLignesDevis = [`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim()];
+  const clientLignesDevis = [];
+  if(r['type-client'] === 'professionnel' && r['entreprise-nom']) clientLignesDevis.push(`Entreprise : ${r['entreprise-nom']}`);
+  if(r['type-client'] === 'professionnel' && r['entreprise-siret']) clientLignesDevis.push(`SIRET : ${r['entreprise-siret']}`);
+  clientLignesDevis.push(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`.trim());
   if(r.tel) clientLignesDevis.push(`Tél : ${r.tel}`);
   if(r.email) clientLignesDevis.push(`Email : ${r.email}`);
   const clientBoxHeightDevis = 20 + (clientLignesDevis.length - 1) * 5;
@@ -4445,6 +4482,9 @@ document.getElementById('depot-detail-create-cr').addEventListener('click', () =
   document.getElementById('f-ville').value = d.ville || '';
   document.getElementById('f-tel').value = d.tel || '';
   document.getElementById('f-email').value = d.email || '';
+  document.getElementById('f-type-client').value = d.type_client || 'particulier';
+  document.getElementById('f-entreprise-nom').value = d.entreprise_nom || '';
+  document.getElementById('f-entreprise-siret').value = d.entreprise_siret || '';
   document.getElementById('f-appareil').value = matchAppareilOption(d.appareil);
   autoFillMainOeuvre(document.getElementById('f-appareil').value);
   document.getElementById('f-panne').value = d.description || '';
@@ -4800,6 +4840,9 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
   document.getElementById('f-ville').value = r.ville || '';
   document.getElementById('f-tel').value = r.tel || '';
   document.getElementById('f-email').value = r.email || '';
+  document.getElementById('f-type-client').value = r.type_client || 'particulier';
+  document.getElementById('f-entreprise-nom').value = r.entreprise_nom || '';
+  document.getElementById('f-entreprise-siret').value = r.entreprise_siret || '';
   document.getElementById('f-appareil').value = matchAppareilOption(r.appareil);
   autoFillMainOeuvre(document.getElementById('f-appareil').value);
   document.getElementById('f-marque').value = r.marque || '';
@@ -5101,6 +5144,10 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
   document.getElementById('newrdv-tel-interlocuteur').value = r.tel_interlocuteur || '';
+  document.getElementById('newrdv-type-client').value = r.type_client || 'particulier';
+  document.getElementById('newrdv-entreprise-nom').value = r.entreprise_nom || '';
+  document.getElementById('newrdv-entreprise-siret').value = r.entreprise_siret || '';
+  document.getElementById('newrdv-entreprise-fields').style.display = r.type_client === 'professionnel' ? 'block' : 'none';
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = r.appareil || '';
   document.getElementById('newrdv-marque').value = r.marque || '';
@@ -5176,6 +5223,9 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     ville: document.getElementById('newrdv-ville').value.trim(),
     tel: document.getElementById('newrdv-tel').value.trim(),
     tel_interlocuteur: document.getElementById('newrdv-tel-interlocuteur').value.trim() || null,
+    type_client: document.getElementById('newrdv-type-client').value,
+    entreprise_nom: document.getElementById('newrdv-type-client').value === 'professionnel' ? document.getElementById('newrdv-entreprise-nom').value.trim() : null,
+    entreprise_siret: document.getElementById('newrdv-type-client').value === 'professionnel' ? document.getElementById('newrdv-entreprise-siret').value.trim() : null,
     email: document.getElementById('newrdv-email').value.trim(),
     appareil: document.getElementById('newrdv-appareil').value,
     marque: document.getElementById('newrdv-marque').value.trim() || null,
@@ -6325,7 +6375,7 @@ document.getElementById('plaque-analyze-btn').addEventListener('click', async ()
 
 
 const fieldIds = [
-  'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-adresse2','f-cp','f-ville','f-tel','f-email',
+  'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-adresse2','f-cp','f-ville','f-tel','f-email','f-type-client','f-entreprise-nom','f-entreprise-siret',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
   'f-piece-desc','f-prix-fournisseur','f-livraison','f-piece-cout',
@@ -6967,6 +7017,17 @@ function renderDetailContent(r, container){
   html += '<div class="field" style="margin-top:0.6rem;"><label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui recevra le technicien)</span></label>';
   html += `<input type="tel" id="quick-tel-interlocuteur" placeholder="Facultatif" value="${escapeHtml(r['tel-interlocuteur']||'')}"></div>`;
 
+  const typeClientActuel = r['type-client'] || 'particulier';
+  html += '<div class="field" style="margin-top:0.6rem;"><label>Type de client</label>';
+  html += `<select id="quick-type-client">
+    <option value="particulier" ${typeClientActuel === 'particulier' ? 'selected' : ''}>Particulier</option>
+    <option value="professionnel" ${typeClientActuel === 'professionnel' ? 'selected' : ''}>Professionnel</option>
+  </select></div>`;
+  html += `<div id="quick-entreprise-fields" style="display:${typeClientActuel === 'professionnel' ? 'block' : 'none'};">
+    <div class="field" style="margin-top:0.5rem;"><label>Nom de l'entreprise</label><input type="text" id="quick-entreprise-nom" placeholder="Raison sociale" value="${escapeHtml(r['entreprise-nom']||'')}"></div>
+    <div class="field" style="margin-top:0.5rem;"><label>N° SIRET</label><input type="text" id="quick-entreprise-siret" placeholder="14 chiffres" maxlength="14" value="${escapeHtml(r['entreprise-siret']||'')}"></div>
+  </div>`;
+
   html += '<div class="checkbox-row" style="margin-top:0.4rem;">';
   html += `<input type="checkbox" id="quick-facture" ${r['facture-creee'] ? 'checked' : ''}>`;
   html += '<label for="quick-facture">Facture créée / envoyée</label></div>';
@@ -7091,6 +7152,10 @@ function renderDetailContent(r, container){
 
   c.innerHTML = html;
 
+  c.querySelector('#quick-type-client')?.addEventListener('change', (e) => {
+    c.querySelector('#quick-entreprise-fields').style.display = e.target.value === 'professionnel' ? 'block' : 'none';
+  });
+
   c.querySelector('.voir-dossier-origine-btn')?.addEventListener('click', (e) => {
     const parentId = e.currentTarget.dataset.parentId;
     const parent = reports.find(x => (x.app_id||x.id) === parentId);
@@ -7152,11 +7217,20 @@ function renderDetailContent(r, container){
       const paiementEl = document.getElementById('quick-paiement');
       const factureEl = document.getElementById('quick-facture');
       const telInterlocuteurEl = document.getElementById('quick-tel-interlocuteur');
+      const typeClientEl = document.getElementById('quick-type-client');
 
       reports[idx].statut = statutEl.value;
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
       reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
+      reports[idx]['type-client'] = typeClientEl.value;
+      if(typeClientEl.value === 'professionnel'){
+        reports[idx]['entreprise-nom'] = document.getElementById('quick-entreprise-nom').value.trim();
+        reports[idx]['entreprise-siret'] = document.getElementById('quick-entreprise-siret').value.trim();
+      } else {
+        reports[idx]['entreprise-nom'] = '';
+        reports[idx]['entreprise-siret'] = '';
+      }
 
       // Le délai d'archivage démarre uniquement quand le dossier est Terminé ET la facture créée
       const TERMINES = ['Terminée', 'Non_reparable'];
@@ -7313,6 +7387,9 @@ document.getElementById('detail-add-appareil-btn').addEventListener('click', () 
   document.getElementById('f-ville').value   = r.ville   || '';
   document.getElementById('f-tel').value     = r.tel     || '';
   document.getElementById('f-email').value   = r.email   || '';
+  document.getElementById('f-type-client').value = r['type-client'] || 'particulier';
+  document.getElementById('f-entreprise-nom').value = r['entreprise-nom'] || '';
+  document.getElementById('f-entreprise-siret').value = r['entreprise-siret'] || '';
   document.getElementById('f-date').value    = r.date    || todayISO();
   document.getElementById('f-technicien').value = r.technicien || 'Jonathan';
   window._currentDossierAppId    = r.dossier_id;
@@ -9059,6 +9136,10 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
   document.getElementById('newrdv-tel-interlocuteur').value = r['tel-interlocuteur'] || '';
+  document.getElementById('newrdv-type-client').value = r['type-client'] || 'particulier';
+  document.getElementById('newrdv-entreprise-nom').value = r['entreprise-nom'] || '';
+  document.getElementById('newrdv-entreprise-siret').value = r['entreprise-siret'] || '';
+  document.getElementById('newrdv-entreprise-fields').style.display = r['type-client'] === 'professionnel' ? 'block' : 'none';
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
   document.getElementById('newrdv-panne').value = `SAV — ${motif}\n\nProblème signalé par le client : ${probleme}`;
@@ -9119,6 +9200,10 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
   document.getElementById('newrdv-tel-interlocuteur').value = r['tel-interlocuteur'] || '';
+  document.getElementById('newrdv-type-client').value = r['type-client'] || 'particulier';
+  document.getElementById('newrdv-entreprise-nom').value = r['entreprise-nom'] || '';
+  document.getElementById('newrdv-entreprise-siret').value = r['entreprise-siret'] || '';
+  document.getElementById('newrdv-entreprise-fields').style.display = r['type-client'] === 'professionnel' ? 'block' : 'none';
   document.getElementById('newrdv-email').value = r.email || '';
   document.getElementById('newrdv-appareil').value = matchAppareilOption(r.appareil);
   document.getElementById('newrdv-panne').value = r.panne || '';
@@ -9294,6 +9379,10 @@ function openClientForm(appId){
   document.getElementById('cf-nom').value     = c ? (c.nom||'')    : '';
   document.getElementById('cf-tel').value     = c ? (c.tel||'')    : '';
   document.getElementById('cf-tel-interlocuteur').value = c ? (c.tel_interlocuteur||'') : '';
+  document.getElementById('cf-type-client').value = c ? (c.type_client||'particulier') : 'particulier';
+  document.getElementById('cf-entreprise-nom').value = c ? (c.entreprise_nom||'') : '';
+  document.getElementById('cf-entreprise-siret').value = c ? (c.entreprise_siret||'') : '';
+  document.getElementById('cf-entreprise-fields').style.display = (c && c.type_client === 'professionnel') ? 'block' : 'none';
   document.getElementById('cf-email').value   = c ? (c.email||'')  : '';
   document.getElementById('cf-adresse').value = c ? (c.adresse||''): '';
   document.getElementById('cf-cp').value      = c ? (c.cp||'')     : '';
@@ -9301,6 +9390,14 @@ function openClientForm(appId){
   document.getElementById('cf-note').value    = c ? (c.note||'')   : '';
   showView('client-form');
 }
+
+document.getElementById('cf-type-client').addEventListener('change', (e) => {
+  document.getElementById('cf-entreprise-fields').style.display = e.target.value === 'professionnel' ? 'block' : 'none';
+});
+
+document.getElementById('newrdv-type-client').addEventListener('change', (e) => {
+  document.getElementById('newrdv-entreprise-fields').style.display = e.target.value === 'professionnel' ? 'block' : 'none';
+});
 
 // --- Sauvegarde ---
 document.getElementById('client-form-save').addEventListener('click', async () => {
@@ -9313,6 +9410,9 @@ document.getElementById('client-form-save').addEventListener('click', async () =
     nom, prenom,
     tel:     document.getElementById('cf-tel').value.trim(),
     tel_interlocuteur: document.getElementById('cf-tel-interlocuteur').value.trim() || null,
+    type_client: document.getElementById('cf-type-client').value,
+    entreprise_nom: document.getElementById('cf-type-client').value === 'professionnel' ? document.getElementById('cf-entreprise-nom').value.trim() : null,
+    entreprise_siret: document.getElementById('cf-type-client').value === 'professionnel' ? document.getElementById('cf-entreprise-siret').value.trim() : null,
     email:   document.getElementById('cf-email').value.trim(),
     adresse: document.getElementById('cf-adresse').value.trim(),
     cp:      document.getElementById('cf-cp').value.trim(),
@@ -9328,7 +9428,8 @@ document.getElementById('client-form-save').addEventListener('click', async () =
       const clientFields = {
         nom: row.nom, prenom: row.prenom,
         tel: row.tel, email: row.email,
-        adresse: row.adresse, cp: row.cp, ville: row.ville
+        adresse: row.adresse, cp: row.cp, ville: row.ville,
+        type_client: row.type_client, entreprise_nom: row.entreprise_nom, entreprise_siret: row.entreprise_siret
       };
       try{
         await sb.from(TABLE).update(clientFields).eq('client_id', editingClientId);
@@ -9485,6 +9586,10 @@ document.getElementById('client-search') && document.getElementById('client-sear
         document.getElementById('newrdv-nom').value     = c.nom     || '';
         document.getElementById('newrdv-tel').value     = c.tel     || '';
         document.getElementById('newrdv-tel-interlocuteur').value = c.tel_interlocuteur || '';
+        document.getElementById('newrdv-type-client').value = c.type_client || 'particulier';
+        document.getElementById('newrdv-entreprise-nom').value = c.entreprise_nom || '';
+        document.getElementById('newrdv-entreprise-siret').value = c.entreprise_siret || '';
+        document.getElementById('newrdv-entreprise-fields').style.display = c.type_client === 'professionnel' ? 'block' : 'none';
         document.getElementById('newrdv-email').value   = c.email   || '';
         document.getElementById('newrdv-adresse').value = c.adresse || '';
         document.getElementById('newrdv-cp').value      = c.cp      || '';
