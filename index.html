@@ -7679,17 +7679,25 @@ async function generatePdfFor(data, mode){
     y += 8;
     const imgW = 85, imgH = 65, gap = 8;
     let col = 0;
-    data.photos.forEach((src) => {
+    for(const src of data.photos){
       if(y + imgH > 285){
         doc.addPage();
         y = 18;
         col = 0;
       }
       const x = 16 + col * (imgW + gap);
-      try{ doc.addImage(src, 'JPEG', x, y, imgW, imgH); }catch(e){}
+      try{
+        const dims = await getImageDimensions(src);
+        const ratio = Math.min(imgW / dims.width, imgH / dims.height);
+        const w = dims.width * ratio;
+        const h = dims.height * ratio;
+        doc.addImage(src, 'JPEG', x + (imgW - w) / 2, y + (imgH - h) / 2, w, h);
+      }catch(e){
+        try{ doc.addImage(src, 'JPEG', x, y, imgW, imgH); }catch(e2){}
+      }
       col++;
       if(col >= 2){ col = 0; y += imgH + gap; }
-    });
+    }
   }
 
   // Photos de la pièce posée
@@ -7702,17 +7710,25 @@ async function generatePdfFor(data, mode){
     y += 8;
     const imgW = 85, imgH = 65, gap = 8;
     let col = 0;
-    data.pieceDeposePhotos.forEach((src) => {
+    for(const src of data.pieceDeposePhotos){
       if(y + imgH > 285){
         doc.addPage();
         y = 18;
         col = 0;
       }
       const x = 16 + col * (imgW + gap);
-      try{ doc.addImage(src, 'JPEG', x, y, imgW, imgH); }catch(e){}
+      try{
+        const dims = await getImageDimensions(src);
+        const ratio = Math.min(imgW / dims.width, imgH / dims.height);
+        const w = dims.width * ratio;
+        const h = dims.height * ratio;
+        doc.addImage(src, 'JPEG', x + (imgW - w) / 2, y + (imgH - h) / 2, w, h);
+      }catch(e){
+        try{ doc.addImage(src, 'JPEG', x, y, imgW, imgH); }catch(e2){}
+      }
       col++;
       if(col >= 2){ col = 0; y += imgH + gap; }
-    });
+    }
   }
 
   // Fusion avec le PDF de conseils d'entretien si demandé (téléchargement uniquement —
