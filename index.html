@@ -1609,9 +1609,8 @@
       <div class="settings-section" data-section="export-cr">
         <div class="settings-section-header"><h3>📥 Export des comptes-rendus archivés</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
-          <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.8rem;">Régénère tous les comptes-rendus des dossiers archivés et te les envoie par email (par lots, pour rester sous la limite de taille des pièces jointes) — indépendamment du récap hebdomadaire automatique.</p>
-          <button class="btn btn-outline" id="export-cr-archives-local-btn" style="width:100%;margin-bottom:0.5rem;">📦 Télécharger en local (ZIP, sans email)</button>
-          <button class="btn btn-primary" id="export-cr-archives-btn" style="width:100%;">📧 Recevoir tous les CR archivés par email (par lots)</button>
+          <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.8rem;">Régénère et télécharge en un ZIP tous les comptes-rendus des dossiers archivés, directement sur cet appareil — indépendamment du récap hebdomadaire automatique par email.</p>
+          <button class="btn btn-primary" id="export-cr-archives-local-btn" style="width:100%;">📦 Télécharger tous les CR archivés (ZIP)</button>
           <p id="export-cr-archives-progress" style="font-size:0.78rem;color:var(--text-muted);margin:0.6rem 0 0;"></p>
         </div>
       </div>
@@ -3867,20 +3866,6 @@ async function terminerEtEnvoyer(r){
   });
   if(crError) throw crError;
 
-  // Sauvegarde du PDF du CR pour le récap hebdomadaire (même principe que factures/devis)
-  try{
-    await sb.from('comptes_rendus_pdf').upsert({
-      app_id: r.id,
-      ref: r.ref || '',
-      nom: r.nom || '',
-      prenom: r.prenom || '',
-      date_envoi: todayISO(),
-      pdf_base64: pdfBase64Cr
-    });
-  }catch(e){
-    console.error('Erreur sauvegarde PDF compte-rendu (récap hebdo) :', e);
-  }
-
   // 2. Facture (génère si besoin)
   const facture = await getOuGenererFacture(r);
   if(facture){
@@ -3993,86 +3978,7 @@ document.getElementById('export-cr-archives-local-btn').addEventListener('click'
   }
 
   btn.disabled = false;
-  btn.textContent = '📦 Télécharger en local (ZIP, sans email)';
-});
-
-document.getElementById('export-cr-archives-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('export-cr-archives-btn');
-  const progressEl = document.getElementById('export-cr-archives-progress');
-  const archives = reports.filter(r => r.statut === 'archivé' && !r._isDraft);
-  if(!archives.length){ showToast('Aucun dossier archivé trouvé', true); return; }
-
-  const TAILLE_LOT = 3; // Edge Function limitée en mémoire — les PDF avec photos font vite exploser un lot trop gros
-  const lots = [];
-  for(let i = 0; i < archives.length; i += TAILLE_LOT) lots.push(archives.slice(i, i + TAILLE_LOT));
-
-  btn.disabled = true;
-  btn.textContent = 'Génération en cours…';
-  let totalEnvoyes = 0;
-  let totalErreurs = 0;
-  let dernierMessageErreur = '';
-
-  for(let lotIndex = 0; lotIndex < lots.length; lotIndex++){
-    const lot = lots[lotIndex];
-    const zip = new JSZip();
-    const nomsUtilises = {};
-
-    for(let i = 0; i < lot.length; i++){
-      const r = lot[i];
-      progressEl.textContent = `Lot ${lotIndex + 1}/${lots.length} — génération ${i + 1}/${lot.length}…`;
-      try{
-        await ensureFullReportLoaded(r);
-        const pdfBytes = await generatePdfFor(r, 'email');
-        let nomFichier = (r.ref || r.id || 'CR').replace(/[^a-zA-Z0-9_-]/g, '_');
-        if(nomsUtilises[nomFichier]){
-          nomsUtilises[nomFichier]++;
-          nomFichier += '_' + nomsUtilises[nomFichier];
-        } else {
-          nomsUtilises[nomFichier] = 1;
-        }
-        zip.file(`${nomFichier}.pdf`, pdfBytes);
-      }catch(e){
-        console.error('Erreur génération CR pour export :', r.ref, e);
-      }
-    }
-
-    progressEl.textContent = `Lot ${lotIndex + 1}/${lots.length} — envoi par email…`;
-    try{
-      const zipBase64 = await zip.generateAsync({ type: 'base64' });
-      const { error } = await sb.functions.invoke('send-export-zip', {
-        body: {
-          zip_base64: zipBase64,
-          filename: `comptes-rendus-archives-${todayISO()}-lot${lotIndex + 1}.zip`,
-          subject: `Export CR archivés — lot ${lotIndex + 1}/${lots.length} (${lot.length} dossiers)`,
-          message: `Lot ${lotIndex + 1} sur ${lots.length} de l'export des comptes-rendus archivés (${lot.length} dossiers dans ce ZIP).`
-        }
-      });
-      if(error){
-        // Le SDK Supabase n'inclut pas toujours le corps de la réponse dans l'erreur —
-        // on va le chercher nous-même pour afficher le vrai message (ex : erreur Brevo, payload trop lourd...).
-        if(error.context && typeof error.context.json === 'function'){
-          try{
-            const detail = await error.context.json();
-            error.message = detail.error || detail.details || error.message;
-          }catch(_e){ /* corps non-JSON, on garde le message par défaut */ }
-        }
-        throw error;
-      }
-      totalEnvoyes += lot.length;
-    }catch(e){
-      console.error('Erreur envoi lot', lotIndex + 1, ':', e);
-      totalErreurs += lot.length;
-      dernierMessageErreur = e.message || 'voir console';
-    }
-  }
-
-  progressEl.textContent = totalErreurs
-    ? `${totalEnvoyes} dossier(s) envoyé(s), ${totalErreurs} en erreur — ${dernierMessageErreur}`
-    : `${totalEnvoyes} dossier(s) envoyé(s) par email en ${lots.length} lot(s).`;
-  showToast(totalErreurs ? 'Export terminé avec des erreurs' : 'Export envoyé par email ✓', !!totalErreurs);
-
-  btn.disabled = false;
-  btn.textContent = '📧 Recevoir tous les CR archivés par email';
+  btn.textContent = '📦 Télécharger tous les CR archivés (ZIP)';
 });
 
 document.getElementById('apercu-test-facture-btn').addEventListener('click', () => {
