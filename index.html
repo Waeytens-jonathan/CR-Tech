@@ -1610,7 +1610,8 @@
         <div class="settings-section-header"><h3>📥 Export des comptes-rendus archivés</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.8rem;">Régénère tous les comptes-rendus des dossiers archivés et te les envoie par email (par lots, pour rester sous la limite de taille des pièces jointes) — indépendamment du récap hebdomadaire automatique.</p>
-          <button class="btn btn-primary" id="export-cr-archives-btn" style="width:100%;">📧 Recevoir tous les CR archivés par email</button>
+          <button class="btn btn-outline" id="export-cr-archives-local-btn" style="width:100%;margin-bottom:0.5rem;">📦 Télécharger en local (ZIP, sans email)</button>
+          <button class="btn btn-primary" id="export-cr-archives-btn" style="width:100%;">📧 Recevoir tous les CR archivés par email (par lots)</button>
           <p id="export-cr-archives-progress" style="font-size:0.78rem;color:var(--text-muted);margin:0.6rem 0 0;"></p>
         </div>
       </div>
@@ -3941,6 +3942,58 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
   }
   btn.disabled = false;
   btn.textContent = '🧾 Générer la facture';
+});
+
+document.getElementById('export-cr-archives-local-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('export-cr-archives-local-btn');
+  const progressEl = document.getElementById('export-cr-archives-progress');
+  const archives = reports.filter(r => r.statut === 'archivé' && !r._isDraft);
+  if(!archives.length){ showToast('Aucun dossier archivé trouvé', true); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Génération en cours…';
+  const zip = new JSZip();
+  const nomsUtilises = {};
+  let done = 0;
+
+  for(const r of archives){
+    progressEl.textContent = `Génération ${done + 1}/${archives.length}…`;
+    try{
+      await ensureFullReportLoaded(r);
+      const pdfBytes = await generatePdfFor(r, 'email');
+      let nomFichier = (r.ref || r.id || 'CR').replace(/[^a-zA-Z0-9_-]/g, '_');
+      if(nomsUtilises[nomFichier]){
+        nomsUtilises[nomFichier]++;
+        nomFichier += '_' + nomsUtilises[nomFichier];
+      } else {
+        nomsUtilises[nomFichier] = 1;
+      }
+      zip.file(`${nomFichier}.pdf`, pdfBytes);
+    }catch(e){
+      console.error('Erreur génération CR pour export :', r.ref, e);
+    }
+    done++;
+  }
+
+  progressEl.textContent = 'Compression du ZIP…';
+  try{
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `comptes-rendus-archives-${todayISO()}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    progressEl.textContent = `${done} compte(s)-rendu(s) exporté(s) sur ${archives.length} — téléchargement lancé.`;
+  }catch(e){
+    console.error('Erreur création ZIP :', e);
+    progressEl.textContent = 'Erreur lors de la création du ZIP (voir console).';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📦 Télécharger en local (ZIP, sans email)';
 });
 
 document.getElementById('export-cr-archives-btn').addEventListener('click', async () => {
