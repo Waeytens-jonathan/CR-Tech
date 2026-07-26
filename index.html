@@ -3949,7 +3949,7 @@ document.getElementById('export-cr-archives-btn').addEventListener('click', asyn
   const archives = reports.filter(r => r.statut === 'archivé' && !r._isDraft);
   if(!archives.length){ showToast('Aucun dossier archivé trouvé', true); return; }
 
-  const TAILLE_LOT = 15; // pour rester sous la limite de taille des emails (photos incluses)
+  const TAILLE_LOT = 3; // Edge Function limitée en mémoire — les PDF avec photos font vite exploser un lot trop gros
   const lots = [];
   for(let i = 0; i < archives.length; i += TAILLE_LOT) lots.push(archives.slice(i, i + TAILLE_LOT));
 
@@ -3957,6 +3957,7 @@ document.getElementById('export-cr-archives-btn').addEventListener('click', asyn
   btn.textContent = 'Génération en cours…';
   let totalEnvoyes = 0;
   let totalErreurs = 0;
+  let dernierMessageErreur = '';
 
   for(let lotIndex = 0; lotIndex < lots.length; lotIndex++){
     const lot = lots[lotIndex];
@@ -3993,16 +3994,27 @@ document.getElementById('export-cr-archives-btn').addEventListener('click', asyn
           message: `Lot ${lotIndex + 1} sur ${lots.length} de l'export des comptes-rendus archivés (${lot.length} dossiers dans ce ZIP).`
         }
       });
-      if(error) throw error;
+      if(error){
+        // Le SDK Supabase n'inclut pas toujours le corps de la réponse dans l'erreur —
+        // on va le chercher nous-même pour afficher le vrai message (ex : erreur Brevo, payload trop lourd...).
+        if(error.context && typeof error.context.json === 'function'){
+          try{
+            const detail = await error.context.json();
+            error.message = detail.error || detail.details || error.message;
+          }catch(_e){ /* corps non-JSON, on garde le message par défaut */ }
+        }
+        throw error;
+      }
       totalEnvoyes += lot.length;
     }catch(e){
       console.error('Erreur envoi lot', lotIndex + 1, ':', e);
       totalErreurs += lot.length;
+      dernierMessageErreur = e.message || 'voir console';
     }
   }
 
   progressEl.textContent = totalErreurs
-    ? `${totalEnvoyes} dossier(s) envoyé(s), ${totalErreurs} en erreur (voir console).`
+    ? `${totalEnvoyes} dossier(s) envoyé(s), ${totalErreurs} en erreur — ${dernierMessageErreur}`
     : `${totalEnvoyes} dossier(s) envoyé(s) par email en ${lots.length} lot(s).`;
   showToast(totalErreurs ? 'Export terminé avec des erreurs' : 'Export envoyé par email ✓', !!totalErreurs);
 
