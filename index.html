@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1601,6 +1602,16 @@
           <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Taux URSSAF (%)</label>
           <input type="number" id="p-urssaf-taux" min="0" max="100" step="0.1" style="width:140px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
           <p style="font-size:0.75rem;color:var(--text-muted);margin:0.5rem 0 0;">Utilisé dans l'onglet Stats pour calculer l'argent réellement gagné. À ajuster si votre taux de cotisation change.</p>
+        </div>
+      </div>
+
+      <!-- EXPORT CR ARCHIVÉS -->
+      <div class="settings-section" data-section="export-cr">
+        <div class="settings-section-header"><h3>📥 Export des comptes-rendus archivés</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.8rem;">Régénère tous les comptes-rendus des dossiers archivés et te les envoie par email (par lots, pour rester sous la limite de taille des pièces jointes) — indépendamment du récap hebdomadaire automatique.</p>
+          <button class="btn btn-primary" id="export-cr-archives-btn" style="width:100%;">📧 Recevoir tous les CR archivés par email</button>
+          <p id="export-cr-archives-progress" style="font-size:0.78rem;color:var(--text-muted);margin:0.6rem 0 0;"></p>
         </div>
       </div>
 
@@ -3930,6 +3941,73 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
   }
   btn.disabled = false;
   btn.textContent = '🧾 Générer la facture';
+});
+
+document.getElementById('export-cr-archives-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('export-cr-archives-btn');
+  const progressEl = document.getElementById('export-cr-archives-progress');
+  const archives = reports.filter(r => r.statut === 'archivé' && !r._isDraft);
+  if(!archives.length){ showToast('Aucun dossier archivé trouvé', true); return; }
+
+  const TAILLE_LOT = 15; // pour rester sous la limite de taille des emails (photos incluses)
+  const lots = [];
+  for(let i = 0; i < archives.length; i += TAILLE_LOT) lots.push(archives.slice(i, i + TAILLE_LOT));
+
+  btn.disabled = true;
+  btn.textContent = 'Génération en cours…';
+  let totalEnvoyes = 0;
+  let totalErreurs = 0;
+
+  for(let lotIndex = 0; lotIndex < lots.length; lotIndex++){
+    const lot = lots[lotIndex];
+    const zip = new JSZip();
+    const nomsUtilises = {};
+
+    for(let i = 0; i < lot.length; i++){
+      const r = lot[i];
+      progressEl.textContent = `Lot ${lotIndex + 1}/${lots.length} — génération ${i + 1}/${lot.length}…`;
+      try{
+        await ensureFullReportLoaded(r);
+        const pdfBytes = await generatePdfFor(r, 'email');
+        let nomFichier = (r.ref || r.id || 'CR').replace(/[^a-zA-Z0-9_-]/g, '_');
+        if(nomsUtilises[nomFichier]){
+          nomsUtilises[nomFichier]++;
+          nomFichier += '_' + nomsUtilises[nomFichier];
+        } else {
+          nomsUtilises[nomFichier] = 1;
+        }
+        zip.file(`${nomFichier}.pdf`, pdfBytes);
+      }catch(e){
+        console.error('Erreur génération CR pour export :', r.ref, e);
+      }
+    }
+
+    progressEl.textContent = `Lot ${lotIndex + 1}/${lots.length} — envoi par email…`;
+    try{
+      const zipBase64 = await zip.generateAsync({ type: 'base64' });
+      const { error } = await sb.functions.invoke('send-export-zip', {
+        body: {
+          zip_base64: zipBase64,
+          filename: `comptes-rendus-archives-${todayISO()}-lot${lotIndex + 1}.zip`,
+          subject: `Export CR archivés — lot ${lotIndex + 1}/${lots.length} (${lot.length} dossiers)`,
+          message: `Lot ${lotIndex + 1} sur ${lots.length} de l'export des comptes-rendus archivés (${lot.length} dossiers dans ce ZIP).`
+        }
+      });
+      if(error) throw error;
+      totalEnvoyes += lot.length;
+    }catch(e){
+      console.error('Erreur envoi lot', lotIndex + 1, ':', e);
+      totalErreurs += lot.length;
+    }
+  }
+
+  progressEl.textContent = totalErreurs
+    ? `${totalEnvoyes} dossier(s) envoyé(s), ${totalErreurs} en erreur (voir console).`
+    : `${totalEnvoyes} dossier(s) envoyé(s) par email en ${lots.length} lot(s).`;
+  showToast(totalErreurs ? 'Export terminé avec des erreurs' : 'Export envoyé par email ✓', !!totalErreurs);
+
+  btn.disabled = false;
+  btn.textContent = '📧 Recevoir tous les CR archivés par email';
 });
 
 document.getElementById('apercu-test-facture-btn').addEventListener('click', () => {
