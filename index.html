@@ -2317,8 +2317,12 @@ function renderMemoWidget(iso){
       memo.fait = cb.checked;
       renderMemoWidget(iso);
       try{
-        await sb.from(MEMOS_TABLE).update({ fait: cb.checked }).eq('app_id', id);
-      }catch(e){ console.error('Erreur mise à jour mémo :', e); }
+        const { error } = await sb.from(MEMOS_TABLE).update({ fait: cb.checked }).eq('app_id', id);
+        if(error) throw error;
+      }catch(e){
+        console.error('Erreur mise à jour mémo :', e);
+        showToast('Erreur : mise à jour non enregistrée', true);
+      }
     });
   });
 
@@ -2328,8 +2332,12 @@ function renderMemoWidget(iso){
       agendaMemos = agendaMemos.filter(m => m.app_id !== id);
       renderMemoWidget(iso);
       try{
-        await sb.from(MEMOS_TABLE).delete().eq('app_id', id);
-      }catch(e){ console.error('Erreur suppression mémo :', e); }
+        const { error } = await sb.from(MEMOS_TABLE).delete().eq('app_id', id);
+        if(error) throw error;
+      }catch(e){
+        console.error('Erreur suppression mémo :', e);
+        showToast('Erreur : suppression non enregistrée', true);
+      }
     });
   });
 
@@ -2358,10 +2366,11 @@ function renderMemoWidget(iso){
     agendaMemoAdding = false;
     renderMemoWidget(iso);
     try{
-      await sb.from(MEMOS_TABLE).insert(nouveauMemo);
+      const { error } = await sb.from(MEMOS_TABLE).insert(nouveauMemo);
+      if(error) throw error;
     }catch(e){
       console.error('Erreur ajout mémo :', e);
-      showToast('Erreur lors de l\'enregistrement du mémo', true);
+      showToast('Erreur : mémo non enregistré (' + (e.message || 'voir console') + ')', true);
     }
   });
 }
