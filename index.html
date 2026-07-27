@@ -1114,6 +1114,7 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:0.6rem;">
         <button class="btn btn-outline" id="telecharger-cr-btn" style="width:100%;">📋 Télécharger le compte-rendu</button>
+        <button class="btn btn-outline" id="envoyer-cr-seul-btn" style="width:100%;">📧 Envoyer le compte-rendu</button>
         <hr style="border:none;border-top:1px solid var(--border);width:100%;margin:0.3rem 0;">
         <button class="btn btn-primary" id="generer-facture-btn" style="display:none;width:100%;">🧾 Générer la facture</button>
         <button class="btn btn-outline" id="voir-facture-btn" style="display:none;width:100%;">🧾 Voir la facture</button>
@@ -4108,6 +4109,35 @@ document.getElementById('telecharger-cr-btn').addEventListener('click', async ()
     console.error('Erreur génération PDF compte-rendu :', e);
     showToast('Erreur lors de la génération du compte-rendu', true);
   }
+});
+
+document.getElementById('envoyer-cr-seul-btn').addEventListener('click', async () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+  const emailCible = await getEmailAJour(r);
+  if(!emailCible){ showToast('Email du client manquant', true); return; }
+
+  const btn = document.getElementById('envoyer-cr-seul-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi en cours…';
+
+  try{
+    const pdfBytes = await generatePdfFor(r, 'email');
+    const pdfBase64Cr = arrayBufferToBase64(pdfBytes);
+    const { error } = await sb.functions.invoke('send-compte-rendu', {
+      body: {
+        email: emailCible, nom: r.nom, prenom: r.prenom, appareil: r.appareil, ref: r.ref,
+        pdf_base64: pdfBase64Cr, include_conseils: !!r['conseils-entretien']
+      }
+    });
+    if(error) throw error;
+    showToast('Compte-rendu envoyé au client ✓');
+  }catch(e){
+    console.error('Erreur envoi compte-rendu :', e);
+    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
+  }
+  btn.disabled = false;
+  btn.textContent = '📧 Envoyer le compte-rendu';
 });
 
 document.getElementById('voir-facture-btn').addEventListener('click', async () => {
