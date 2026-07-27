@@ -3620,6 +3620,17 @@ async function getNextFactureNumero(){
   }
 }
 
+// Nettoie une référence pièce qui contiendrait déjà un wrapper "(Réf. ...)" ou "Réf. ...",
+// pour éviter de le dupliquer quand on reformate "(Réf. X)" nous-mêmes.
+function cleanRef(ref){
+  if(!ref) return '';
+  return String(ref).replace(/^\(?\s*R[ée]f\.?\s*:?\s*/i, '').replace(/\)\s*$/, '').trim();
+}
+// Nettoie un nom de pièce des virgules/espaces parasites en fin de chaîne
+function cleanNom(nom){
+  return String(nom || '').replace(/\s*,\s*$/, '').trim();
+}
+
 function buildFactureLignes(r){
   const lignes = [];
   const mo = parseFloat(r['cout-mo']) || 0;
@@ -3641,14 +3652,17 @@ function buildFactureLignes(r){
     // sinon (pose-pièce, garantie), on répartit le total également entre les lignes.
     const stockAvecPrix = Array.isArray(r.stockPieces) && r.stockPieces.length === pieces.length && r.stockPieces.every(p => p.prix_vente);
     pieces.forEach((p, i) => {
-      const desc = p.nom || 'Pièce détachée';
+      const desc = cleanNom(p.nom) || 'Pièce détachée';
+      const refClean = cleanRef(p.ref);
       const prixLigne = stockAvecPrix ? (parseFloat(r.stockPieces[i].prix_vente) || 0) : (coutPieces / pieces.length);
-      lignes.push({ designation: 'Pièce', description: desc + (p.ref ? ` (Réf. ${p.ref})` : ''), garantie: p.garantie || '3 mois', quantite: 1, prix_unitaire: prixLigne, total: prixLigne });
+      lignes.push({ designation: 'Pièce', description: desc + (refClean ? ` (Réf. ${refClean})` : ''), garantie: p.garantie || '3 mois', quantite: 1, prix_unitaire: prixLigne, total: prixLigne });
     });
   } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
     r.piecesCommandees.forEach(p => {
       const prix = parseFloat(p.prixVente) || 0;
-      lignes.push({ designation: 'Pièce', description: (p.nom || 'Pièce détachée') + (p.ref ? ` (Réf. ${p.ref})` : ''), garantie: '3 mois', quantite: 1, prix_unitaire: prix, total: prix });
+      const nomClean = cleanNom(p.nom) || 'Pièce détachée';
+      const refClean = cleanRef(p.ref);
+      lignes.push({ designation: 'Pièce', description: nomClean + (refClean ? ` (Réf. ${refClean})` : ''), garantie: '3 mois', quantite: 1, prix_unitaire: prix, total: prix });
     });
     const sommePieces = r.piecesCommandees.reduce((s,p) => s + (parseFloat(p.prixVente) || 0), 0);
     const livraisonRestante = coutPieces - sommePieces;
@@ -3752,7 +3766,13 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
 
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
   lignes.forEach((l, i) => {
-    const rowHeight = l.description ? 12 : 7;
+    let descText = '';
+    if(l.description){
+      descText = l.description;
+      if(l.garantie) descText += `  —  Garantie : ${l.garantie}`;
+    }
+    const descLines = descText ? doc.splitTextToSize(descText, 130) : [];
+    const rowHeight = descLines.length ? 7 + descLines.length * 4.2 : 7;
     if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, rowHeight, 'F'); }
 
     doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40);
@@ -3762,12 +3782,9 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
     doc.text(l.prix_unitaire.toFixed(2)+' €', W-margin-32, y+5);
     doc.text(l.total.toFixed(2)+' €', W-margin-3, y+5, {align:'right'});
 
-    if(l.description){
+    if(descLines.length){
       doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(100,100,100);
-      let descText = l.description;
-      if(l.garantie) descText += `  —  Garantie : ${l.garantie}`;
-      const descLines = doc.splitTextToSize(descText, 130);
-      doc.text(descLines[0], margin+3, y+10);
+      doc.text(descLines, margin+3, y+10);
       doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
     }
 
@@ -4253,13 +4270,14 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
 
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
   lignes.forEach((l, i) => {
-    if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, 7, 'F'); }
     const desLines = doc.splitTextToSize(l.designation, 95);
-    doc.text(desLines[0], margin+3, y+5);
+    const rowHeight = Math.max(7, desLines.length * 5 + 2);
+    if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, rowHeight, 'F'); }
+    doc.text(desLines, margin+3, y+5);
     doc.text(String(l.quantite), W-margin-45, y+5);
     doc.text(l.prix_unitaire.toFixed(2)+' €', W-margin-32, y+5);
     doc.text((l.quantite*l.prix_unitaire).toFixed(2)+' €', W-margin-3, y+5, {align:'right'});
-    y += 7;
+    y += rowHeight;
   });
 
   y += 3;
@@ -6124,12 +6142,12 @@ function recalculerPrixPiece(){
   document.getElementById('f-piece-cout').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
   document.getElementById('f-cout-pieces').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
   document.getElementById('f-piece-desc').value = validRows
-    .map(r => r.nom.trim() ? (r.nom.trim() + (r.ref && r.ref.trim() ? ` (Réf. ${r.ref.trim()})` : '')) : '')
+    .map(r => r.nom.trim() ? (cleanNom(r.nom) + (r.ref && r.ref.trim() ? ` (Réf. ${cleanRef(r.ref)})` : '')) : '')
     .filter(Boolean).join(', ');
   document.getElementById('f-pieces-commandees-json').value = JSON.stringify(
     validRows.filter(r => r.nom.trim()).map(r => {
       const pf = parseFloat(r.prixFournisseur) || 0;
-      return { nom: r.nom.trim(), ref: (r.ref||'').trim(), prixVente: pf > 0 ? calculerPrixVente(pf, 0) : 0 };
+      return { nom: cleanNom(r.nom), ref: cleanRef(r.ref), prixVente: pf > 0 ? calculerPrixVente(pf, 0) : 0 };
     })
   );
   recalcTotal();
@@ -7155,9 +7173,10 @@ function renderDetailContent(r, container){
       });
     } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
       r.piecesCommandees.forEach(p => {
-        html += dRow(p.nom || 'Pièce', (p.ref ? `Réf. ${escapeHtml(p.ref)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—'));
+        const refClean = cleanRef(p.ref);
+        html += dRow(cleanNom(p.nom) || 'Pièce', (refClean ? `Réf. ${escapeHtml(refClean)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—'));
       });
-      if(r['piece-cout']) html += dRow('Total facturé (livraison incluse)', parseFloat(r['piece-cout']).toFixed(2) + ' €');
+      if(r['piece-cout']) html += dRow('Total pièces + livraison', parseFloat(r['piece-cout']).toFixed(2) + ' €');
     } else {
       html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
       html += dRow('Prix facturé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
@@ -7754,8 +7773,9 @@ async function generatePdfFor(data, mode){
   } else if(pdfStockPieces.length){
     section(pdfStockPieces.length > 1 ? 'Pièces (stock)' : 'Pièce (stock)');
     pdfStockPieces.forEach(p => {
-      line('Désignation', p.nom || '');
-      if(p.ref) line('Référence', p.ref);
+      line('Désignation', cleanNom(p.nom));
+      const refClean = cleanRef(p.ref);
+      if(refClean) line('Référence', refClean);
     });
     y += 2;
   } else if(data['commande-piece']){
@@ -7763,11 +7783,12 @@ async function generatePdfFor(data, mode){
     if(pdfPiecesCommandees.length){
       section(pdfPiecesCommandees.length > 1 ? 'Pièces commandées' : 'Pièce commandée');
       pdfPiecesCommandees.forEach(p => {
-        line('Désignation', p.nom || '');
-        if(p.ref) line('Référence', p.ref);
+        line('Désignation', cleanNom(p.nom));
+        const refClean = cleanRef(p.ref);
+        if(refClean) line('Référence', refClean);
         if(p.prixVente) line('Prix', parseFloat(p.prixVente).toFixed(2) + ' €');
       });
-      if(data['piece-cout']) line('Total facturé (livraison incluse)', data['piece-cout'] + ' €');
+      if(data['piece-cout']) line('Total (livr. incl.)', data['piece-cout'] + ' €');
     } else {
       section('Commande de pièces');
       line('Désignation', data['piece-desc']);
@@ -7781,8 +7802,9 @@ async function generatePdfFor(data, mode){
   if(pdfPiecesPosees.length){
     section(pdfPiecesPosees.length > 1 ? 'Pièces posées' : 'Pièce posée');
     pdfPiecesPosees.forEach(p => {
-      line('Nom', p.nom || '');
-      if(p.ref) line('Référence', p.ref);
+      line('Nom', cleanNom(p.nom));
+      const refClean = cleanRef(p.ref);
+      if(refClean) line('Référence', refClean);
     });
     y += 2;
   }
