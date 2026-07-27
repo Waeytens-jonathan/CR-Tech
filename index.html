@@ -1123,7 +1123,8 @@
         <button class="btn btn-outline" id="voir-devis-btn" style="display:none;width:100%;">📝 Voir le devis</button>
         <button class="btn btn-outline" id="envoyer-devis-btn" style="display:none;width:100%;">📧 Envoyer le devis</button>
         <hr style="border:none;border-top:1px solid var(--border);width:100%;margin:0.3rem 0;">
-        <button class="btn btn-outline" id="apercu-test-facture-btn" style="width:100%;border-color:#778;color:#aab;font-size:0.85rem;">🧪 Aperçu test (rien n'est enregistré)</button>
+        <button class="btn btn-outline" id="apercu-test-facture-btn" style="width:100%;border-color:#778;color:#aab;font-size:0.85rem;">🧪 Aperçu test facture (rien n'est enregistré)</button>
+        <button class="btn btn-outline" id="apercu-test-devis-btn" style="width:100%;border-color:#778;color:#aab;font-size:0.85rem;">🧪 Aperçu test devis (rien n'est enregistré)</button>
       </div>
     </div>
   </div>
@@ -1330,6 +1331,7 @@
         </div>
         <div id="commande-piece-fields" style="margin-top:0.8rem; display:none;">
           <input type="hidden" id="f-piece-desc">
+          <input type="hidden" id="f-pieces-commandees-json">
           <div class="field" style="margin-bottom:0.8rem;">
             <label>Livraison (pour l'ensemble de la commande)</label>
             <select id="f-livraison">
@@ -2083,6 +2085,7 @@ function reportToRow(r){
     piece_depose_ref: r.pieceDeposeRef || '',
     piece_depose_photos: r.pieceDeposePhotos ? JSON.stringify(r.pieceDeposePhotos) : '',
     pieces_posees: (Array.isArray(r.piecesPosees) && r.piecesPosees.length) ? JSON.stringify(r.piecesPosees) : '',
+    pieces_commandees: r['pieces-commandees-json'] || '',
     client_id: r.client_id || null,
     dossier_id: r.dossier_id || null,
     rdv_app_id: r.rdv_app_id || null,
@@ -2188,6 +2191,7 @@ function rowToReport(row){
     pieceDeposeRef: row.piece_depose_ref || '',
     pieceDeposePhotos: row.piece_depose_photos ? (() => { try{ return JSON.parse(row.piece_depose_photos); }catch(e){ return []; } })() : [],
     piecesPosees: row.pieces_posees ? (() => { try{ return JSON.parse(row.pieces_posees); }catch(e){ return []; } })() : [],
+    piecesCommandees: row.pieces_commandees ? (() => { try{ return JSON.parse(row.pieces_commandees); }catch(e){ return []; } })() : [],
     client_id: row.client_id || null,
     dossier_id: row.dossier_id || null,
     rdv_app_id: row.rdv_app_id || null,
@@ -2211,7 +2215,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -3140,7 +3144,8 @@ function renderStockPickerList(filterText){
       selectedStockPieces.push({ type, app_id: item.app_id, nom: item.nom, ref: item.ref, prix_vente: item.prix_vente, garantie: item.garantie || '3 mois' });
       renderStockPiecesSelectedList();
       recalcPieceCoutFromStock();
-      document.getElementById('stock-picker-overlay').style.display = 'none';
+      showToast(`${item.nom} ajouté(e) — continuez ou fermez la fenêtre`);
+      renderStockPickerList(document.getElementById('stock-picker-search').value);
     });
   });
 }
@@ -3640,6 +3645,16 @@ function buildFactureLignes(r){
       const prixLigne = stockAvecPrix ? (parseFloat(r.stockPieces[i].prix_vente) || 0) : (coutPieces / pieces.length);
       lignes.push({ designation: 'Pièce', description: desc + (p.ref ? ` (Réf. ${p.ref})` : ''), garantie: p.garantie || '3 mois', quantite: 1, prix_unitaire: prixLigne, total: prixLigne });
     });
+  } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
+    r.piecesCommandees.forEach(p => {
+      const prix = parseFloat(p.prixVente) || 0;
+      lignes.push({ designation: 'Pièce', description: (p.nom || 'Pièce détachée') + (p.ref ? ` (Réf. ${p.ref})` : ''), garantie: '3 mois', quantite: 1, prix_unitaire: prix, total: prix });
+    });
+    const sommePieces = r.piecesCommandees.reduce((s,p) => s + (parseFloat(p.prixVente) || 0), 0);
+    const livraisonRestante = coutPieces - sommePieces;
+    if(livraisonRestante > 0.01){
+      lignes.push({ designation: 'Livraison pièce', description: '', quantite: 1, prix_unitaire: livraisonRestante, total: livraisonRestante });
+    }
   } else if(coutPieces > 0){
     const descCommande = (r['piece-desc'] || '').trim();
     lignes.push({ designation: 'Pièce', description: descCommande || 'Pièce détachée', garantie: '3 mois', quantite: 1, prix_unitaire: coutPieces, total: coutPieces });
@@ -4039,6 +4054,35 @@ document.getElementById('apercu-test-facture-btn').addEventListener('click', () 
   }
 });
 
+document.getElementById('apercu-test-devis-btn').addEventListener('click', () => {
+  if(!currentDetailReport) return;
+  const r = currentDetailReport;
+
+  try{
+    const lignesInit = buildFactureLignes(r);
+    if(!lignesInit.length){
+      showToast('Aucun montant à mettre dans le devis pour ce compte-rendu', true);
+      return;
+    }
+    const lignes = lignesInit.map(l => ({
+      designation: l.description ? `${l.designation} — ${l.description}${l.garantie ? ' (Garantie : '+l.garantie+')' : ''}` : l.designation,
+      quantite: l.quantite,
+      prix_unitaire: l.prix_unitaire,
+      total: l.total
+    }));
+    const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
+    const dateEmission = todayISO();
+
+    // Numéro factice, aucune écriture en base : rien n'est consommé ni enregistré
+    const doc = generateDevisPdf(r, 'APERÇU-TEST', lignes, montantTotal, dateEmission);
+    doc.save('apercu-test-devis.pdf');
+    showToast('Aperçu généré — non enregistré, la numérotation n\'a pas bougé');
+  }catch(e){
+    console.error('Erreur aperçu test devis :', e);
+    showToast('Erreur lors de la génération de l\'aperçu', true);
+  }
+});
+
 document.getElementById('telecharger-cr-btn').addEventListener('click', async () => {
   if(!currentDetailReport) return;
   try{
@@ -4255,14 +4299,22 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
   try{
     const lignes = validRows.map(row => ({ designation: row.designation.trim(), quantite: row.quantite, prix_unitaire: row.prix_unitaire, total: row.quantite * row.prix_unitaire }));
     const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
-    const { annee, sequence, numero } = await getNextDevisNumero();
     const dateEmission = todayISO();
+    const existant = devisLight.find(d => d.rapport_app_id === r.id);
+
+    let numero, annee, sequence, devisAppId;
+    if(existant){
+      // Régénération : on garde le même numéro, on remplace juste le contenu
+      numero = existant.numero; annee = existant.annee; sequence = existant.sequence; devisAppId = existant.app_id;
+    } else {
+      ({ annee, sequence, numero } = await getNextDevisNumero());
+      devisAppId = 'devis_' + Date.now();
+    }
 
     const doc = generateDevisPdf(r, numero, lignes, montantTotal, dateEmission);
     const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-    const devisAppId = 'devis_' + Date.now();
-    const { error } = await sb.from('devis').insert({
+    const devisRow = {
       app_id: devisAppId,
       numero, annee, sequence,
       date_emission: dateEmission,
@@ -4275,12 +4327,20 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
       lignes: JSON.stringify(lignes),
       montant_total: montantTotal,
       pdf_base64: pdfBase64,
-      statut: 'envoye'
-    });
-    if(error) throw error;
+      statut: 'genere'
+    };
 
-    devisLight.push({ app_id: devisAppId, numero, rapport_app_id: r.id, annee, sequence });
-    showToast(`Devis ${numero} généré et enregistré ✓`);
+    if(existant){
+      const { error } = await sb.from('devis').update(devisRow).eq('app_id', devisAppId);
+      if(error) throw error;
+      showToast(`Devis ${numero} régénéré avec les nouvelles données ✓`);
+    } else {
+      const { error } = await sb.from('devis').insert(devisRow);
+      if(error) throw error;
+      devisLight.push({ app_id: devisAppId, numero, rapport_app_id: r.id, annee, sequence });
+      showToast(`Devis ${numero} généré et enregistré ✓`);
+    }
+
     document.getElementById('devis-modal').style.display = 'none';
     updateDevisButtons(r);
   }catch(e){
@@ -4315,7 +4375,8 @@ function updateDevisButtons(r){
   const voirBtn = document.getElementById('voir-devis-btn');
   const envoyerBtn = document.getElementById('envoyer-devis-btn');
   const existant = devisLight.some(d => d.rapport_app_id === r.id);
-  genBtn.style.display = !existant ? 'inline-flex' : 'none';
+  genBtn.style.display = 'inline-flex';
+  genBtn.textContent = existant ? '🔄 Régénérer le devis (si le CR a changé)' : '📝 Générer un devis';
   voirBtn.style.display = existant ? 'inline-flex' : 'none';
   envoyerBtn.style.display = existant ? 'inline-flex' : 'none';
 }
@@ -4397,6 +4458,7 @@ document.getElementById('envoyer-devis-btn').addEventListener('click', async () 
       }
     });
     if(sendError) throw sendError;
+    await sb.from('devis').update({ statut: 'envoye' }).eq('app_id', existant.app_id);
     showToast('Devis envoyé au client par email ✓');
   }catch(e){
     console.error('Erreur envoi devis :', e);
@@ -6064,6 +6126,12 @@ function recalculerPrixPiece(){
   document.getElementById('f-piece-desc').value = validRows
     .map(r => r.nom.trim() ? (r.nom.trim() + (r.ref && r.ref.trim() ? ` (Réf. ${r.ref.trim()})` : '')) : '')
     .filter(Boolean).join(', ');
+  document.getElementById('f-pieces-commandees-json').value = JSON.stringify(
+    validRows.filter(r => r.nom.trim()).map(r => {
+      const pf = parseFloat(r.prixFournisseur) || 0;
+      return { nom: r.nom.trim(), ref: (r.ref||'').trim(), prixVente: pf > 0 ? calculerPrixVente(pf, 0) : 0 };
+    })
+  );
   recalcTotal();
 }
 
@@ -6378,7 +6446,7 @@ const fieldIds = [
   'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-adresse2','f-cp','f-ville','f-tel','f-email','f-type-client','f-entreprise-nom','f-entreprise-siret',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
-  'f-piece-desc','f-prix-fournisseur','f-livraison','f-piece-cout',
+  'f-piece-desc','f-pieces-commandees-json','f-prix-fournisseur','f-livraison','f-piece-cout',
   'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-cout-total','f-reste-encaisser',
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen','f-paiement-especes','f-paiement-carte',
   'f-notes'
@@ -7085,6 +7153,11 @@ function renderDetailContent(r, container){
       stockPiecesArr.forEach(p => {
         html += dRow('Pièce (stock)', escapeHtml(p.nom || '') + (p.ref ? ' — ' + escapeHtml(p.ref) : ''));
       });
+    } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
+      r.piecesCommandees.forEach(p => {
+        html += dRow(p.nom || 'Pièce', (p.ref ? `Réf. ${escapeHtml(p.ref)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—'));
+      });
+      if(r['piece-cout']) html += dRow('Total facturé (livraison incluse)', parseFloat(r['piece-cout']).toFixed(2) + ' €');
     } else {
       html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
       html += dRow('Prix facturé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
@@ -7686,9 +7759,20 @@ async function generatePdfFor(data, mode){
     });
     y += 2;
   } else if(data['commande-piece']){
-    section('Commande de pièces');
-    line('Désignation', data['piece-desc']);
-    line('Prix facturé', data['piece-cout'] ? data['piece-cout'] + ' €' : '—');
+    const pdfPiecesCommandees = Array.isArray(data.piecesCommandees) ? data.piecesCommandees : [];
+    if(pdfPiecesCommandees.length){
+      section(pdfPiecesCommandees.length > 1 ? 'Pièces commandées' : 'Pièce commandée');
+      pdfPiecesCommandees.forEach(p => {
+        line('Désignation', p.nom || '');
+        if(p.ref) line('Référence', p.ref);
+        if(p.prixVente) line('Prix', parseFloat(p.prixVente).toFixed(2) + ' €');
+      });
+      if(data['piece-cout']) line('Total facturé (livraison incluse)', data['piece-cout'] + ' €');
+    } else {
+      section('Commande de pièces');
+      line('Désignation', data['piece-desc']);
+      line('Prix facturé', data['piece-cout'] ? data['piece-cout'] + ' €' : '—');
+    }
     y += 2;
   }
   const pdfPiecesPosees = (Array.isArray(data.piecesPosees) && data.piecesPosees.length)
