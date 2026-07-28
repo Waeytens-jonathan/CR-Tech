@@ -1814,6 +1814,19 @@
 </div>
 
 <!-- Ouvrir un SAV -->
+<div id="annulation-rdv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <h3 style="margin:0 0 0.8rem;color:var(--red,#e0584f);">🚫 Annuler le RDV</h3>
+    <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1rem;">Le client sera informé par email si son adresse est renseignée, avec le motif ci-dessous.</p>
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Motif de l'annulation</label>
+    <textarea id="annulation-rdv-motif" rows="3" placeholder="Ex : indisponibilité, demande du client, appareil déjà réparé ailleurs…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:1rem;resize:vertical;"></textarea>
+    <div style="display:flex;gap:0.6rem;">
+      <button class="btn btn-outline" id="annulation-rdv-cancel-btn" style="flex:1;">Retour</button>
+      <button class="btn btn-danger" id="annulation-rdv-confirm-btn" style="flex:1;">Confirmer l'annulation</button>
+    </div>
+  </div>
+</div>
+
 <div id="sav-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
@@ -10184,19 +10197,6 @@ document.getElementById('attestation-generate').addEventListener('click', async 
 </script>
 
 <!-- ===================== MODALE SMS ARRIVÉE ===================== -->
-<div id="annulation-rdv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
-  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-    <h3 style="margin:0 0 0.8rem;color:var(--red,#e0584f);">🚫 Annuler le RDV</h3>
-    <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1rem;">Le client sera informé par email si son adresse est renseignée, avec le motif ci-dessous.</p>
-    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Motif de l'annulation</label>
-    <textarea id="annulation-rdv-motif" rows="3" placeholder="Ex : indisponibilité, demande du client, appareil déjà réparé ailleurs…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:1rem;resize:vertical;"></textarea>
-    <div style="display:flex;gap:0.6rem;">
-      <button class="btn btn-outline" id="annulation-rdv-cancel-btn" style="flex:1;">Retour</button>
-      <button class="btn btn-danger" id="annulation-rdv-confirm-btn" style="flex:1;">Confirmer l'annulation</button>
-    </div>
-  </div>
-</div>
-
 <div id="sms-arrival-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
     <h3 style="margin:0 0 0.8rem;color:var(--orange);">💬 SMS — J'arrive</h3>
