@@ -818,6 +818,17 @@
         <div style="display:flex;justify-content:space-between;padding:0.3rem 0;"><span style="color:#aab;">URSSAF (<span id="stat-urssaf-taux">20</span>% du CA)</span><span id="stat-urssaf">0,00 €</span></div>
       </div>
 
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;margin-bottom:0.7rem;">
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Moyenne inter./jour</div>
+          <div style="font-size:1.5rem;font-weight:700;" id="stat-moyenne-jour">0</div>
+        </div>
+        <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.9rem;">
+          <div style="font-size:0.75rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Pièces posées</div>
+          <div style="font-size:1.5rem;font-weight:700;" id="stat-nb-pieces-posees">0</div>
+        </div>
+      </div>
+
       <div style="background:rgba(63,191,111,0.12);border:1px solid rgba(63,191,111,0.3);border-radius:10px;padding:1rem;">
         <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--green,#3fbf6f);margin-bottom:0.3rem;">Argent réellement gagné</div>
         <div style="font-size:1.8rem;font-weight:700;color:var(--green,#3fbf6f);" id="stat-net">0,00 €</div>
@@ -2725,7 +2736,7 @@ async function renderStats(){
     ? candidats.filter(r => r.date >= prevRange.start && r.date <= prevRange.end)
     : null;
 
-  let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0, nbNonReparable = 0;
+  let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0, nbNonReparable = 0, nbPiecesPosees = 0;
   const marqueCount = {};
   filtered.forEach(r => {
     totalMo += parseFloat(r['cout-mo']) || 0;
@@ -2739,6 +2750,11 @@ async function renderStats(){
     if(r.statut === 'Non_reparable') nbNonReparable++;
     const marque = (r.marque || '').trim();
     if(marque) marqueCount[marque] = (marqueCount[marque] || 0) + 1;
+    if(Array.isArray(r.piecesPosees) && r.piecesPosees.length){
+      nbPiecesPosees += r.piecesPosees.length;
+    } else if(r['piece-posee'] || r.pieceDeposeNom){
+      nbPiecesPosees += 1;
+    }
   });
 
   const ca = totalMo + totalPieces + totalDepl;
@@ -2770,8 +2786,22 @@ async function renderStats(){
   const nbAnnules = rdvPeriode.filter(r => r.statut === 'annule').length;
   const tauxAnnulation = rdvPeriode.length ? Math.round((nbAnnules / rdvPeriode.length) * 100) : 0;
 
+  // Moyenne d'interventions par jour sur la période
+  let nbJoursPeriode;
+  if(range){
+    nbJoursPeriode = Math.round((new Date(range.end) - new Date(range.start)) / 86400000) + 1;
+  } else if(filtered.length){
+    const dates = filtered.map(r => r.date).sort();
+    nbJoursPeriode = Math.round((new Date(dates[dates.length-1]) - new Date(dates[0])) / 86400000) + 1;
+  } else {
+    nbJoursPeriode = 1;
+  }
+  const moyenneParJour = nbJoursPeriode > 0 ? filtered.length / nbJoursPeriode : 0;
+
   document.getElementById('stat-nb-interventions').textContent = filtered.length;
   document.getElementById('stat-ca').textContent = formatEur(ca);
+  document.getElementById('stat-moyenne-jour').textContent = moyenneParJour.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  document.getElementById('stat-nb-pieces-posees').textContent = nbPiecesPosees;
   document.getElementById('stat-panier-moyen').textContent = formatEur(panierMoyen);
   document.getElementById('stat-taux-non-reparable').textContent = tauxNonReparable + ' %';
   document.getElementById('stat-taux-annulation').textContent = tauxAnnulation + ' %';
