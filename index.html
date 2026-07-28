@@ -477,8 +477,9 @@
 
   <div class="tabs" style="justify-content:space-between;">
     <div class="tile-grid" style="flex:1;">
-      <button class="tab-btn tab-tile active" data-tile="agenda" data-view="agenda" id="tab-agenda">
+      <button class="tab-btn tab-tile active" data-tile="agenda" data-view="agenda" id="tab-agenda" style="position:relative;">
         <span class="tile-icon">📅</span><span>Agenda</span>
+        <span id="agenda-badge-nouveaux" style="display:none;position:absolute;top:4px;right:8px;background:var(--red,#e0584f);color:#fff;font-size:0.68rem;font-weight:700;min-width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;padding:0 3px;"></span>
       </button>
       <button class="tab-btn tab-tile" data-tile="list" data-view="list">
         <span class="tile-icon">📁</span><span>Dossiers-clients</span>
@@ -611,7 +612,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.7rem;gap:0.5rem;">
         <button id="agenda-prev-week" class="btn btn-outline" style="padding:0.5rem 1rem;font-size:1.1rem;">‹</button>
         <div style="text-align:center;flex:1;">
-          <div id="agenda-week-label" style="font-size:1rem;font-weight:700;color:var(--text);"></div>
+          <div id="agenda-week-label" style="font-size:1rem;font-weight:700;color:var(--text);display:inline-flex;align-items:center;gap:0.4rem;justify-content:center;width:100%;"><span id="agenda-week-label-text"></span><span id="agenda-day-badge-nouveaux" style="display:none;background:var(--red,#e0584f);color:#fff;font-size:0.7rem;font-weight:700;min-width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;padding:0 3px;"></span></div>
           <div id="agenda-day-sublabel" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;"></div>
         </div>
         <button id="agenda-next-week" class="btn btn-outline" style="padding:0.5rem 1rem;font-size:1.1rem;">›</button>
@@ -2476,13 +2477,28 @@ function getDisplayDate(offset){
 async function renderAgenda(){
   agendaRdvs = await loadAgendaFromSupabase();
   agendaMemos = await loadMemosFromSupabase();
+  updateAgendaBadge();
   renderAgendaList();
+}
+
+function updateAgendaBadge(){
+  const badge = document.getElementById('agenda-badge-nouveaux');
+  if(!badge) return;
+  const nb = agendaRdvs.filter(r => !r.vu && r.statut !== 'annule' && r.statut !== 'effectue').length;
+  if(nb > 0){
+    badge.textContent = nb > 9 ? '9+' : String(nb);
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function renderAgendaList(){
   const grid = document.getElementById('agenda-week-grid');
   const emptyEl = document.getElementById('agenda-empty-msg');
-  const label = document.getElementById('agenda-week-label');
+  const label = document.getElementById('agenda-week-label-text');
+  const labelWrap = document.getElementById('agenda-week-label');
+  const dayBadge = document.getElementById('agenda-day-badge-nouveaux');
   const sublabel = document.getElementById('agenda-day-sublabel');
   if(!grid) return;
 
@@ -2496,12 +2512,19 @@ function renderAgendaList(){
   const isTomorrow = agendaDayOffset === 1;
   let dayPrefix = isToday ? 'Aujourd\'hui' : isTomorrow ? 'Demain' : DAY_NAMES_LONG[d.getDay()];
   label.textContent = dayPrefix;
-  label.style.color = isToday ? 'var(--orange)' : 'var(--text)';
+  labelWrap.style.color = isToday ? 'var(--orange)' : 'var(--text)';
   sublabel.textContent = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 
   const isBlocked = isDateBlocked(iso);
   renderMemoWidget(iso);
   const dayRdvs = agendaRdvs.filter(r => r.date === iso && r.statut !== 'annule');
+  const nbNouveauxJour = dayRdvs.filter(r => !r.vu && r.statut !== 'effectue').length;
+  if(nbNouveauxJour > 0){
+    dayBadge.textContent = nbNouveauxJour > 9 ? '9+' : String(nbNouveauxJour);
+    dayBadge.style.display = 'flex';
+  } else {
+    dayBadge.style.display = 'none';
+  }
   const sortByTournee = (a,b) => {
     const oa = a.ordre_tournee, ob = b.ordre_tournee;
     if(oa == null && ob == null) return 0;
@@ -2524,13 +2547,14 @@ function renderAgendaList(){
   const makeCard = r => {
     const typeLabel = r.type_rdv === 'pose_piece' ? '🔧 Pose pièce' : r.type_rdv === 'sav' ? '🛠️ SAV' : '🔍 Diagnostic';
     const doneLabel = r.statut === 'effectue' ? '<span class="badge green" style="font-size:0.7rem;">Effectué</span>' : '';
+    const nouveauLabel = (!r.vu && r.statut !== 'annule' && r.statut !== 'effectue') ? '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red,#e0584f);flex-shrink:0;"></span>' : '';
     const borderColor = r.statut === 'effectue' ? '#4caf50' : 'var(--orange)';
     const bgColor = r.statut === 'effectue' ? 'rgba(76,175,80,0.06)' : 'rgba(245,166,35,0.07)';
     return `<div class="list-item agenda-rdv-chip" data-rdv-id="${escapeHtml(r.app_id)}"
       style="cursor:pointer;border-left:4px solid ${borderColor};background:${bgColor};${r.statut==='effectue'?'opacity:0.7;':''}padding:0.6rem 0.8rem;margin-bottom:0.5rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
         <strong style="font-size:0.95rem;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong>
-        <div style="display:flex;gap:0.3rem;align-items:center;">${doneLabel}</div>
+        <div style="display:flex;gap:0.3rem;align-items:center;">${nouveauLabel}${doneLabel}</div>
       </div>
       <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">${escapeHtml(r.appareil||'')}${r.ville?' — '+escapeHtml(r.ville):''}</div>
       ${typeLabel ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">${typeLabel}</div>` : ''}
@@ -4822,6 +4846,15 @@ function showAgendaDetail(appId){
   if(!r) return;
   currentAgendaRdv = r;
 
+  if(!r.vu){
+    r.vu = true;
+    updateAgendaBadge();
+    renderAgendaList();
+    sb.from(RDV_TABLE).update({ vu: true }).eq('app_id', r.app_id).then(({error}) => {
+      if(error) console.error('Erreur marquage RDV vu :', error);
+    });
+  }
+
   let statutLabel = '';
   if(r.statut === 'effectue') statutLabel = '<span class="badge green">✅ Effectué</span>';
   else if(r.statut === 'annule') statutLabel = '<span class="badge red">🚫 Annulé</span>';
@@ -5352,6 +5385,7 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
   const row = {
     date: date,
     creneau: creneau,
+    vu: true,
     nom: nom,
     prenom: prenom,
     adresse: document.getElementById('newrdv-adresse').value.trim(),
