@@ -769,9 +769,17 @@ async function renderStats(){
   let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0, nbNonReparable = 0, nbPiecesPosees = 0;
   const marqueCount = {};
   filtered.forEach(r => {
-    totalMo += parseFloat(r['cout-mo']) || 0;
-    totalPieces += parseFloat(r['cout-pieces']) || 0;
-    totalDepl += parseFloat(r['cout-deplacement']) || 0;
+    const mo = parseFloat(r['cout-mo']) || 0;
+    const pieces = parseFloat(r['cout-pieces']) || 0;
+    const depl = parseFloat(r['cout-deplacement']) || 0;
+    const montantLigne = mo + pieces + depl;
+    const reste = parseFloat(r['reste-encaisser']) || 0;
+    // Ratio réellement encaissé sur ce dossier (1 = tout payé, 0 = rien payé)
+    const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, (montantLigne - reste) / montantLigne)) : 1;
+
+    totalMo += mo * ratioEncaisse;
+    totalPieces += pieces * ratioEncaisse;
+    totalDepl += depl * ratioEncaisse;
     const prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
     totalFournisseur += prixFournisseur;
     if(prixFournisseur > 0){
@@ -794,7 +802,15 @@ async function renderStats(){
   // Tendance vs période précédente
   let prevCa = null;
   if(prevFiltered){
-    prevCa = prevFiltered.reduce((sum, r) => sum + (parseFloat(r['cout-mo'])||0) + (parseFloat(r['cout-pieces'])||0) + (parseFloat(r['cout-deplacement'])||0), 0);
+    prevCa = prevFiltered.reduce((sum, r) => {
+      const mo = parseFloat(r['cout-mo']) || 0;
+      const pieces = parseFloat(r['cout-pieces']) || 0;
+      const depl = parseFloat(r['cout-deplacement']) || 0;
+      const montantLigne = mo + pieces + depl;
+      const reste = parseFloat(r['reste-encaisser']) || 0;
+      const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, (montantLigne - reste) / montantLigne)) : 1;
+      return sum + montantLigne * ratioEncaisse;
+    }, 0);
   }
   renderTrend('stat-nb-trend', filtered.length, prevFiltered ? prevFiltered.length : null);
   renderTrend('stat-ca-trend', ca, prevCa);
