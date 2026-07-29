@@ -722,16 +722,6 @@
         <button class="btn btn-outline" id="telecharger-cr-btn" style="width:100%;">📋 Télécharger le compte-rendu</button>
         <button class="btn btn-outline" id="envoyer-cr-seul-btn" style="width:100%;">📧 Envoyer le compte-rendu</button>
         <hr style="border:none;border-top:1px solid var(--border);width:100%;margin:0.3rem 0;">
-        <div style="display:flex;gap:0.5rem;align-items:flex-end;">
-          <div style="flex:1;">
-            <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Remise (facultatif)</label>
-            <input type="number" id="remise-facture-valeur" placeholder="0" step="0.01" min="0" style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-          </div>
-          <select id="remise-facture-type" style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);">
-            <option value="eur">€</option>
-            <option value="pct">%</option>
-          </select>
-        </div>
         <button class="btn btn-primary" id="generer-facture-btn" style="display:none;width:100%;">🧾 Générer la facture</button>
         <button class="btn btn-outline" id="voir-facture-btn" style="display:none;width:100%;">🧾 Voir la facture</button>
         <button class="btn btn-outline" id="envoyer-facture-btn" style="display:none;width:100%;">📧 Envoyer la facture</button>
@@ -987,6 +977,17 @@
         <div class="field">
           <label>Déplacement (€)</label>
           <input type="number" id="f-cout-deplacement" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Remise</label>
+          <input type="number" id="f-remise-valeur" placeholder="0" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Type de remise</label>
+          <select id="f-remise-type">
+            <option value="eur">€</option>
+            <option value="pct">%</option>
+          </select>
         </div>
         <div class="field">
           <label><strong>Total (€)</strong></label>

@@ -84,6 +84,15 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 const TABLE = 'rapports';
 
 // Convertit un objet "report" (format interne JS) -> ligne Supabase
+// Calcule le montant réel (en €) déduit par la remise d'un dossier, à partir de son sous-total brut
+function calculerMontantRemise(r){
+  const remiseValeur = parseFloat(r['remise-valeur']) || 0;
+  if(remiseValeur <= 0) return 0;
+  const sousTotal = (parseFloat(r['cout-mo'])||0) + (parseFloat(r['cout-pieces'])||0) + (parseFloat(r['cout-deplacement'])||0);
+  const montant = r['remise-type'] === 'pct' ? sousTotal * (remiseValeur/100) : remiseValeur;
+  return Math.min(sousTotal, montant);
+}
+
 function reportToRow(r){
   const row = {
     app_id: r.id,
@@ -104,6 +113,9 @@ function reportToRow(r){
     remboursement_motif: r['remboursement-montant'] ? (r['remboursement-motif'] || '') : null,
     remboursement_montant: r['remboursement-montant'] || null,
     remboursement_categorie: r['remboursement-montant'] ? (r['remboursement-categorie'] || null) : null,
+    remise_type: r['remise-valeur'] ? (r['remise-type'] || 'eur') : null,
+    remise_valeur: r['remise-valeur'] || null,
+    remise_montant: r['remise-valeur'] ? calculerMontantRemise(r) : null,
     email: r.email || '',
     appareil: r.appareil || '',
     marque: r.marque || '',
@@ -202,6 +214,9 @@ function rowToReport(row){
     'remboursement-motif': row.remboursement_motif || '',
     'remboursement-montant': row.remboursement_montant || '',
     'remboursement-categorie': row.remboursement_categorie || '',
+    'remise-type': row.remise_type || 'eur',
+    'remise-valeur': row.remise_valeur || '',
+    'remise-montant': row.remise_montant || '',
     email: row.email,
     appareil: row.appareil,
     marque: row.marque,
@@ -277,7 +292,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -779,9 +794,12 @@ async function renderStats(){
     const pieces = parseFloat(r['cout-pieces']) || 0;
     const depl = parseFloat(r['cout-deplacement']) || 0;
     const montantLigne = mo + pieces + depl;
+    const remiseMontant = calculerMontantRemise(r);
+    const montantNetFacture = Math.max(0, montantLigne - remiseMontant);
     const reste = parseFloat(r['reste-encaisser']) || 0;
-    // Ratio réellement encaissé sur ce dossier (1 = tout payé, 0 = rien payé)
-    const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, (montantLigne - reste) / montantLigne)) : 1;
+    // Ratio réellement encaissé sur ce dossier (1 = tout payé, 0 = rien payé), remise déjà déduite
+    const encaisseNet = Math.max(0, montantNetFacture - reste);
+    const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, encaisseNet / montantLigne)) : 1;
 
     let moEncaisse = mo * ratioEncaisse;
     let piecesEncaisse = pieces * ratioEncaisse;
@@ -824,8 +842,11 @@ async function renderStats(){
       const pieces = parseFloat(r['cout-pieces']) || 0;
       const depl = parseFloat(r['cout-deplacement']) || 0;
       const montantLigne = mo + pieces + depl;
+      const remiseMontant = calculerMontantRemise(r);
+      const montantNetFacture = Math.max(0, montantLigne - remiseMontant);
       const reste = parseFloat(r['reste-encaisser']) || 0;
-      const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, (montantLigne - reste) / montantLigne)) : 1;
+      const encaisseNet = Math.max(0, montantNetFacture - reste);
+      const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, encaisseNet / montantLigne)) : 1;
       const remboursementMontant = parseFloat(r['remboursement-montant']) || 0;
       return sum + Math.max(0, montantLigne * ratioEncaisse - remboursementMontant);
     }, 0);
@@ -2106,13 +2127,8 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
     }
     const sousTotal = lignes.reduce((s,l) => s + l.total, 0);
 
-    const remiseValeur = parseFloat(document.getElementById('remise-facture-valeur').value) || 0;
-    const remiseType = document.getElementById('remise-facture-type').value;
-    let remise = null;
-    if(remiseValeur > 0){
-      const montantDeduit = remiseType === 'pct' ? sousTotal * (remiseValeur / 100) : remiseValeur;
-      remise = { type: remiseType, valeur: remiseValeur, montantDeduit: Math.min(montantDeduit, sousTotal) };
-    }
+    const remiseMontant = calculerMontantRemise(r);
+    const remise = remiseMontant > 0 ? { type: r['remise-type'] || 'eur', valeur: parseFloat(r['remise-valeur']) || 0, montantDeduit: remiseMontant } : null;
     const montantTotal = remise ? Math.max(0, sousTotal - remise.montantDeduit) : sousTotal;
 
     const { annee, sequence, numero } = await getNextFactureNumero();
@@ -2135,16 +2151,12 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
       client_ville: r.ville || '',
       lignes: JSON.stringify(lignes),
       montant_total: montantTotal,
-      remise_type: remise ? remise.type : null,
-      remise_valeur: remise ? remise.valeur : null,
-      remise_montant: remise ? remise.montantDeduit : null,
       mode_paiement: r['paiement-moyen'] || '',
       pdf_base64: pdfBase64
     });
     if(error) throw error;
 
     facturesLight.push({ app_id: factureAppId, numero, rapport_app_id: r.id, annee, sequence });
-    document.getElementById('remise-facture-valeur').value = '';
     showToast(`Facture ${numero} générée et enregistrée ✓`);
     updateFactureButtons(r);
   }catch(e){
@@ -2220,13 +2232,8 @@ document.getElementById('apercu-test-facture-btn').addEventListener('click', () 
     }
     const sousTotal = lignes.reduce((s,l) => s + l.total, 0);
 
-    const remiseValeur = parseFloat(document.getElementById('remise-facture-valeur').value) || 0;
-    const remiseType = document.getElementById('remise-facture-type').value;
-    let remise = null;
-    if(remiseValeur > 0){
-      const montantDeduit = remiseType === 'pct' ? sousTotal * (remiseValeur / 100) : remiseValeur;
-      remise = { type: remiseType, valeur: remiseValeur, montantDeduit: Math.min(montantDeduit, sousTotal) };
-    }
+    const remiseMontant = calculerMontantRemise(r);
+    const remise = remiseMontant > 0 ? { type: r['remise-type'] || 'eur', valeur: parseFloat(r['remise-valeur']) || 0, montantDeduit: remiseMontant } : null;
     const montantTotal = remise ? Math.max(0, sousTotal - remise.montantDeduit) : sousTotal;
     const dateEmission = todayISO();
 
@@ -2331,13 +2338,9 @@ function updateFactureButtons(r){
   const genBtn = document.getElementById('generer-facture-btn');
   const voirBtn = document.getElementById('voir-facture-btn');
   const envoyerBtn = document.getElementById('envoyer-facture-btn');
-  const remiseValeurEl = document.getElementById('remise-facture-valeur');
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
   const existante = facturesLight.some(f => f.rapport_app_id === r.id);
-  const peutGenerer = isTermine && !existante;
-  genBtn.style.display = peutGenerer ? 'inline-flex' : 'none';
-  remiseValeurEl.closest('div').parentElement.style.display = peutGenerer ? 'flex' : 'none';
-  if(!peutGenerer) remiseValeurEl.value = '';
+  genBtn.style.display = (isTermine && !existante) ? 'inline-flex' : 'none';
   voirBtn.style.display = existante ? 'inline-flex' : 'none';
   envoyerBtn.style.display = existante ? 'inline-flex' : 'none';
 }
@@ -4135,12 +4138,24 @@ function updateResteAEncaisser(){
   document.getElementById('f-reste-encaisser').value = reste.toFixed(2);
 }
 
-['f-cout-mo','f-cout-pieces','f-cout-deplacement'].forEach(id => {
+function calculerTotalAvecRemise(){
+  const mo = parseFloat(document.getElementById('f-cout-mo').value) || 0;
+  const pieces = parseFloat(document.getElementById('f-cout-pieces').value) || 0;
+  const depl = parseFloat(document.getElementById('f-cout-deplacement').value) || 0;
+  const sousTotal = mo + pieces + depl;
+  const remiseValeur = parseFloat(document.getElementById('f-remise-valeur').value) || 0;
+  const remiseType = document.getElementById('f-remise-type').value;
+  const remiseMontant = remiseValeur > 0 ? Math.min(sousTotal, remiseType === 'pct' ? sousTotal * (remiseValeur/100) : remiseValeur) : 0;
+  return Math.max(0, sousTotal - remiseMontant);
+}
+
+['f-cout-mo','f-cout-pieces','f-cout-deplacement','f-remise-valeur','f-remise-type'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => {
-    const mo = parseFloat(document.getElementById('f-cout-mo').value) || 0;
-    const pieces = parseFloat(document.getElementById('f-cout-pieces').value) || 0;
-    const depl = parseFloat(document.getElementById('f-cout-deplacement').value) || 0;
-    document.getElementById('f-cout-total').value = (mo + pieces + depl).toFixed(2);
+    document.getElementById('f-cout-total').value = calculerTotalAvecRemise().toFixed(2);
+    updateResteAEncaisser();
+  });
+  document.getElementById(id).addEventListener('change', () => {
+    document.getElementById('f-cout-total').value = calculerTotalAvecRemise().toFixed(2);
     updateResteAEncaisser();
   });
 });
@@ -4150,10 +4165,7 @@ document.getElementById('f-cout-total').addEventListener('input', updateResteAEn
 
 // ---------- Pré-remplissage du coût pièce dans la facturation ----------
 function recalcTotal(){
-  const mo = parseFloat(document.getElementById('f-cout-mo').value) || 0;
-  const pieces = parseFloat(document.getElementById('f-cout-pieces').value) || 0;
-  const depl = parseFloat(document.getElementById('f-cout-deplacement').value) || 0;
-  document.getElementById('f-cout-total').value = (mo + pieces + depl).toFixed(2);
+  document.getElementById('f-cout-total').value = calculerTotalAvecRemise().toFixed(2);
   updateResteAEncaisser();
 }
 
@@ -4690,7 +4702,7 @@ const fieldIds = [
   'f-appareil','f-marque','f-modele','f-serie','f-age',
   'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
   'f-piece-desc','f-pieces-commandees-json','f-prix-fournisseur','f-livraison','f-piece-cout',
-  'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-cout-total','f-reste-encaisser',
+  'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-remise-valeur','f-remise-type','f-cout-total','f-reste-encaisser',
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen','f-paiement-especes','f-paiement-carte',
   'f-notes'
 ];
@@ -4714,6 +4726,8 @@ function resetForm(){
   document.getElementById('f-paiement-statut').value = 'Paye_total';
   document.getElementById('f-paiement-statut').disabled = false;
   document.getElementById('f-reste-encaisser').value = '0.00';
+  document.getElementById('f-remise-valeur').value = '';
+  document.getElementById('f-remise-type').value = 'eur';
   document.getElementById('commande-piece-fields').style.display = 'none';
   document.getElementById('acompte-field').style.display = 'none';
   document.getElementById('paiement-mixte-fields').style.display = 'none';
