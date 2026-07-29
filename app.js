@@ -47,6 +47,7 @@ function onAuthenticated(){
   if(typeof loadReportsFromSupabase === 'function') loadReportsFromSupabase();
   if(typeof loadFacturesLight === 'function') loadFacturesLight();
   if(typeof loadDevisLight === 'function') loadDevisLight();
+  if(typeof checkDraft === 'function') checkDraft();
 }
 
 document.getElementById('login-submit-btn').addEventListener('click', async () => {
@@ -3995,7 +3996,7 @@ function clearDraft(){
 
 function hasDraftContent(data){
   // Considère qu'il y a un brouillon utile si au moins un champ texte/coché est rempli
-  const skip = ['date','heure','technicien','statut','paiement-statut','reste-encaisser','livraison','cout-total','ref','id','_draftStep','photos','plaquePhoto','signature'];
+  const skip = ['date','heure','technicien','statut','paiement-statut','reste-encaisser','livraison','cout-total','ref','id','_draftStep','photos','plaquePhoto','signature','remise-type'];
   for(const key in data){
     if(skip.includes(key)) continue;
     const val = data[key];
@@ -8473,7 +8474,7 @@ document.getElementById('attestation-generate').addEventListener('click', async 
 });
 
 
-(function checkDraft(){
+function checkDraft(){
   try{
     const raw = localStorage.getItem(DRAFT_KEY);
     if(!raw) return;
@@ -8503,6 +8504,6 @@ document.getElementById('attestation-generate').addEventListener('click', async 
       clearDraft();
     }
   }catch(e){}
-})();
+}
 
 
