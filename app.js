@@ -3075,7 +3075,7 @@ function showAgendaDetail(appId){
     ['Client', `${r.prenom || ''} ${r.nom || ''}`.trim()],
     ['Téléphone', r.tel ? '__HTML__' + telValue : null],
     ['Email', r.email],
-    ['Adresse', `${r.adresse || ''}, ${r.cp || ''} ${r.ville || ''}`],
+    ['Adresse', `${r.adresse || ''}${r.adresse2 ? ', ' + r.adresse2 : ''}, ${r.cp || ''} ${r.ville || ''}`],
     ['Appareil', r.appareil],
     ['Marque', r.marque],
     ['Modèle', r.modele],
@@ -3097,10 +3097,11 @@ function showAgendaDetail(appId){
 
   // Boutons Waze / Copier adresse
   const addrFull = `${r.adresse||''} ${r.cp||''} ${r.ville||''}`.trim();
+  const addrCopie = `${r.adresse||''}${r.adresse2 ? ', ' + r.adresse2 : ''} ${r.cp||''} ${r.ville||''}`.trim();
   if(addrFull){
     html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.4rem;">';
     html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull)}'))">🗺️ Waze</button>`;
-    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrFull)}'))">📋 Copier adresse</button>`;
+    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie)}'))">📋 Copier adresse</button>`;
     html += '</div>';
   }
 
@@ -3511,6 +3512,7 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
   document.getElementById('newrdv-prenom').value = r.prenom || '';
   document.getElementById('newrdv-nom').value = r.nom || '';
   document.getElementById('newrdv-adresse').value = r.adresse || '';
+  document.getElementById('newrdv-adresse2').value = r.adresse2 || '';
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
@@ -3591,6 +3593,7 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     nom: nom,
     prenom: prenom,
     adresse: document.getElementById('newrdv-adresse').value.trim(),
+    adresse2: document.getElementById('newrdv-adresse2').value.trim(),
     cp: document.getElementById('newrdv-cp').value.trim(),
     ville: document.getElementById('newrdv-ville').value.trim(),
     tel: document.getElementById('newrdv-tel').value.trim(),
@@ -5475,13 +5478,14 @@ function renderDetailContent(r, container){
   html += '</div>';
 
   html += '<div class="detail-section"><h3>Client</h3>';
-  html += dRow('Adresse', escapeHtml(`${r.adresse||''}, ${r.cp||''} ${r.ville||''}`));
+  html += dRow('Adresse', escapeHtml(`${r.adresse||''}${r.adresse2 ? ', ' + r.adresse2 : ''}, ${r.cp||''} ${r.ville||''}`));
   // Boutons adresse
   const addrFull = `${r.adresse||''} ${r.cp||''} ${r.ville||''}`.trim();
+  const addrCopie = `${r.adresse||''}${r.adresse2 ? ', ' + r.adresse2 : ''} ${r.cp||''} ${r.ville||''}`.trim();
   if(addrFull){
     html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">';
     html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull)}'))">🗺️ Waze</button>`;
-    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrFull)}'))">📋 Copier adresse</button>`;
+    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie)}'))">📋 Copier adresse</button>`;
 
     html += '</div>';
   }
@@ -7607,6 +7611,7 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   document.getElementById('newrdv-nom').value = r.nom || '';
   document.getElementById('newrdv-prenom').value = r.prenom || '';
   document.getElementById('newrdv-adresse').value = r.adresse || '';
+  document.getElementById('newrdv-adresse2').value = r.adresse2 || '';
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
@@ -7671,6 +7676,7 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   document.getElementById('newrdv-prenom').value = r.prenom || '';
   document.getElementById('newrdv-nom').value = r.nom || '';
   document.getElementById('newrdv-adresse').value = r.adresse || '';
+  document.getElementById('newrdv-adresse2').value = r.adresse2 || '';
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
   document.getElementById('newrdv-tel').value = r.tel || '';
@@ -8067,6 +8073,7 @@ document.getElementById('client-search') && document.getElementById('client-sear
         document.getElementById('newrdv-entreprise-fields').style.display = c.type_client === 'professionnel' ? 'block' : 'none';
         document.getElementById('newrdv-email').value   = c.email   || '';
         document.getElementById('newrdv-adresse').value = c.adresse || '';
+        document.getElementById('newrdv-adresse2').value = '';
         document.getElementById('newrdv-cp').value      = c.cp      || '';
         document.getElementById('newrdv-ville').value   = c.ville   || '';
         input.value = clientDisplayName(c);
