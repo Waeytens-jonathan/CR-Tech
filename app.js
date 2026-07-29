@@ -101,6 +101,9 @@ function reportToRow(r){
     type_client: r['type-client'] || 'particulier',
     entreprise_nom: r['type-client'] === 'professionnel' ? (r['entreprise-nom'] || null) : null,
     entreprise_siret: r['type-client'] === 'professionnel' ? (r['entreprise-siret'] || null) : null,
+    remboursement_motif: r['remboursement-montant'] ? (r['remboursement-motif'] || '') : null,
+    remboursement_montant: r['remboursement-montant'] || null,
+    remboursement_categorie: r['remboursement-montant'] ? (r['remboursement-categorie'] || null) : null,
     email: r.email || '',
     appareil: r.appareil || '',
     marque: r.marque || '',
@@ -196,6 +199,9 @@ function rowToReport(row){
     'type-client': row.type_client || 'particulier',
     'entreprise-nom': row.entreprise_nom || '',
     'entreprise-siret': row.entreprise_siret || '',
+    'remboursement-motif': row.remboursement_motif || '',
+    'remboursement-montant': row.remboursement_montant || '',
+    'remboursement-categorie': row.remboursement_categorie || '',
     email: row.email,
     appareil: row.appareil,
     marque: row.marque,
@@ -271,7 +277,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -777,9 +783,20 @@ async function renderStats(){
     // Ratio réellement encaissé sur ce dossier (1 = tout payé, 0 = rien payé)
     const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, (montantLigne - reste) / montantLigne)) : 1;
 
-    totalMo += mo * ratioEncaisse;
-    totalPieces += pieces * ratioEncaisse;
-    totalDepl += depl * ratioEncaisse;
+    let moEncaisse = mo * ratioEncaisse;
+    let piecesEncaisse = pieces * ratioEncaisse;
+    let deplEncaisse = depl * ratioEncaisse;
+
+    const remboursementMontant = parseFloat(r['remboursement-montant']) || 0;
+    if(remboursementMontant > 0){
+      if(r['remboursement-categorie'] === 'piece') piecesEncaisse = Math.max(0, piecesEncaisse - remboursementMontant);
+      else if(r['remboursement-categorie'] === 'mo') moEncaisse = Math.max(0, moEncaisse - remboursementMontant);
+      else if(r['remboursement-categorie'] === 'deplacement') deplEncaisse = Math.max(0, deplEncaisse - remboursementMontant);
+    }
+
+    totalMo += moEncaisse;
+    totalPieces += piecesEncaisse;
+    totalDepl += deplEncaisse;
     const prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
     totalFournisseur += prixFournisseur;
     if(prixFournisseur > 0){
@@ -809,7 +826,8 @@ async function renderStats(){
       const montantLigne = mo + pieces + depl;
       const reste = parseFloat(r['reste-encaisser']) || 0;
       const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, (montantLigne - reste) / montantLigne)) : 1;
-      return sum + montantLigne * ratioEncaisse;
+      const remboursementMontant = parseFloat(r['remboursement-montant']) || 0;
+      return sum + Math.max(0, montantLigne * ratioEncaisse - remboursementMontant);
     }, 0);
   }
   renderTrend('stat-nb-trend', filtered.length, prevFiltered ? prevFiltered.length : null);
@@ -1794,7 +1812,7 @@ function buildFactureLignes(r){
   return lignes;
 }
 
-function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
+function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission, remise){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const W = 210, margin = 20;
@@ -1908,6 +1926,20 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission){
   y += 3;
   doc.setDrawColor(220,220,220); doc.line(margin, y, W-margin, y);
   y += 8;
+
+  if(remise && remise.montantDeduit > 0){
+    const sousTotal = montantTotal + remise.montantDeduit;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(80,80,80);
+    doc.text('Sous-total', margin, y);
+    doc.text(sousTotal.toFixed(2)+' €', W-margin-3, y, {align:'right'});
+    y += 6;
+    const remiseLabel = remise.type === 'pct' ? `Remise (${remise.valeur}%)` : 'Remise';
+    doc.setTextColor(224,88,79);
+    doc.text(remiseLabel, margin, y);
+    doc.text('-' + remise.montantDeduit.toFixed(2)+' €', W-margin-3, y, {align:'right'});
+    y += 8;
+  }
+
   doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(13,27,42);
   doc.text('TOTAL TTC À PAYER', margin, y);
   doc.text(montantTotal.toFixed(2)+' €', W-margin-3, y, {align:'right'});
@@ -2072,11 +2104,21 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
       btn.textContent = '🧾 Générer la facture';
       return;
     }
-    const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
+    const sousTotal = lignes.reduce((s,l) => s + l.total, 0);
+
+    const remiseValeur = parseFloat(document.getElementById('remise-facture-valeur').value) || 0;
+    const remiseType = document.getElementById('remise-facture-type').value;
+    let remise = null;
+    if(remiseValeur > 0){
+      const montantDeduit = remiseType === 'pct' ? sousTotal * (remiseValeur / 100) : remiseValeur;
+      remise = { type: remiseType, valeur: remiseValeur, montantDeduit: Math.min(montantDeduit, sousTotal) };
+    }
+    const montantTotal = remise ? Math.max(0, sousTotal - remise.montantDeduit) : sousTotal;
+
     const { annee, sequence, numero } = await getNextFactureNumero();
     const dateEmission = todayISO();
 
-    const doc = generateFacturePdf(r, numero, lignes, montantTotal, dateEmission);
+    const doc = generateFacturePdf(r, numero, lignes, montantTotal, dateEmission, remise);
     const pdfBase64 = doc.output('datauristring').split(',')[1];
 
     const factureAppId = 'fact_' + Date.now();
@@ -2093,12 +2135,16 @@ document.getElementById('generer-facture-btn').addEventListener('click', async (
       client_ville: r.ville || '',
       lignes: JSON.stringify(lignes),
       montant_total: montantTotal,
+      remise_type: remise ? remise.type : null,
+      remise_valeur: remise ? remise.valeur : null,
+      remise_montant: remise ? remise.montantDeduit : null,
       mode_paiement: r['paiement-moyen'] || '',
       pdf_base64: pdfBase64
     });
     if(error) throw error;
 
     facturesLight.push({ app_id: factureAppId, numero, rapport_app_id: r.id, annee, sequence });
+    document.getElementById('remise-facture-valeur').value = '';
     showToast(`Facture ${numero} générée et enregistrée ✓`);
     updateFactureButtons(r);
   }catch(e){
@@ -2172,11 +2218,20 @@ document.getElementById('apercu-test-facture-btn').addEventListener('click', () 
       showToast('Aucun montant à facturer sur ce compte-rendu', true);
       return;
     }
-    const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
+    const sousTotal = lignes.reduce((s,l) => s + l.total, 0);
+
+    const remiseValeur = parseFloat(document.getElementById('remise-facture-valeur').value) || 0;
+    const remiseType = document.getElementById('remise-facture-type').value;
+    let remise = null;
+    if(remiseValeur > 0){
+      const montantDeduit = remiseType === 'pct' ? sousTotal * (remiseValeur / 100) : remiseValeur;
+      remise = { type: remiseType, valeur: remiseValeur, montantDeduit: Math.min(montantDeduit, sousTotal) };
+    }
+    const montantTotal = remise ? Math.max(0, sousTotal - remise.montantDeduit) : sousTotal;
     const dateEmission = todayISO();
 
     // Numéro factice, aucune écriture en base : rien n'est consommé ni enregistré
-    const doc = generateFacturePdf(r, 'APERÇU-TEST', lignes, montantTotal, dateEmission);
+    const doc = generateFacturePdf(r, 'APERÇU-TEST', lignes, montantTotal, dateEmission, remise);
     doc.save('apercu-test-facture.pdf');
     showToast('Aperçu généré — non enregistré, la numérotation n\'a pas bougé');
   }catch(e){
@@ -2276,9 +2331,13 @@ function updateFactureButtons(r){
   const genBtn = document.getElementById('generer-facture-btn');
   const voirBtn = document.getElementById('voir-facture-btn');
   const envoyerBtn = document.getElementById('envoyer-facture-btn');
+  const remiseValeurEl = document.getElementById('remise-facture-valeur');
   const isTermine = ['Terminée','Non_reparable'].includes(r.statut);
   const existante = facturesLight.some(f => f.rapport_app_id === r.id);
-  genBtn.style.display = (isTermine && !existante) ? 'inline-flex' : 'none';
+  const peutGenerer = isTermine && !existante;
+  genBtn.style.display = peutGenerer ? 'inline-flex' : 'none';
+  remiseValeurEl.closest('div').parentElement.style.display = peutGenerer ? 'flex' : 'none';
+  if(!peutGenerer) remiseValeurEl.value = '';
   voirBtn.style.display = existante ? 'inline-flex' : 'none';
   envoyerBtn.style.display = existante ? 'inline-flex' : 'none';
 }
@@ -5299,6 +5358,23 @@ function renderDetailContent(r, container){
     <div class="field" style="margin-top:0.5rem;"><label>N° SIRET</label><input type="text" id="quick-entreprise-siret" placeholder="14 chiffres" maxlength="14" value="${escapeHtml(r['entreprise-siret']||'')}"></div>
   </div>`;
 
+  const remboursementActif = !!r['remboursement-montant'] && parseFloat(r['remboursement-montant']) > 0;
+  html += `<div class="checkbox-row" style="margin-top:0.6rem;">
+    <input type="checkbox" id="quick-remboursement-toggle" ${remboursementActif ? 'checked' : ''}>
+    <label for="quick-remboursement-toggle">Remboursement / geste commercial effectué</label>
+  </div>`;
+  html += `<div id="quick-remboursement-fields" style="display:${remboursementActif ? 'block' : 'none'};">
+    <div class="field" style="margin-top:0.5rem;"><label>Motif</label><input type="text" id="quick-remboursement-motif" placeholder="Ex : appareil rendu défectueux, insatisfaction..." value="${escapeHtml(r['remboursement-motif']||'')}"></div>
+    <div class="field" style="margin-top:0.5rem;"><label>Montant remboursé (€)</label><input type="number" id="quick-remboursement-montant" step="0.01" min="0" placeholder="0.00" value="${escapeHtml(r['remboursement-montant']||'')}"></div>
+    <div class="field" style="margin-top:0.5rem;"><label>Sur quelle partie ?</label>
+      <select id="quick-remboursement-categorie">
+        <option value="piece" ${r['remboursement-categorie']==='piece'?'selected':''}>Pièce</option>
+        <option value="mo" ${r['remboursement-categorie']==='mo'?'selected':''}>Main d'œuvre</option>
+        <option value="deplacement" ${r['remboursement-categorie']==='deplacement'?'selected':''}>Déplacement</option>
+      </select>
+    </div>
+  </div>`;
+
   html += '<div class="checkbox-row" style="margin-top:0.4rem;">';
   html += `<input type="checkbox" id="quick-facture" ${r['facture-creee'] ? 'checked' : ''}>`;
   html += '<label for="quick-facture">Facture créée / envoyée</label></div>';
@@ -5433,6 +5509,10 @@ function renderDetailContent(r, container){
     c.querySelector('#quick-entreprise-fields').style.display = e.target.value === 'professionnel' ? 'block' : 'none';
   });
 
+  c.querySelector('#quick-remboursement-toggle')?.addEventListener('change', (e) => {
+    c.querySelector('#quick-remboursement-fields').style.display = e.target.checked ? 'block' : 'none';
+  });
+
   c.querySelector('.voir-dossier-origine-btn')?.addEventListener('click', (e) => {
     const parentId = e.currentTarget.dataset.parentId;
     const parent = reports.find(x => (x.app_id||x.id) === parentId);
@@ -5507,6 +5587,17 @@ function renderDetailContent(r, container){
       } else {
         reports[idx]['entreprise-nom'] = '';
         reports[idx]['entreprise-siret'] = '';
+      }
+
+      const remboursementToggle = document.getElementById('quick-remboursement-toggle');
+      if(remboursementToggle.checked){
+        reports[idx]['remboursement-motif'] = document.getElementById('quick-remboursement-motif').value.trim();
+        reports[idx]['remboursement-montant'] = document.getElementById('quick-remboursement-montant').value || '0';
+        reports[idx]['remboursement-categorie'] = document.getElementById('quick-remboursement-categorie').value;
+      } else {
+        reports[idx]['remboursement-motif'] = '';
+        reports[idx]['remboursement-montant'] = '';
+        reports[idx]['remboursement-categorie'] = '';
       }
 
       // Le délai d'archivage démarre uniquement quand le dossier est Terminé ET la facture créée
