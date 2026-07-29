@@ -7591,6 +7591,7 @@ async function renderDossierAppareilContent(r){
     <button class="btn btn-secondary doss-avis-btn">⭐ Avis</button>
     ${isTermine ? '<button class="btn btn-outline doss-archiver-btn" style="font-size:0.82rem;">📦 Archiver</button>' : ''}
     ${r.statut === 'archivé' ? '<button class="btn btn-outline doss-sav-btn" style="border-color:#e0584f;color:#e0584f;">🛠️ Rouvrir SAV</button>' : ''}
+    <button class="btn btn-danger doss-delete-btn" style="width:100%;">🗑️ Supprimer cet appareil</button>
   `;
   el.appendChild(actionsDiv);
 
@@ -7612,6 +7613,24 @@ async function renderDossierAppareilContent(r){
     clearDraft();
     loadIntoForm(r);
     goToStep(1);
+  });
+  actionsDiv.querySelector('.doss-delete-btn')?.addEventListener('click', () => {
+    const name = `${r.prenom||''} ${r.nom||''}`.trim() || 'ce dossier';
+    const appareilLabel = r.appareil ? ` (${r.appareil})` : '';
+    if(!confirm(`Supprimer le compte-rendu de ${name}${appareilLabel} ?`)) return;
+    if(!confirm('Confirmer ? Action irréversible.')) return;
+
+    reports = reports.filter(rep => rep.id !== r.id);
+    deleteReportFromSupabase(r.id);
+    currentDossierRapports = currentDossierRapports.filter(rep => rep.id !== r.id);
+    showToast('Appareil supprimé ✓');
+
+    if(currentDossierRapports.length){
+      if(activeDossierTabIdx >= currentDossierRapports.length) activeDossierTabIdx = currentDossierRapports.length - 1;
+      renderDossierView();
+    } else {
+      goToList();
+    }
   });
   actionsDiv.querySelector('.doss-documents-btn')?.addEventListener('click', () => {
     currentDetailReport = r;
