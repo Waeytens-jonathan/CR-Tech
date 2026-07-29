@@ -3088,13 +3088,15 @@ function showAgendaDetail(appId){
       }
       const tous = [{ appareil: r.appareil, marque: r.marque, modele: r.modele, panne: r.panne }, ...sup];
       if(!tous[0].appareil && !sup.length) return null;
-      return '__HTML__<div style="display:flex;flex-direction:column;gap:0.5rem;">' + tous.map((a, i) => {
+      return '__HTML__<div style="display:flex;flex-direction:column;gap:0.9rem;">' + tous.map((a, i) => {
         const sousTitre = [a.marque, a.modele].filter(Boolean).join(' ');
-        return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--orange);margin-bottom:0.2rem;">Appareil ${i+1}</div>
-          <div style="font-weight:600;">${escapeHtml(a.appareil||'—')}</div>
-          ${sousTitre ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.1rem;">${escapeHtml(sousTitre)}</div>` : ''}
-          ${a.panne ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.3rem;">${escapeHtml(a.panne)}</div>` : ''}
+        return `<div>
+          <div style="font-weight:600;margin-bottom:0.4rem;">Appareil ${i+1}</div>
+          <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;">
+            <div style="font-weight:600;">${escapeHtml(a.appareil||'—')}</div>
+            ${sousTitre ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.1rem;">${escapeHtml(sousTitre)}</div>` : ''}
+            ${a.panne ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.3rem;">${escapeHtml(a.panne)}</div>` : ''}
+          </div>
         </div>`;
       }).join('') + '</div>';
     })()],
