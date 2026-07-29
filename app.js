@@ -3090,10 +3090,14 @@ function showAgendaDetail(appId){
       try{
         const sup = JSON.parse(r.appareils_supplementaires);
         if(!Array.isArray(sup) || !sup.length) return null;
-        return '__HTML__' + sup.map((a,i) => `<div style="margin-bottom:${i<sup.length-1?'0.6rem':'0'};padding-bottom:${i<sup.length-1?'0.6rem':'0'};${i<sup.length-1?'border-bottom:1px solid var(--border);':''}">
-          <strong>${escapeHtml(a.appareil||'—')}</strong>${a.marque || a.modele ? ` — ${escapeHtml(a.marque||'')} ${escapeHtml(a.modele||'')}`.trim() : ''}
-          ${a.panne ? `<div style="color:var(--muted,#778);margin-top:0.2rem;">${escapeHtml(a.panne)}</div>` : ''}
-        </div>`).join('');
+        return '__HTML__<div style="display:flex;flex-direction:column;gap:0.5rem;">' + sup.map(a => {
+          const sousTitre = [a.marque, a.modele].filter(Boolean).join(' ');
+          return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;">
+            <div style="font-weight:600;">${escapeHtml(a.appareil||'—')}</div>
+            ${sousTitre ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.1rem;">${escapeHtml(sousTitre)}</div>` : ''}
+            ${a.panne ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.3rem;">${escapeHtml(a.panne)}</div>` : ''}
+          </div>`;
+        }).join('') + '</div>';
       }catch(e){ return null; }
     })()],
     ['Note pour le technicien', noteAffichee],
@@ -3200,6 +3204,41 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
     console.error('Erreur mise à jour statut RDV :', e);
   }
 
+  let appareilsSup = [];
+  if(r.appareils_supplementaires){
+    try{ appareilsSup = JSON.parse(r.appareils_supplementaires) || []; }catch(e){}
+  }
+
+  if(appareilsSup.length){
+    const tousAppareils = [{ appareil: r.appareil, marque: r.marque, modele: r.modele, panne: r.panne }, ...appareilsSup];
+    const listEl = document.getElementById('choix-appareil-depart-list');
+    listEl.innerHTML = tousAppareils.map((a, i) => `
+      <button class="btn btn-outline choix-appareil-btn" data-idx="${i}" style="text-align:left;padding:0.7rem 0.9rem;">
+        <div style="font-weight:600;">${escapeHtml(a.appareil || 'Appareil ' + (i+1))}</div>
+        ${[a.marque,a.modele].filter(Boolean).length ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.15rem;">${escapeHtml([a.marque,a.modele].filter(Boolean).join(' '))}</div>` : ''}
+        ${a.panne ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.15rem;">${escapeHtml(a.panne)}</div>` : ''}
+      </button>
+    `).join('');
+    listEl.querySelectorAll('.choix-appareil-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        document.getElementById('choix-appareil-depart-modal').style.display = 'none';
+        const choisi = tousAppareils[idx];
+        const reste = tousAppareils.filter((_, i2) => i2 !== idx);
+        demarrerCrDepuisRdv(r, choisi, reste);
+      });
+    });
+    document.getElementById('choix-appareil-depart-modal').style.display = 'flex';
+  } else {
+    demarrerCrDepuisRdv(r, { appareil: r.appareil, marque: r.marque, modele: r.modele, panne: r.panne }, []);
+  }
+});
+
+document.getElementById('choix-appareil-depart-cancel').addEventListener('click', () => {
+  document.getElementById('choix-appareil-depart-modal').style.display = 'none';
+});
+
+function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
   resetForm();
   clearDraft();
   window._creatingFromRdvAppId = r.app_id;
@@ -3218,35 +3257,27 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
   document.getElementById('f-type-client').value = r.type_client || 'particulier';
   document.getElementById('f-entreprise-nom').value = r.entreprise_nom || '';
   document.getElementById('f-entreprise-siret').value = r.entreprise_siret || '';
-  document.getElementById('f-appareil').value = matchAppareilOption(r.appareil);
+  document.getElementById('f-appareil').value = matchAppareilOption(appareilDepart.appareil);
   autoFillMainOeuvre(document.getElementById('f-appareil').value);
-  document.getElementById('f-marque').value = r.marque || '';
-  document.getElementById('f-modele').value = r.modele || '';
-  document.getElementById('f-panne').value = r.panne || '';
+  document.getElementById('f-marque').value = appareilDepart.marque || '';
+  document.getElementById('f-modele').value = appareilDepart.modele || '';
+  document.getElementById('f-panne').value = appareilDepart.panne || '';
   if(r.plaque_photo){
     plaquePhoto = r.plaque_photo;
     renderPlaqueThumb();
   }
 
-  // Si le RDV a plusieurs appareils, on prépare une file d'attente pour créer un CR par appareil,
-  // regroupés dans le même dossier.
-  window._appareilsRestants = [];
-  if(r.appareils_supplementaires){
-    try{
-      const sup = JSON.parse(r.appareils_supplementaires);
-      if(Array.isArray(sup) && sup.length){
-        window._appareilsRestants = sup;
-        window._multiAppareilsDossierId = 'dos_' + Date.now();
-        window._currentDossierAppId = window._multiAppareilsDossierId;
-        window._dossierMultiAppareilsTotal = sup.length + 1;
-        window._multiAppareilsIndex = 1;
-        window._multiAppareilsClientInfo = {
-          nom: r.nom||'', prenom: r.prenom||'', adresse: r.adresse||'', cp: r.cp||'', ville: r.ville||'',
-          tel: r.tel||'', email: r.email||'', type_client: r.type_client||'particulier',
-          entreprise_nom: r.entreprise_nom||'', entreprise_siret: r.entreprise_siret||'', date: r.date || todayISO()
-        };
-      }
-    }catch(e){}
+  window._appareilsRestants = appareilsRestants || [];
+  if(window._appareilsRestants.length){
+    window._multiAppareilsDossierId = 'dos_' + Date.now();
+    window._currentDossierAppId = window._multiAppareilsDossierId;
+    window._dossierMultiAppareilsTotal = window._appareilsRestants.length + 1;
+    window._multiAppareilsIndex = 1;
+    window._multiAppareilsClientInfo = {
+      nom: r.nom||'', prenom: r.prenom||'', adresse: r.adresse||'', cp: r.cp||'', ville: r.ville||'',
+      tel: r.tel||'', email: r.email||'', type_client: r.type_client||'particulier',
+      entreprise_nom: r.entreprise_nom||'', entreprise_siret: r.entreprise_siret||'', date: r.date || todayISO()
+    };
   }
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -3258,7 +3289,7 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
   } else {
     showToast(r.is_sav ? 'Infos pré-remplies — compte-rendu SAV lié au dossier d\'origine' : 'Infos client pré-remplies depuis le RDV');
   }
-});
+}
 
 document.getElementById('agenda-detail-sms-arrival-btn').addEventListener('click', () => {
   if(!currentAgendaRdv) return;

@@ -1439,6 +1439,15 @@
 </div>
 
 <!-- Ouvrir un SAV -->
+<div id="choix-appareil-depart-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <h3 style="margin:0 0 0.5rem;color:var(--orange);">🔧 Par quel appareil commencer ?</h3>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 1rem;">Ce RDV a plusieurs appareils. Choisis celui par lequel tu veux commencer le diagnostic — les autres suivront ensuite.</p>
+    <div id="choix-appareil-depart-list" style="display:flex;flex-direction:column;gap:0.6rem;"></div>
+    <button class="btn btn-outline" id="choix-appareil-depart-cancel" style="width:100%;margin-top:1rem;">Annuler</button>
+  </div>
+</div>
+
 <div id="annulation-rdv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
     <h3 style="margin:0 0 0.8rem;color:var(--red,#e0584f);">🚫 Annuler le RDV</h3>
