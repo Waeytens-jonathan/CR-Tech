@@ -85,6 +85,69 @@ const TABLE = 'rapports';
 
 // Convertit un objet "report" (format interne JS) -> ligne Supabase
 // Calcule le montant réel (en €) déduit par la remise d'un dossier, à partir de son sous-total brut
+// Un dossier est-il en situation d'impayé (> 15 jours, reste à encaisser > 0) ?
+function joursDepuisIntervention(r){
+  if(!r.date) return 0;
+  return Math.floor((Date.now() - new Date(r.date + 'T00:00:00').getTime()) / 86400000);
+}
+function estEnRetardPaiement(r){
+  if(!r.date) return false;
+  if(r['paiement-statut'] === 'Gratuit') return false;
+  const reste = parseFloat(r['reste-encaisser']) || 0;
+  if(reste <= 0) return false;
+  return joursDepuisIntervention(r) > 15;
+}
+
+async function envoyerRelanceImpaye(r){
+  const reste = parseFloat(r['reste-encaisser']) || 0;
+  const emailCible = await getEmailAJour(r);
+  if(!emailCible){ showToast('Email du client manquant', true); return; }
+
+  if(!confirm(`Confirmer l'envoi de la relance de paiement à ${r.prenom || ''} ${r.nom || ''} (${emailCible}) pour ${reste.toFixed(2)} € restant dû, avec un délai de 48h ?`)) return;
+
+  const btn = document.getElementById('relance-impaye-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Envoi en cours…'; }
+
+  try{
+    // Récupérer la facture liée si elle existe, pour joindre son PDF et son numéro
+    const factureLight = facturesLight.find(f => f.rapport_app_id === r.id);
+    let numeroFacture = '', dateEmissionFacture = '', pdfBase64Facture = null;
+    if(factureLight){
+      const { data: factureRow, error: factureErr } = await sb.from('factures').select('numero,date_emission,pdf_base64').eq('app_id', factureLight.app_id).single();
+      if(!factureErr && factureRow){
+        numeroFacture = factureRow.numero || '';
+        dateEmissionFacture = factureRow.date_emission || '';
+        pdfBase64Facture = factureRow.pdf_base64 || null;
+      }
+    }
+
+    if(!_agendaConfigCache){ try{ await getAgendaParams(); }catch(e){} }
+
+    const { error } = await sb.functions.invoke('send-relance-impaye', {
+      body: {
+        email: emailCible,
+        cc_email: 'technikhome62@gmail.com',
+        nom: r.nom || '', prenom: r.prenom || '',
+        appareil: r.appareil || '',
+        date_prestation: r.date || '',
+        numero_facture: numeroFacture,
+        date_emission_facture: dateEmissionFacture,
+        montant: reste.toFixed(2),
+        rib_titulaire: (_agendaConfigCache && _agendaConfigCache.ribTitulaire) || '',
+        rib_iban: (_agendaConfigCache && _agendaConfigCache.ribIban) || '',
+        rib_bic: (_agendaConfigCache && _agendaConfigCache.ribBic) || '',
+        pdf_base64: pdfBase64Facture
+      }
+    });
+    if(error) throw error;
+    showToast('Relance envoyée au client (en copie à toi-même) ✓');
+  }catch(e){
+    console.error('Erreur envoi relance impayé :', e);
+    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
+  }
+  if(btn){ btn.disabled = false; btn.textContent = '📧 Envoyer la relance (48h pour régulariser)'; }
+}
+
 function calculerMontantRemise(r){
   const remiseValeur = parseFloat(r['remise-valeur']) || 0;
   if(remiseValeur <= 0) return 0;
@@ -5190,6 +5253,7 @@ function buildDossierItem(rapports){
     statutBadge = '<span class="badge orange">🔄 En cours</span>';
   }
   if(hasSAV) statutBadge += '<span class="badge red" style="font-size:0.7rem;margin-left:4px;">🛠️ SAV</span>';
+  if(rapports.some(r => estEnRetardPaiement(r))) statutBadge += '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;font-size:0.7rem;margin-left:4px;">⚠️ Impayé</span>';
 
   // Badges appareils
   const appareilBadges = rapports.map(r =>
@@ -5338,6 +5402,17 @@ function renderDetailContent(r, container){
       </div>`;
     });
     html += `</div>`;
+  }
+
+  // ---------- Alerte impayé (> 15 jours, reste à encaisser) ----------
+  if(estEnRetardPaiement(r)){
+    const joursEcoules = joursDepuisIntervention(r);
+    const reste = parseFloat(r['reste-encaisser']) || 0;
+    html += `<div style="background:rgba(224,88,79,0.1);border:1px solid #e0584f;border-radius:10px;padding:1rem;margin-bottom:1rem;">
+      <div style="font-weight:700;color:#e0584f;margin-bottom:0.4rem;">⚠️ Impayé depuis ${joursEcoules} jours</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.8rem;">Reste à encaisser : ${reste.toFixed(2)} € — intervention du ${dateFrLong ? dateFrLong(r.date) : r.date}</div>
+      <button class="btn btn-danger" id="relance-impaye-btn" style="width:100%;">📧 Envoyer la relance (48h pour régulariser)</button>
+    </div>`;
   }
 
   // ---------- Suivi rapide (éditable) ----------
@@ -5550,6 +5625,9 @@ function renderDetailContent(r, container){
       c.querySelector('#sav-piece-cout').style.display = e.target.value === 'oui' ? 'block' : 'none';
     });
   }
+
+  c.querySelector('#relance-impaye-btn')?.addEventListener('click', () => envoyerRelanceImpaye(r));
+
   const savFicheSaveBtn = c.querySelector('#sav-fiche-save-btn');
   if(savFicheSaveBtn){
     savFicheSaveBtn.addEventListener('click', () => {
