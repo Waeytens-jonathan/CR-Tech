@@ -3220,17 +3220,17 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
       </button>
     `).join('');
     listEl.querySelectorAll('.choix-appareil-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const idx = parseInt(btn.dataset.idx, 10);
         document.getElementById('choix-appareil-depart-modal').style.display = 'none';
         const choisi = tousAppareils[idx];
         const reste = tousAppareils.filter((_, i2) => i2 !== idx);
-        demarrerCrDepuisRdv(r, choisi, reste);
+        await demarrerCrDepuisRdv(r, choisi, reste);
       });
     });
     document.getElementById('choix-appareil-depart-modal').style.display = 'flex';
   } else {
-    demarrerCrDepuisRdv(r, { appareil: r.appareil, marque: r.marque, modele: r.modele, panne: r.panne }, []);
+    await demarrerCrDepuisRdv(r, { appareil: r.appareil, marque: r.marque, modele: r.modele, panne: r.panne }, []);
   }
 });
 
@@ -3238,7 +3238,7 @@ document.getElementById('choix-appareil-depart-cancel').addEventListener('click'
   document.getElementById('choix-appareil-depart-modal').style.display = 'none';
 });
 
-function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
+async function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
   resetForm();
   clearDraft();
   window._creatingFromRdvAppId = r.app_id;
@@ -3269,8 +3269,9 @@ function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
 
   window._appareilsRestants = appareilsRestants || [];
   if(window._appareilsRestants.length){
-    window._multiAppareilsDossierId = 'dos_' + Date.now();
-    window._currentDossierAppId = window._multiAppareilsDossierId;
+    const nouveauDossierId = 'dos_' + Date.now();
+    window._multiAppareilsDossierId = nouveauDossierId;
+    window._currentDossierAppId = nouveauDossierId;
     window._dossierMultiAppareilsTotal = window._appareilsRestants.length + 1;
     window._multiAppareilsIndex = 1;
     window._multiAppareilsClientInfo = {
@@ -3278,6 +3279,16 @@ function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
       tel: r.tel||'', email: r.email||'', type_client: r.type_client||'particulier',
       entreprise_nom: r.entreprise_nom||'', entreprise_siret: r.entreprise_siret||'', date: r.date || todayISO()
     };
+    // La ligne "dossiers" doit exister avant que le 1er CR ne référence son app_id (contrainte de clé étrangère)
+    try{
+      const { error } = await sb.from(DOSSIERS_TABLE).insert({
+        app_id: nouveauDossierId,
+        client_id: r.client_id || null,
+        date: r.date || todayISO(),
+        technicien: r.technicien || 'Jonathan'
+      });
+      if(error) console.error('Erreur création dossier multi-appareils :', error);
+    }catch(e){ console.error('Erreur création dossier multi-appareils :', e); }
   }
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
