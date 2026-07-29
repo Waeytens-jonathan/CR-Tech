@@ -7017,8 +7017,27 @@ function renderList(){
     const archiveContainer = document.createElement('div');
     archiveContainer.id = 'archive-container';
     archiveContainer.style.display = 'none';
-    dossiersArchives.forEach(d => archiveContainer.appendChild(buildDossierItem(d.rapports)));
     container.appendChild(archiveContainer);
+    renderArchivesPage(dossiersArchives, archiveContainer, ARCHIVES_PAGE_SIZE);
+  }
+}
+
+const ARCHIVES_PAGE_SIZE = 30;
+
+function renderArchivesPage(dossiersArchives, archiveContainer, nbAffiches){
+  archiveContainer.innerHTML = '';
+  const aAfficher = dossiersArchives.slice(0, nbAffiches);
+  aAfficher.forEach(d => archiveContainer.appendChild(buildDossierItem(d.rapports)));
+
+  if(dossiersArchives.length > nbAffiches){
+    const loadMoreBtn = document.createElement('button');
+    loadMoreBtn.className = 'btn btn-outline';
+    loadMoreBtn.style.cssText = 'width:100%;margin-top:0.6rem;font-size:0.85rem;';
+    loadMoreBtn.textContent = `Charger plus (${aAfficher.length}/${dossiersArchives.length})`;
+    loadMoreBtn.addEventListener('click', () => {
+      renderArchivesPage(dossiersArchives, archiveContainer, nbAffiches + ARCHIVES_PAGE_SIZE);
+    });
+    archiveContainer.appendChild(loadMoreBtn);
   }
 }
 
