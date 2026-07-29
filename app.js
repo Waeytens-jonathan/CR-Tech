@@ -674,13 +674,18 @@ function renderAgendaList(){
     const typeLabel = r.type_rdv === 'pose_piece' ? '🔧 Pose pièce' : r.type_rdv === 'sav' ? '🛠️ SAV' : '🔍 Diagnostic';
     const doneLabel = r.statut === 'effectue' ? '<span class="badge green" style="font-size:0.7rem;">Effectué</span>' : '';
     const nouveauLabel = (!r.vu && r.statut !== 'annule' && r.statut !== 'effectue') ? '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red,#e0584f);flex-shrink:0;"></span>' : '';
+    let nbAppareilsSup = 0;
+    if(r.appareils_supplementaires){
+      try{ const sup = JSON.parse(r.appareils_supplementaires); if(Array.isArray(sup)) nbAppareilsSup = sup.length; }catch(e){}
+    }
+    const multiLabel = nbAppareilsSup > 0 ? `<span class="badge" style="background:rgba(26,115,200,0.18);color:var(--blue);font-size:0.68rem;">+${nbAppareilsSup} appareil${nbAppareilsSup>1?'s':''}</span>` : '';
     const borderColor = r.statut === 'effectue' ? '#4caf50' : 'var(--orange)';
     const bgColor = r.statut === 'effectue' ? 'rgba(76,175,80,0.06)' : 'rgba(245,166,35,0.07)';
     return `<div class="list-item agenda-rdv-chip" data-rdv-id="${escapeHtml(r.app_id)}"
       style="cursor:pointer;border-left:4px solid ${borderColor};background:${bgColor};${r.statut==='effectue'?'opacity:0.7;':''}padding:0.6rem 0.8rem;margin-bottom:0.5rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
         <strong style="font-size:0.95rem;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong>
-        <div style="display:flex;gap:0.3rem;align-items:center;">${nouveauLabel}${doneLabel}</div>
+        <div style="display:flex;gap:0.3rem;align-items:center;">${nouveauLabel}${multiLabel}${doneLabel}</div>
       </div>
       <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">${escapeHtml(r.appareil||'')}${r.ville?' — '+escapeHtml(r.ville):''}</div>
       ${typeLabel ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">${typeLabel}</div>` : ''}
@@ -3080,6 +3085,17 @@ function showAgendaDetail(appId){
     ['Marque', r.marque],
     ['Modèle', r.modele],
     ['Panne décrite', r.panne],
+    ['Autres appareils', (() => {
+      if(!r.appareils_supplementaires) return null;
+      try{
+        const sup = JSON.parse(r.appareils_supplementaires);
+        if(!Array.isArray(sup) || !sup.length) return null;
+        return '__HTML__' + sup.map((a,i) => `<div style="margin-bottom:${i<sup.length-1?'0.6rem':'0'};padding-bottom:${i<sup.length-1?'0.6rem':'0'};${i<sup.length-1?'border-bottom:1px solid var(--border);':''}">
+          <strong>${escapeHtml(a.appareil||'—')}</strong>${a.marque || a.modele ? ` — ${escapeHtml(a.marque||'')} ${escapeHtml(a.modele||'')}`.trim() : ''}
+          ${a.panne ? `<div style="color:var(--muted,#778);margin-top:0.2rem;">${escapeHtml(a.panne)}</div>` : ''}
+        </div>`).join('');
+      }catch(e){ return null; }
+    })()],
     ['Note pour le technicien', noteAffichee],
     ['Distance depuis Lens', r.distance_km ? `${r.distance_km} km` : null],
   ];
@@ -3212,11 +3228,36 @@ document.getElementById('agenda-detail-create-cr').addEventListener('click', asy
     renderPlaqueThumb();
   }
 
+  // Si le RDV a plusieurs appareils, on prépare une file d'attente pour créer un CR par appareil,
+  // regroupés dans le même dossier.
+  window._appareilsRestants = [];
+  if(r.appareils_supplementaires){
+    try{
+      const sup = JSON.parse(r.appareils_supplementaires);
+      if(Array.isArray(sup) && sup.length){
+        window._appareilsRestants = sup;
+        window._multiAppareilsDossierId = 'dos_' + Date.now();
+        window._currentDossierAppId = window._multiAppareilsDossierId;
+        window._dossierMultiAppareilsTotal = sup.length + 1;
+        window._multiAppareilsIndex = 1;
+        window._multiAppareilsClientInfo = {
+          nom: r.nom||'', prenom: r.prenom||'', adresse: r.adresse||'', cp: r.cp||'', ville: r.ville||'',
+          tel: r.tel||'', email: r.email||'', type_client: r.type_client||'particulier',
+          entreprise_nom: r.entreprise_nom||'', entreprise_siret: r.entreprise_siret||'', date: r.date || todayISO()
+        };
+      }
+    }catch(e){}
+  }
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
-  showToast(r.is_sav ? 'Infos pré-remplies — compte-rendu SAV lié au dossier d\'origine' : 'Infos client pré-remplies depuis le RDV');
+  if(window._appareilsRestants.length){
+    showToast(`Appareil 1/${window._dossierMultiAppareilsTotal} — saisissez le diagnostic, les suivants suivront`);
+  } else {
+    showToast(r.is_sav ? 'Infos pré-remplies — compte-rendu SAV lié au dossier d\'origine' : 'Infos client pré-remplies depuis le RDV');
+  }
 });
 
 document.getElementById('agenda-detail-sms-arrival-btn').addEventListener('click', () => {
@@ -3302,6 +3343,78 @@ document.getElementById('agenda-detail-done-btn').addEventListener('click', asyn
 });
 
 // ---------- Nouveau RDV (ajout manuel, ex: appel téléphonique) ----------
+let newrdvAppareilsSup = [];
+
+function newAppareilSupRow(prefill){
+  return Object.assign({ id: 'as' + Date.now() + Math.random().toString(36).slice(2,7), appareil: '', marque: '', modele: '', panne: '' }, prefill || {});
+}
+
+function renderNewrdvAppareilsSupRows(){
+  const container = document.getElementById('newrdv-appareils-sup-rows');
+  const appareilOptions = document.getElementById('f-appareil').innerHTML;
+  container.innerHTML = newrdvAppareilsSup.map((row, i) => `
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+        <strong style="font-size:0.85rem;color:var(--orange);">Appareil ${i+2}</strong>
+        <span class="as-remove-btn" data-id="${row.id}" style="cursor:pointer;color:var(--text-muted);font-size:0.85rem;">🗑️ Retirer</span>
+      </div>
+      <div class="field" style="margin-bottom:0.6rem;">
+        <label>Appareil</label>
+        <select class="as-appareil" data-id="${row.id}">${appareilOptions}</select>
+      </div>
+      <div class="grid" style="margin-bottom:0.6rem;">
+        <div class="field">
+          <label>Marque</label>
+          <input type="text" class="as-marque" data-id="${row.id}" value="${escapeHtml(row.marque)}" placeholder="ex : Bosch">
+        </div>
+        <div class="field">
+          <label>Modèle</label>
+          <input type="text" class="as-modele" data-id="${row.id}" value="${escapeHtml(row.modele)}" placeholder="ex : WAT28440FF">
+        </div>
+      </div>
+      <div class="field">
+        <label>Panne décrite</label>
+        <textarea class="as-panne" data-id="${row.id}" rows="2">${escapeHtml(row.panne)}</textarea>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.as-appareil').forEach(el => {
+    const row = newrdvAppareilsSup.find(r => r.id === el.dataset.id);
+    if(row) el.value = row.appareil;
+    el.addEventListener('change', () => { row.appareil = el.value; });
+  });
+  container.querySelectorAll('.as-marque').forEach(el => {
+    el.addEventListener('input', () => {
+      const row = newrdvAppareilsSup.find(r => r.id === el.dataset.id);
+      if(row) row.marque = el.value;
+    });
+  });
+  container.querySelectorAll('.as-modele').forEach(el => {
+    el.addEventListener('input', () => {
+      const row = newrdvAppareilsSup.find(r => r.id === el.dataset.id);
+      if(row) row.modele = el.value;
+    });
+  });
+  container.querySelectorAll('.as-panne').forEach(el => {
+    el.addEventListener('input', () => {
+      const row = newrdvAppareilsSup.find(r => r.id === el.dataset.id);
+      if(row) row.panne = el.value;
+    });
+  });
+  container.querySelectorAll('.as-remove-btn').forEach(el => {
+    el.addEventListener('click', () => {
+      newrdvAppareilsSup = newrdvAppareilsSup.filter(r => r.id !== el.dataset.id);
+      renderNewrdvAppareilsSupRows();
+    });
+  });
+}
+
+document.getElementById('newrdv-add-appareil-btn').addEventListener('click', () => {
+  newrdvAppareilsSup.push(newAppareilSupRow());
+  renderNewrdvAppareilsSupRows();
+});
+
 function populateNewRdvAppareilOptions(){
   const sourceSelect = document.getElementById('f-appareil');
   const targetSelect = document.getElementById('newrdv-appareil');
@@ -3493,6 +3606,8 @@ document.getElementById('agenda-new-btn').addEventListener('click', () => {
   if(distInfo) distInfo.style.display = 'none';
   document.querySelector('#view-agenda-new h2').textContent = 'Nouveau rendez-vous';
   document.getElementById('newrdv-save-btn').textContent = 'Enregistrer le rendez-vous';
+  newrdvAppareilsSup = [];
+  renderNewrdvAppareilsSupRows();
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -3527,6 +3642,10 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
   document.getElementById('newrdv-modele').value = r.modele || '';
   document.getElementById('newrdv-panne').value = r.panne || '';
   document.getElementById('newrdv-note').value = r.note_technicien || '';
+  try{
+    newrdvAppareilsSup = r.appareils_supplementaires ? JSON.parse(r.appareils_supplementaires).map(a => newAppareilSupRow(a)) : [];
+  }catch(e){ newrdvAppareilsSup = []; }
+  renderNewrdvAppareilsSupRows();
 
   document.querySelector('#view-agenda-new h2').textContent = 'Modifier le rendez-vous';
   document.getElementById('newrdv-save-btn').textContent = 'Enregistrer les modifications';
@@ -3606,6 +3725,7 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
     marque: document.getElementById('newrdv-marque').value.trim() || null,
     modele: document.getElementById('newrdv-modele').value.trim() || null,
     panne: document.getElementById('newrdv-panne').value.trim(),
+    appareils_supplementaires: newrdvAppareilsSup.filter(r => r.appareil || r.panne).length ? JSON.stringify(newrdvAppareilsSup.filter(r => r.appareil || r.panne)) : null,
     note_technicien: document.getElementById('newrdv-note').value.trim(),
     type_rdv: document.getElementById('newrdv-type').value.trim() || null,
     distance_km: window._newRdvDistanceKm || null
@@ -4953,9 +5073,53 @@ async function saveCurrentReport(){
   return data;
 }
 
+// Après la sauvegarde d'un CR : passe au prochain appareil de la file (dossier multi-appareils) ou termine.
+function avancerAppareilSuivantOuTerminer(){
+  if(window._appareilsRestants && window._appareilsRestants.length){
+    const next = window._appareilsRestants.shift();
+    window._multiAppareilsIndex = (window._multiAppareilsIndex || 1) + 1;
+    const total = window._dossierMultiAppareilsTotal || window._multiAppareilsIndex;
+    const ci = window._multiAppareilsClientInfo || {};
+
+    resetForm();
+    clearDraft();
+    document.getElementById('f-nom').value = ci.nom || '';
+    document.getElementById('f-prenom').value = ci.prenom || '';
+    document.getElementById('f-adresse').value = ci.adresse || '';
+    document.getElementById('f-cp').value = ci.cp || '';
+    document.getElementById('f-ville').value = ci.ville || '';
+    document.getElementById('f-tel').value = ci.tel || '';
+    document.getElementById('f-email').value = ci.email || '';
+    document.getElementById('f-type-client').value = ci.type_client || 'particulier';
+    document.getElementById('f-entreprise-nom').value = ci.entreprise_nom || '';
+    document.getElementById('f-entreprise-siret').value = ci.entreprise_siret || '';
+    document.getElementById('f-date').value = ci.date || todayISO();
+    document.getElementById('f-appareil').value = matchAppareilOption(next.appareil);
+    autoFillMainOeuvre(document.getElementById('f-appareil').value);
+    document.getElementById('f-marque').value = next.marque || '';
+    document.getElementById('f-modele').value = next.modele || '';
+    document.getElementById('f-panne').value = next.panne || '';
+    window._currentDossierAppId = window._multiAppareilsDossierId;
+
+    goToStep(1);
+    showToast(`Appareil ${window._multiAppareilsIndex}/${total} : saisissez le diagnostic`);
+    return true;
+  }
+  if(window._multiAppareilsDossierId){
+    showToast('Dossier multi-appareils complet ✓');
+    window._multiAppareilsDossierId = null;
+    window._multiAppareilsClientInfo = null;
+    window._dossierMultiAppareilsTotal = null;
+    window._multiAppareilsIndex = null;
+  }
+  return false;
+}
+
 document.getElementById('save-btn').addEventListener('click', async () => {
   const data = await saveCurrentReport();
-  if(data) showToast('Compte-rendu enregistré');
+  if(!data) return;
+  showToast('Compte-rendu enregistré');
+  avancerAppareilSuivantOuTerminer();
 });
 
 // Décrémente la quantité en stock d'une pièce consommée (jamais sous 0, jamais supprimée)
@@ -5032,6 +5196,7 @@ document.getElementById('email-btn').addEventListener('click', async () => {
   }
   btn.disabled = false;
   btn.textContent = '✅ Terminer et envoyer (CR + facture)';
+  avancerAppareilSuivantOuTerminer();
 });
 
 
@@ -7625,6 +7790,8 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   document.getElementById('newrdv-panne').value = `SAV — ${motif}\n\nProblème signalé par le client : ${probleme}`;
   const typeSelect = document.getElementById('newrdv-type');
   if(typeSelect) typeSelect.value = 'sav';
+  newrdvAppareilsSup = [];
+  renderNewrdvAppareilsSupRows();
 
   window._rdvSavParentAppId = r.app_id || r.id;
   window._rdvSavRaison = motif;
@@ -7673,6 +7840,8 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   document.getElementById('newrdv-date').value = todayISO();
   document.getElementById('newrdv-creneau').value = 'apresmidi';
   document.getElementById('newrdv-type').value = 'pose_piece';
+  newrdvAppareilsSup = [];
+  renderNewrdvAppareilsSupRows();
   document.getElementById('newrdv-prenom').value = r.prenom || '';
   document.getElementById('newrdv-nom').value = r.nom || '';
   document.getElementById('newrdv-adresse').value = r.adresse || '';
