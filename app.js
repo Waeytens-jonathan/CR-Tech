@@ -3081,24 +3081,22 @@ function showAgendaDetail(appId){
     ['Téléphone', r.tel ? '__HTML__' + telValue : null],
     ['Email', r.email],
     ['Adresse', `${r.adresse || ''}${r.adresse2 ? ', ' + r.adresse2 : ''}, ${r.cp || ''} ${r.ville || ''}`],
-    ['Appareil', r.appareil],
-    ['Marque', r.marque],
-    ['Modèle', r.modele],
-    ['Panne décrite', r.panne],
-    ['Autres appareils', (() => {
-      if(!r.appareils_supplementaires) return null;
-      try{
-        const sup = JSON.parse(r.appareils_supplementaires);
-        if(!Array.isArray(sup) || !sup.length) return null;
-        return '__HTML__<div style="display:flex;flex-direction:column;gap:0.5rem;">' + sup.map(a => {
-          const sousTitre = [a.marque, a.modele].filter(Boolean).join(' ');
-          return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;">
-            <div style="font-weight:600;">${escapeHtml(a.appareil||'—')}</div>
-            ${sousTitre ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.1rem;">${escapeHtml(sousTitre)}</div>` : ''}
-            ${a.panne ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.3rem;">${escapeHtml(a.panne)}</div>` : ''}
-          </div>`;
-        }).join('') + '</div>';
-      }catch(e){ return null; }
+    ['Appareils', (() => {
+      let sup = [];
+      if(r.appareils_supplementaires){
+        try{ sup = JSON.parse(r.appareils_supplementaires) || []; }catch(e){ sup = []; }
+      }
+      const tous = [{ appareil: r.appareil, marque: r.marque, modele: r.modele, panne: r.panne }, ...sup];
+      if(!tous[0].appareil && !sup.length) return null;
+      return '__HTML__<div style="display:flex;flex-direction:column;gap:0.5rem;">' + tous.map((a, i) => {
+        const sousTitre = [a.marque, a.modele].filter(Boolean).join(' ');
+        return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;">
+          <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--orange);margin-bottom:0.2rem;">Appareil ${i+1}</div>
+          <div style="font-weight:600;">${escapeHtml(a.appareil||'—')}</div>
+          ${sousTitre ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.1rem;">${escapeHtml(sousTitre)}</div>` : ''}
+          ${a.panne ? `<div style="color:var(--muted,#778);font-size:0.85rem;margin-top:0.3rem;">${escapeHtml(a.panne)}</div>` : ''}
+        </div>`;
+      }).join('') + '</div>';
     })()],
     ['Note pour le technicien', noteAffichee],
     ['Distance depuis Lens', r.distance_km ? `${r.distance_km} km` : null],
