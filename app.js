@@ -661,6 +661,25 @@ function renderAgendaList(){
   const matinRdvs = dayRdvs.filter(r => r.creneau === 'matin').sort(sortByTournee);
   const amRdvs    = dayRdvs.filter(r => r.creneau !== 'matin').sort(sortByTournee);
 
+  // Places restantes par créneau (quotas configurés dans Réglages, différents le samedi)
+  const isSamedi = d.getDay() === 6;
+  const quotaMatinJour = isSamedi ? (params.quotaMatinSam ?? 2) : (params.quotaMatin ?? 2);
+  const quotaAmJour    = isSamedi ? (params.quotaAMSam ?? 2)    : (params.quotaAM ?? 4);
+  const restantMatin = Math.max(0, quotaMatinJour - matinRdvs.length);
+  const restantAm    = Math.max(0, quotaAmJour - amRdvs.length);
+  const capaciteHtml = `<div style="display:flex;gap:0.6rem;margin-bottom:0.7rem;">
+    <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;">
+      <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">☀️ Matin</div>
+      <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${matinRdvs.length}/${quotaMatinJour} RDV</div>
+      <div style="font-size:0.78rem;color:${restantMatin > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantMatin > 0 ? restantMatin + ' place' + (restantMatin>1?'s':'') + ' restante' + (restantMatin>1?'s':'') : 'Complet'}</div>
+    </div>
+    <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;">
+      <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">🌤 Après-midi</div>
+      <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${amRdvs.length}/${quotaAmJour} RDV</div>
+      <div style="font-size:0.78rem;color:${restantAm > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantAm > 0 ? restantAm + ' place' + (restantAm>1?'s':'') + ' restante' + (restantAm>1?'s':'') : 'Complet'}</div>
+    </div>
+  </div>`;
+
   // RDV annulés des dernières 24h pour ce jour
   const now = new Date();
   const annulesRecents = agendaRdvs.filter(r => {
@@ -693,6 +712,8 @@ function renderAgendaList(){
   };
 
   let html = '';
+
+  html += capaciteHtml;
 
   if(isBlocked){
     html = `<div style="text-align:center;padding:0.6rem 0.5rem;color:#e0584f;font-size:0.82rem;background:rgba(224,88,79,0.08);border-radius:8px;margin-bottom:0.5rem;">🔴 Jour fermé — vos RDV restent visibles</div>`;
@@ -857,6 +878,7 @@ async function renderStats(){
     : null;
 
   let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0, nbNonReparable = 0, nbPiecesPosees = 0;
+  const caParJour = {};
   const marqueCount = {};
   filtered.forEach(r => {
     const mo = parseFloat(r['cout-mo']) || 0;
@@ -884,6 +906,9 @@ async function renderStats(){
     totalMo += moEncaisse;
     totalPieces += piecesEncaisse;
     totalDepl += deplEncaisse;
+    if(r.date){
+      caParJour[r.date] = (caParJour[r.date] || 0) + moEncaisse + piecesEncaisse + deplEncaisse;
+    }
     const prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
     totalFournisseur += prixFournisseur;
     if(prixFournisseur > 0){
@@ -902,6 +927,15 @@ async function renderStats(){
   const ca = totalMo + totalPieces + totalDepl;
   const urssaf = ca * urssafTaux;
   const net = ca - totalFournisseur - totalLivraison - urssaf;
+
+  // Meilleure journée (CA encaissé le plus élevé sur une seule date)
+  let meilleureJourDate = null, meilleureJourMontant = 0;
+  Object.keys(caParJour).forEach(date => {
+    if(caParJour[date] > meilleureJourMontant){
+      meilleureJourMontant = caParJour[date];
+      meilleureJourDate = date;
+    }
+  });
 
   // Tendance vs période précédente
   let prevCa = null;
@@ -956,6 +990,13 @@ async function renderStats(){
   document.getElementById('stat-ca').textContent = formatEur(ca);
   document.getElementById('stat-moyenne-jour').textContent = moyenneParJour.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   document.getElementById('stat-nb-pieces-posees').textContent = nbPiecesPosees;
+  if(meilleureJourDate){
+    document.getElementById('stat-meilleure-journee-montant').textContent = formatEur(meilleureJourMontant);
+    document.getElementById('stat-meilleure-journee-date').textContent = dateFrLong(meilleureJourDate);
+  } else {
+    document.getElementById('stat-meilleure-journee-montant').textContent = '—';
+    document.getElementById('stat-meilleure-journee-date').textContent = '';
+  }
   document.getElementById('stat-panier-moyen').textContent = formatEur(panierMoyen);
   document.getElementById('stat-taux-non-reparable').textContent = tauxNonReparable + ' %';
   document.getElementById('stat-taux-annulation').textContent = tauxAnnulation + ' %';
