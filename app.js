@@ -2188,7 +2188,7 @@ async function getOuGenererFacture(r){
   return await genererFacturePourDossier(r);
 }
 
-// Envoie le compte-rendu ET la facture au client, l'un après l'autre.
+// Envoie le compte-rendu ET la facture au client, en parallèle pour aller plus vite.
 // Génère la facture si elle n'existe pas encore. Ne fait rien tant que le dossier n'est pas terminé.
 async function terminerEtEnvoyer(r){
   if(!['Terminée','Non_reparable'].includes(r.statut)){
@@ -2198,24 +2198,32 @@ async function terminerEtEnvoyer(r){
   const emailCible = await getEmailAJour(r);
   if(!emailCible){ showToast('Email du client manquant', true); return false; }
 
-  // 1. Compte-rendu
-  const pdfBytes = await generatePdfFor(r, 'email');
+  // Génération du PDF du CR et récupération/génération de la facture en parallèle
+  // (les deux sont indépendants l'un de l'autre, pas besoin d'attendre l'un pour commencer l'autre)
+  const [pdfBytes, facture] = await Promise.all([
+    generatePdfFor(r, 'email'),
+    getOuGenererFacture(r)
+  ]);
   const pdfBase64Cr = arrayBufferToBase64(pdfBytes);
-  const { error: crError } = await sb.functions.invoke('send-compte-rendu', {
-    body: {
-      email: emailCible, nom: r.nom, prenom: r.prenom, appareil: r.appareil, ref: r.ref,
-      pdf_base64: pdfBase64Cr, include_conseils: !!r['conseils-entretien']
-    }
-  });
-  if(crError) throw crError;
 
-  // 2. Facture (génère si besoin)
-  const facture = await getOuGenererFacture(r);
+  // Envoi des deux emails en parallèle plutôt que l'un après l'autre
+  const envois = [
+    sb.functions.invoke('send-compte-rendu', {
+      body: {
+        email: emailCible, nom: r.nom, prenom: r.prenom, appareil: r.appareil, ref: r.ref,
+        pdf_base64: pdfBase64Cr, include_conseils: !!r['conseils-entretien']
+      }
+    })
+  ];
   if(facture){
-    const { error: factError } = await sb.functions.invoke('send-facture', {
+    envois.push(sb.functions.invoke('send-facture', {
       body: { email: emailCible, nom: r.nom, prenom: r.prenom, numero: facture.numero, montant: facture.montant_total, pdf_base64: facture.pdf_base64 }
-    });
-    if(factError) throw factError;
+    }));
+  }
+
+  const resultats = await Promise.all(envois);
+  for(const { error } of resultats){
+    if(error) throw error;
   }
   return true;
 }
