@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Prenez rendez-vous en ligne avec Technik-Home pour la réparation de votre électroménager à domicile dans le Nord et le Pas-de-Calais.">
+<title>Prendre rendez-vous – Technik-Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet"></noscript>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #0d1b2a;
+    --blue: #1a73c8;
+    --blue-light: #3a9bdc;
+    --orange: #f5a623;
+    --white: #f8f9fb;
+    --gray: #8a97a8;
+    --card-bg: #162233;
+    --border: rgba(255,255,255,0.07);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--navy);
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 4vw;
+    background: rgba(13,27,42,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  @media (max-width: 768px) {
+    header { flex-direction: column; padding: 0.8rem 1rem; gap: 0.6rem; }
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.1rem;
+    letter-spacing: 0.05em;
+    color: var(--white);
+    text-decoration: none;
+  }
+  .logo span { color: var(--orange); }
+
+  nav a {
+    color: var(--gray);
+    text-decoration: none;
+    margin-left: 1.6rem;
+    font-size: 0.92rem;
+    transition: color .2s;
+  }
+  nav a:hover { color: var(--white); }
+
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 9rem 1.5rem 4rem;
+  }
+
+  .page-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.6rem;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.4rem;
+  }
+  .page-title span { color: var(--orange); }
+  .page-subtitle { color: var(--gray); margin-bottom: 2.2rem; font-size: 1rem; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.8rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--orange);
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; gap: 0; }
+  }
+
+  .field { margin-bottom: 1rem; }
+  .field label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--gray);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color .2s;
+    appearance: none;
+  }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: var(--blue-light);
+  }
+  .field select option { background: var(--navy); }
+  .field textarea { resize: vertical; min-height: 90px; }
+
+  /* Date selector */
+  .date-scroller {
+    display: flex;
+    gap: 0.6rem;
+    overflow-x: auto;
+    padding-bottom: 0.6rem;
+    margin-bottom: 1.4rem;
+  }
+  .date-chip {
+    flex: 0 0 auto;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.7rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    min-width: 64px;
+  }
+  .date-chip:hover { border-color: var(--blue-light); }
+  .date-chip.selected {
+    background: var(--blue);
+    border-color: var(--blue);
+  }
+  .date-chip.blocked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: rgba(224,88,79,0.4);
+    background: rgba(224,88,79,0.06);
+  }
+  .date-chip.blocked:hover { border-color: rgba(224,88,79,0.4); }
+  .date-chip.blocked .dow { color: #e0584f; }
+  .date-chip .dow { font-size: 0.7rem; color: var(--gray); text-transform: uppercase; }
+  .date-chip.selected .dow { color: rgba(255,255,255,0.85); }
+  .date-chip .dnum { font-size: 1.3rem; font-weight: 600; font-family: 'Bebas Neue', sans-serif; }
+
+  /* Slot selector */
+  .slots-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.4rem;
+  }
+  @media (max-width: 600px) {
+    .slots-grid { grid-template-columns: 1fr; }
+  }
+  .slot-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .slot-card:hover:not(.full) { border-color: var(--blue-light); transform: translateY(-2px); }
+  .slot-card.selected { background: var(--blue); border-color: var(--blue); }
+  .slot-card.full { opacity: 0.45; cursor: not-allowed; }
+  .slot-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 0.2rem; }
+  .slot-hours { color: var(--gray); font-size: 0.85rem; }
+  .slot-card.selected .slot-hours { color: rgba(255,255,255,0.85); }
+  .slot-status { margin-top: 0.5rem; font-size: 0.78rem; font-weight: 600; }
+  .slot-status.ok { color: #4ade80; }
+  .slot-status.full-text { color: #ff6b6b; }
+  .slot-card.selected .slot-status.ok { color: #d7ffe9; }
+
+  .form-submit {
+    width: 100%;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s, transform .15s;
+    margin-top: 0.5rem;
+    display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  }
+  .form-submit:hover:not(:disabled) { background: var(--blue-light); transform: translateY(-2px); }
+  .form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #form-success {
+    display: none;
+    background: rgba(76,222,128,0.1);
+    border: 1px solid rgba(76,222,128,0.3);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-top: 1rem;
+    text-align: center;
+    color: #4ade80;
+    font-weight: 600;
+  }
+  #form-error {
+    display: none;
+    background: rgba(255,107,107,0.1);
+    border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-top: 1rem;
+    text-align: center;
+    color: #ff6b6b;
+    font-weight: 600;
+  }
+
+  footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--gray);
+    font-size: 0.85rem;
+  }
+  footer a { color: var(--white); }
+
+  #astuces-plaque-modal *{ scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  #astuces-plaque-modal *::-webkit-scrollbar{ width: 6px; }
+  #astuces-plaque-modal *::-webkit-scrollbar-track{ background: transparent; }
+  #astuces-plaque-modal *::-webkit-scrollbar-thumb{ background: var(--border); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo">TECHNIK<span>-HOME</span></a>
+  <nav>
+    <a href="/#services">Services</a>
+    <a href="/#tarifs">Tarifs</a>
+    <a href="/#contact">Contact</a>
+    <a href="/rdv.html">Prendre RDV</a>
+  </nav>
+</header>
+
+<main>
+  <div class="page-title">Prendre <span>rendez-vous</span></div>
+  <p class="page-subtitle">Choisissez un jour, un créneau, et décrivez votre panne. Nous vous recontactons pour confirmer l'intervention.</p>
+
+  <form id="rdv-form">
+    <div class="card">
+      <div class="section-label">Vos coordonnées</div>
+      <div class="form-row">
+        <div class="field">
+          <label for="prenom">Prénom</label>
+          <input type="text" id="prenom" required autocomplete="given-name">
+        </div>
+        <div class="field">
+          <label for="nom">Nom</label>
+          <input type="text" id="nom" required autocomplete="family-name">
+        </div>
+      </div>
+      <div class="field" style="position:relative;">
+        <label for="adresse">Adresse</label>
+        <input type="text" id="adresse" placeholder="Numéro et rue" required autocomplete="off">
+        <div id="adresse-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a2535;border:1px solid rgba(255,255,255,0.1);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+      </div>
+      <div class="field">
+        <label for="adresse2">Complément d'adresse <span style="font-size:0.8rem;font-weight:400;opacity:0.7;">(optionnel)</span></label>
+        <input type="text" id="adresse2" placeholder="Appartement, bâtiment, étage…" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="cp">Code postal</label>
+          <input type="text" id="cp" inputmode="numeric" required maxlength="5" autocomplete="postal-code">
+          <div id="cp-error" style="display:none;color:#ff6b6b;font-size:0.8rem;margin-top:0.3rem;">⚠️ Nous n'intervenons que dans les départements 59 et 62.</div>
+        </div>
+        <div class="field">
+          <label for="ville">Ville</label>
+          <input type="text" id="ville" required autocomplete="address-level2">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="tel">Téléphone</label>
+          <input type="tel" id="tel" placeholder="06 / 07..." required autocomplete="tel">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="votre@email.fr" autocomplete="email">
+        </div>
+      </div>
+      <div class="field">
+        <label for="tel-interlocuteur">Autre numéro pour le jour du RDV <span style="font-size:0.8rem;font-weight:400;opacity:0.7;">(optionnel — si ce n'est pas vous qui accueillerez le technicien)</span></label>
+        <input type="tel" id="tel-interlocuteur" placeholder="Ex : numéro d'un proche présent sur place" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Votre panne</div>
+      <div class="field">
+        <label for="appareil">Type d'appareil</label>
+        <select id="appareil" required>
+          <option value="" disabled selected>Choisissez…</option>
+          <option>Lave-linge</option>
+          <option>Sèche-linge</option>
+          <option>Lave-vaisselle</option>
+          <option>Four</option>
+          <option>Plaques de cuisson</option>
+          <option>Réfrigérateur / Congélateur</option>
+          <option>TV / Audiovisuel</option>
+          <option>Autre</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="marque">Marque <span style="text-transform:none;font-weight:400;">(facultatif)</span></label>
+        <input type="text" id="marque" placeholder="ex : Bosch, Samsung, Whirlpool…">
+      </div>
+      <div class="field">
+        <label for="modele">Modèle <span style="text-transform:none;font-weight:400;">(facultatif)</span></label>
+        <input type="text" id="modele" placeholder="ex : WAT28440FF (visible sur la plaque signalétique)">
+      </div>
+      <div class="field">
+        <label for="panne">Description de la panne</label>
+        <textarea id="panne" placeholder="Décrivez le problème rencontré…" required></textarea>
+      </div>
+
+      <div class="field">
+        <label>Photo de la plaque signalétique <span style="text-transform:none;font-weight:400;">(facultatif)</span></label>
+        <p style="font-size:0.82rem;color:var(--gray);margin-bottom:0.9rem;">Nous aide à préparer la bonne pièce avant notre passage. <button type="button" id="ouvrir-astuces-plaque-btn" style="background:none;border:none;padding:0;color:var(--orange);text-decoration:underline;cursor:pointer;font-size:inherit;font-family:inherit;">Où la trouver ?</button></p>
+
+        <!-- Affiché sur PC : choix entre PC et téléphone (avec QR code) -->
+        <div id="plaque-choice-buttons" style="display:none;flex-direction:column;gap:0.6rem;">
+          <label for="plaque-file-input" style="display:block;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:0.8rem 1rem;font-size:0.9rem;cursor:pointer;text-align:center;">
+            💻 J'ai la photo sur mon PC
+          </label>
+          <input type="file" id="plaque-file-input" accept="image/*" style="display:none;">
+
+          <button type="button" id="plaque-open-qr-btn" style="display:block;background:var(--card-bg);border:1px solid var(--orange);color:var(--white);border-radius:10px;padding:0.8rem 1rem;font-size:0.9rem;cursor:pointer;text-align:center;width:100%;">
+            📱 J'ai la photo sur mon téléphone
+          </button>
+        </div>
+
+        <!-- Affiché sur mobile : ajout direct, pas de QR code (inutile sur son propre téléphone) -->
+        <div id="plaque-direct-buttons" style="display:none;flex-direction:column;gap:0.6rem;">
+          <label for="plaque-camera-input" style="display:block;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:0.8rem 1rem;font-size:0.9rem;cursor:pointer;text-align:center;">
+            📷 Prendre une photo
+          </label>
+          <input type="file" id="plaque-camera-input" accept="image/*" capture="environment" style="display:none;">
+
+          <label for="plaque-gallery-input" style="display:block;background:var(--card-bg);border:1px solid var(--orange);color:var(--white);border-radius:10px;padding:0.8rem 1rem;font-size:0.9rem;cursor:pointer;text-align:center;">
+            🖼️ Choisir dans la galerie
+          </label>
+          <input type="file" id="plaque-gallery-input" accept="image/*" style="display:none;">
+        </div>
+
+        <div id="plaque-result" style="display:none;">
+          <img id="plaque-preview" alt="Aperçu plaque signalétique" style="max-width:100%;border-radius:10px;margin-top:0.8rem;">
+          <button type="button" id="plaque-delete-btn" style="display:block;width:100%;background:transparent;border:1px solid var(--red, #ff6b6b);color:var(--red, #ff6b6b);border-radius:10px;padding:0.6rem;font-size:0.85rem;cursor:pointer;margin-top:0.6rem;">🗑️ Supprimer la photo</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="note-technicien">Note pour le technicien <span style="text-transform:none;font-weight:400;">(facultatif)</span></label>
+        <textarea id="note-technicien" placeholder="Ex : ne pas sonner, maison bleue, code portail 1234…"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Choisissez une date</div>
+      <div class="date-scroller" id="date-scroller"></div>
+
+      <div class="section-label">Choisissez un créneau</div>
+      <div class="slots-grid" id="slots-grid">
+        <div class="slot-card" data-slot="matin">
+          <div class="slot-title">🌅 Matin</div>
+          <div class="slot-hours">10h – 12h</div>
+          <div class="slot-status">Chargement…</div>
+        </div>
+        <div class="slot-card" data-slot="apresmidi">
+          <div class="slot-title">☀️ Après-midi</div>
+          <div class="slot-hours">12h – 18h</div>
+          <div class="slot-status">Chargement…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:1rem 1.2rem;">
+      <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.85rem;font-weight:400;text-transform:none;cursor:pointer;">
+        <input type="checkbox" id="cgv-check" style="width:1.1rem;height:1.1rem;margin-top:0.1rem;flex-shrink:0;">
+        <span>J'ai pris connaissance des <a href="/cgv.html" target="_blank" style="color:var(--blue-light);">Conditions Générales de Vente</a>, notamment de la politique d'annulation (annulation gratuite jusqu'à 24h ouvrées avant le rendez-vous).</span>
+      </label>
+    </div>
+
+    <button type="submit" class="form-submit" id="submit-btn" disabled>
+      📅 Confirmer la demande de rendez-vous
+    </button>
+
+    <div id="form-success">
+      <div>✅ Votre rendez-vous est confirmé !</div>
+      <div style="font-weight:400;font-size:0.85rem;margin-top:0.5rem;color:var(--white);">Le technicien vous contactera par SMS pour annoncer son arrivée quelques minutes avant l'intervention.</div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;margin-top:1.2rem;">
+        <svg width="48" height="48" viewBox="0 0 48 48" style="transform:rotate(-90deg);">
+          <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"></circle>
+          <circle id="redirect-progress-circle" cx="24" cy="24" r="20" fill="none" stroke="var(--orange)" stroke-width="4" stroke-linecap="round" stroke-dasharray="125.6" stroke-dashoffset="0" style="transition:stroke-dashoffset 1s linear;"></circle>
+        </svg>
+        <div style="font-size:0.8rem;color:var(--gray);">Retour à l'accueil dans <span id="redirect-countdown">4</span>s…</div>
+      </div>
+
+      <a href="/" class="form-submit" style="text-decoration:none;margin:1rem auto 0;max-width:260px;">← Retour au site</a>
+    </div>
+    <div id="form-error">⚠️ Une erreur est survenue. Merci de réessayer ou de nous appeler directement.</div>
+  </form>
+</main>
+
+<footer>
+  <p><strong>TECHNIK-HOME</strong> — Réparation électroménager à domicile</p>
+  <p style="margin-top:0.4rem;font-size:0.75rem;">© 2026 Technik-Home · <a href="/mentions-legales.html">Mentions légales</a> · <a href="/cgv.html">CGV</a></p>
+</footer>
+
+<div id="astuces-plaque-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;overflow-y:auto;">
+  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.6rem;max-width:460px;width:100%;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:0.02em;margin:0;color:var(--orange);">Où trouver la plaque signalétique ?</h3>
+      <button type="button" id="astuces-plaque-close-btn" style="background:transparent;border:none;color:var(--gray);font-size:1.3rem;cursor:pointer;line-height:1;flex-shrink:0;">✕</button>
+    </div>
+    <p style="font-size:0.85rem;color:var(--gray);margin-bottom:1.2rem;">Pas besoin d'une photo parfaite — juste lisible. Voici où la chercher selon votre appareil :</p>
+
+    <div style="display:flex;flex-direction:column;gap:0.9rem;">
+      <div style="background:var(--bg-dark,#0d1b2a);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;">
+        <div style="font-weight:600;margin-bottom:0.3rem;">🧺 Lave-linge</div>
+        <div style="font-size:0.85rem;color:var(--gray);">Rebord intérieur de la porte, ou tout autour du hublot.</div>
+      </div>
+      <div style="background:var(--bg-dark,#0d1b2a);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;">
+        <div style="font-weight:600;margin-bottom:0.3rem;">🍽️ Lave-vaisselle</div>
+        <div style="font-size:0.85rem;color:var(--gray);">Sur un rebord de la porte (gauche, droite ou haut), porte ouverte.</div>
+      </div>
+      <div style="background:var(--bg-dark,#0d1b2a);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;">
+        <div style="font-weight:600;margin-bottom:0.3rem;">🌀 Sèche-linge</div>
+        <div style="font-size:0.85rem;color:var(--gray);">Intérieur de la porte, pourtour du hublot, ou à l'arrière de l'appareil.</div>
+      </div>
+      <div style="background:var(--bg-dark,#0d1b2a);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;">
+        <div style="font-weight:600;margin-bottom:0.3rem;">🔥 Four</div>
+        <div style="font-size:0.85rem;color:var(--gray);">Rebord de la porte ou encadrement de la niche, porte ouverte.</div>
+      </div>
+      <div style="background:var(--bg-dark,#0d1b2a);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;">
+        <div style="font-weight:600;margin-bottom:0.3rem;">🧊 Réfrigérateur / Congélateur</div>
+        <div style="font-size:0.85rem;color:var(--gray);">À l'intérieur, paroi latérale ou fond, près du bac à légumes — ou à l'arrière.</div>
+      </div>
+    </div>
+
+    <p style="font-size:0.8rem;color:var(--gray);margin-top:1.2rem;margin-bottom:0;">Toujours introuvable ? Les infos sont aussi souvent sur la notice ou la facture d'achat — ou laissez ce champ vide, on s'en occupera sur place.</p>
+  </div>
+</div>
+<script>
+// ---------- Supabase ----------
+const SUPABASE_URL = 'https://gzrqkapwjwlwkvwtykfi.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_EKs2eR3Du9MYSnUgeTFtBQ_vnOOFqHt';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const DOW_LABELS = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+
+// ---------- Config agenda (chargée depuis Supabase) ----------
+let agendaCfg = {
+  matinDebut: '08:00', matinFin: '12:00',
+  amDebut: '12:00',   amFin:   '18:00',
+  quotaMatin: 2, quotaAM: 4,
+  quotaMatinSam: 2, quotaAMSam: 2,
+  joursBlockes: []
+};
+
+async function loadAgendaConfig(){
+  try{
+    const { data, error } = await sb.from('agenda_config').select('*').eq('id',1).single();
+    if(error) throw error;
+    agendaCfg = {
+      matinDebut:    data.matin_debut    || '08:00',
+      matinFin:      data.matin_fin      || '12:00',
+      amDebut:       data.am_debut       || '12:00',
+      amFin:         data.am_fin         || '18:00',
+      quotaMatin:    data.quota_matin    ?? 2,
+      quotaAM:       data.quota_am       ?? 4,
+      quotaMatinSam: data.quota_matin_sam ?? 2,
+      quotaAMSam:    data.quota_am_sam   ?? 2,
+      joursBlockes:  data.jours_bloques  || []
+    };
+  }catch(e){
+    console.error('Erreur chargement config agenda :', e);
+  }
+}
+
+function isDateBlocked(iso){
+  return agendaCfg.joursBlockes.some(b => iso >= b.debut && iso <= b.fin);
+}
+
+function getSlotLimit(dateISO, slot){
+  const dow = new Date(dateISO + 'T00:00:00').getDay();
+  if(dow === 6) return slot === 'matin' ? agendaCfg.quotaMatinSam : agendaCfg.quotaAMSam;
+  return slot === 'matin' ? agendaCfg.quotaMatin : agendaCfg.quotaAM;
+}
+
+function getSlotLabel(slot){
+  if(slot === 'matin')     return `🌅 Matin · ${agendaCfg.matinDebut}–${agendaCfg.matinFin}`;
+  if(slot === 'apresmidi') return `☀️ Après-midi · ${agendaCfg.amDebut}–${agendaCfg.amFin}`;
+  return slot;
+}
+
+// Pour le récap de confirmation
+const SLOT_LABELS = {
+  get matin()     { return `Matin (${agendaCfg.matinDebut}–${agendaCfg.matinFin})`; },
+  get apresmidi() { return `Après-midi (${agendaCfg.amDebut}–${agendaCfg.amFin})`; }
+};
+
+let selectedDate = null;
+let selectedSlot = null;
+let slotCounts = {};
+
+function toISODate(d){
+  const year  = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day   = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildAvailableDates(){
+  // Lundi à samedi, à partir de demain, sur 20 jours ouvrés
+  // Inclut les jours bloqués (affichés comme indisponibles)
+  const dates = [];
+  let cursor = new Date();
+  cursor.setHours(0,0,0,0);
+  cursor.setDate(cursor.getDate() + 1);
+  let added = 0;
+  while(added < 20){
+    const iso = toISODate(cursor);
+    const dow = cursor.getDay();
+    if(dow !== 0){ // exclure uniquement les dimanches
+      dates.push(new Date(cursor));
+      added++;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+    if(cursor - new Date() > 1000 * 60 * 60 * 24 * 120) break;
+  }
+  return dates;
+}
+
+function renderDateScroller(){
+  const dates = buildAvailableDates();
+  const scroller = document.getElementById('date-scroller');
+  scroller.innerHTML = '';
+
+  if(dates.length === 0){
+    scroller.innerHTML = '<p style="color:#ff6b6b;font-size:0.9rem;padding:1rem 0;">Aucune disponibilité dans les prochaines semaines. Appelez-nous au 07 59 70 54 97.</p>';
+    return;
+  }
+
+  let firstSelectable = null;
+  dates.forEach((d, i) => {
+    const iso = toISODate(d);
+    const blocked = isDateBlocked(iso);
+    const chip = document.createElement('div');
+    chip.className = 'date-chip' + (blocked ? ' blocked' : '');
+    chip.dataset.date = iso;
+    chip.innerHTML = `<div class="dow">${DOW_LABELS[d.getDay()]}</div><div class="dnum">${d.getDate()}</div>`;
+    if(blocked){
+      chip.title = 'Indisponible';
+      // non cliquable
+    } else {
+      chip.addEventListener('click', () => selectDate(iso, chip));
+      if(!firstSelectable) firstSelectable = { iso, chip };
+    }
+    scroller.appendChild(chip);
+  });
+
+  // Sélectionner le premier jour disponible
+  if(firstSelectable) selectDate(firstSelectable.iso, firstSelectable.chip);
+}
+
+async function fetchSlotCounts(dateISO){
+  if(slotCounts[dateISO]) return slotCounts[dateISO];
+  try{
+    const { data, error } = await sb
+      .from('rdv')
+      .select('creneau')
+      .eq('date', dateISO)
+      .neq('statut', 'annule');
+    if(error) throw error;
+    const counts = { matin: 0, apresmidi: 0 };
+    (data || []).forEach(row => {
+      if(counts[row.creneau] !== undefined) counts[row.creneau]++;
+    });
+    slotCounts[dateISO] = counts;
+    return counts;
+  }catch(e){
+    console.error('Erreur chargement créneaux :', e);
+    return { matin: 0, apresmidi: 0 };
+  }
+}
+
+async function selectDate(iso, chipEl){
+  selectedDate = iso;
+  selectedSlot = null;
+  document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('selected'));
+  chipEl.classList.add('selected');
+  updateSubmitState();
+  await renderSlots();
+}
+
+async function renderSlots(){
+  const grid = document.getElementById('slots-grid');
+
+  // Mettre à jour les titres/horaires des cards selon la config
+  grid.querySelectorAll('.slot-card').forEach(c => {
+    const slot = c.dataset.slot;
+    const titleEl = c.querySelector('.slot-title');
+    const hoursEl = c.querySelector('.slot-hours');
+    if(titleEl) titleEl.textContent = slot === 'matin' ? '🌅 Matin' : '☀️ Après-midi';
+    if(hoursEl) hoursEl.textContent = slot === 'matin'
+      ? `${agendaCfg.matinDebut} – ${agendaCfg.matinFin}`
+      : `${agendaCfg.amDebut} – ${agendaCfg.amFin}`;
+    c.querySelector('.slot-status').textContent = 'Chargement…';
+    c.querySelector('.slot-status').className = 'slot-status';
+    c.classList.remove('full', 'selected');
+    c.onclick = null;
+  });
+
+  // Si le jour est bloqué : afficher "Fermé" sur les créneaux
+  if(selectedDate && isDateBlocked(selectedDate)){
+    grid.querySelectorAll('.slot-card').forEach(card => {
+      card.classList.add('full');
+      const statusEl = card.querySelector('.slot-status');
+      statusEl.textContent = '🔒 Fermé ce jour';
+      statusEl.classList.add('full-text');
+      card.onclick = null;
+    });
+    return;
+  }
+
+  const counts = await fetchSlotCounts(selectedDate);
+
+  grid.querySelectorAll('.slot-card').forEach(card => {
+    const slot = card.dataset.slot;
+    const used = counts[slot] || 0;
+    const max  = getSlotLimit(selectedDate, slot);
+    const statusEl = card.querySelector('.slot-status');
+    if(max === 0 || used >= max){
+      card.classList.add('full');
+      statusEl.textContent = 'Complet';
+      statusEl.classList.add('full-text');
+      card.onclick = null;
+    } else {
+      const dispo = max - used;
+      statusEl.textContent = `${dispo} place${dispo > 1 ? 's' : ''} disponible${dispo > 1 ? 's' : ''}`;
+      statusEl.classList.add('ok');
+      card.onclick = () => selectSlot(slot, card);
+    }
+  });
+}
+
+function selectSlot(slot, cardEl){
+  selectedSlot = slot;
+  document.querySelectorAll('.slot-card').forEach(c => c.classList.remove('selected'));
+  cardEl.classList.add('selected');
+  updateSubmitState();
+}
+
+function updateSubmitState(){
+  const cgvChecked = document.getElementById('cgv-check').checked;
+  document.getElementById('submit-btn').disabled = !(selectedDate && selectedSlot && cgvChecked);
+}
+document.getElementById('cgv-check').addEventListener('change', updateSubmitState);
+
+function showToastError(msg){
+  const errEl = document.getElementById('form-error');
+  errEl.textContent = '⚠️ ' + msg;
+  errEl.style.display = 'block';
+  setTimeout(() => { errEl.style.display = 'none'; }, 6000);
+}
+
+document.getElementById('rdv-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if(!selectedDate || !selectedSlot){
+    showToastError('Merci de choisir une date et un créneau.');
+    return;
+  }
+  if(!document.getElementById('cgv-check').checked){
+    showToastError('Merci de confirmer avoir pris connaissance des CGV.');
+    return;
+  }
+
+  const dow = new Date(selectedDate + 'T00:00:00').getDay();
+  if(dow === 0){
+    showToastError('Les rendez-vous ne sont pas disponibles le dimanche.');
+    selectedDate = null;
+    document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('selected'));
+    updateSubmitState();
+    return;
+  }
+
+  // Validation code postal
+  const cpVal = (document.getElementById('cp').value || '').trim();
+  if(cpVal && !cpVal.startsWith('59') && !cpVal.startsWith('62')){
+    showToastError('Nous n\'intervenons que dans les départements 59 (Nord) et 62 (Pas-de-Calais). Merci de nous contacter au 07 59 70 54 97 pour toute autre zone.');
+    return;
+  }
+
+  // Double sécurité : jour bloqué
+  if(isDateBlocked(selectedDate)){
+    showToastError('Cette date n\'est plus disponible. Merci de choisir une autre date.');
+    selectedDate = null;
+    selectedSlot = null;
+    slotCounts = {};
+    renderDateScroller();
+    return;
+  }
+
+  // Double sécurité : vérifier quota en temps réel
+  delete slotCounts[selectedDate]; // forcer rechargement
+  const freshCounts = await fetchSlotCounts(selectedDate);
+  const usedFresh = freshCounts[selectedSlot] || 0;
+  const maxFresh  = getSlotLimit(selectedDate, selectedSlot);
+  if(usedFresh >= maxFresh){
+    showToastError('Ce créneau vient d\'être complet. Merci de choisir un autre créneau ou une autre date.');
+    await renderSlots();
+    return;
+  }
+
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Envoi en cours…';
+
+  const appId = 'rdv_' + Date.now();
+  const row = {
+    app_id: appId,
+    date: selectedDate,
+    creneau: selectedSlot,
+    nom: document.getElementById('nom').value.trim(),
+    prenom: document.getElementById('prenom').value.trim(),
+    adresse: document.getElementById('adresse').value.trim(),
+    adresse2: document.getElementById('adresse2').value.trim() || null,
+    cp: document.getElementById('cp').value.trim(),
+    ville: document.getElementById('ville').value.trim(),
+    tel: document.getElementById('tel').value.trim(),
+    tel_interlocuteur: document.getElementById('tel-interlocuteur').value.trim() || null,
+    email: document.getElementById('email').value.trim(),
+    appareil: document.getElementById('appareil').value,
+    marque: document.getElementById('marque').value.trim() || null,
+    modele: document.getElementById('modele').value.trim() || null,
+    panne: document.getElementById('panne').value.trim(),
+    note_technicien: document.getElementById('note-technicien').value.trim(),
+    plaque_photo: plaquePhotoDataUrl || null,
+    statut: 'en_attente'
+  };
+
+  try{
+    const { error } = await sb.from('rdv').insert(row);
+    if(error) throw error;
+
+    if(plaquePollInterval){ clearInterval(plaquePollInterval); plaquePollInterval = null; }
+    if(plaquePhotoDataUrl){
+      sb.from('plaque_photos_temp').delete().eq('code', plaqueCode).then(() => {}).catch(() => {});
+    }
+
+    // Créer ou retrouver la fiche client automatiquement
+    try{
+      let clientId = null;
+      const tel   = (row.tel   || '').trim();
+      const email = (row.email || '').trim();
+      let existing = null;
+      if(tel){
+        const { data } = await sb.from('clients').select('app_id').eq('tel', tel).maybeSingle();
+        existing = data;
+      }
+      if(!existing && email){
+        const { data } = await sb.from('clients').select('app_id').eq('email', email).maybeSingle();
+        existing = data;
+      }
+      if(existing){
+        clientId = existing.app_id;
+      } else {
+        const newClient = {
+          app_id:  'cli_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+          nom:     row.nom     || '',
+          prenom:  row.prenom  || '',
+          tel:     tel,
+          email:   email,
+          adresse: row.adresse || '',
+          cp:      row.cp      || '',
+          ville:   row.ville   || '',
+        };
+        const { data: ins, error: insErr } = await sb.from('clients').insert(newClient).select('app_id').single();
+        if(insErr) throw insErr;
+        clientId = ins && ins.app_id;
+      }
+      if(clientId){
+        await sb.from('rdv').update({ client_id: clientId }).eq('app_id', row.app_id);
+      }
+    }catch(clientErr){
+      console.error('Erreur création client auto :', clientErr);
+    }
+
+    try{
+      const { error: confirmError } = await sb.functions.invoke('send-rdv-confirmation', {
+        body: {
+          app_id: row.app_id,
+          nom: row.nom, prenom: row.prenom, email: row.email,
+          date: row.date, creneau: row.creneau,
+          adresse: row.adresse, cp: row.cp, ville: row.ville,
+          appareil: row.appareil, panne: row.panne
+        }
+      });
+      await sb.from('rdv').update({
+        email_confirmation_envoye: !confirmError,
+        email_confirmation_erreur: confirmError ? (confirmError.message || 'Erreur inconnue') : null
+      }).eq('app_id', row.app_id);
+      if(confirmError) console.error('Erreur envoi email confirmation :', confirmError);
+    }catch(emailErr){
+      console.error('Erreur envoi email confirmation :', emailErr);
+      try{
+        await sb.from('rdv').update({
+          email_confirmation_envoye: false,
+          email_confirmation_erreur: emailErr.message || 'Erreur inconnue'
+        }).eq('app_id', row.app_id);
+      }catch(updateErr){ console.error('Erreur enregistrement statut confirmation :', updateErr); }
+    }
+
+    document.getElementById('form-success').style.display = 'block';
+    document.getElementById('rdv-form').reset();
+    document.querySelectorAll('.date-chip, .slot-card').forEach(c => c.classList.remove('selected'));
+    selectedDate = null; selectedSlot = null; slotCounts = {};
+    submitBtn.textContent = '📅 Confirmer la demande de rendez-vous';
+    submitBtn.style.display = 'none';
+    renderDateScroller();
+    document.getElementById('form-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const totalSeconds = 4;
+    const circle = document.getElementById('redirect-progress-circle');
+    const countdownEl = document.getElementById('redirect-countdown');
+    const circumference = 125.6;
+    let secondsLeft = totalSeconds;
+    const countdownInterval = setInterval(() => {
+      secondsLeft--;
+      if(countdownEl) countdownEl.textContent = Math.max(secondsLeft, 0);
+      if(circle) circle.style.strokeDashoffset = String(circumference * (totalSeconds - secondsLeft) / totalSeconds);
+      if(secondsLeft <= 0){
+        clearInterval(countdownInterval);
+        window.location.href = '/';
+      }
+    }, 1000);
+  }catch(e){
+    console.error('Erreur envoi RDV :', e);
+    showToastError('Impossible d\'envoyer votre demande. Appelez-nous au 07 59 70 54 97.');
+    submitBtn.textContent = '📅 Confirmer la demande de rendez-vous';
+  }
+  updateSubmitState();
+});
+
+// ---------- Autocomplétion adresse ----------
+
+let adresseTimeout = null;
+const adresseInput = document.getElementById('adresse');
+const adresseSuggestionsBox = document.getElementById('adresse-suggestions');
+
+adresseInput.addEventListener('input', () => {
+  clearTimeout(adresseTimeout);
+  const q = adresseInput.value.trim();
+  if(q.length < 3){ adresseSuggestionsBox.style.display = 'none'; return; }
+  adresseTimeout = setTimeout(() => fetchAdresseSuggestions(q), 300);
+});
+
+async function fetchAdresseSuggestions(q){
+  try{
+    const url = `https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&type=StreetAddress&maximumResponses=6&terr=METROPOLE`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const results = data.results || [];
+    if(!results.length){ adresseSuggestionsBox.style.display = 'none'; return; }
+    adresseSuggestionsBox.innerHTML = results.map((r,i) => `
+      <div class="adresse-item" data-idx="${i}" data-zip="${r.zipcode||''}" data-city="${r.city||''}" data-lat="${r.y||''}" data-lon="${r.x||''}" data-street="${r.street||''}" data-fulltext="${r.fulltext||''}"
+        style="padding:0.55rem 0.8rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.88rem;">
+        ${r.fulltext || ''}
+      </div>`).join('');
+    adresseSuggestionsBox.style.display = 'block';
+    adresseSuggestionsBox.querySelectorAll('.adresse-item').forEach(el => {
+      el.addEventListener('click', () => {
+        // Extraire juste la partie adresse (sans CP et ville) depuis fulltext
+        // fulltext = "12 Rue Emile Zola, 62300 Lens" → on prend avant la virgule
+        const fulltext = el.dataset.fulltext || '';
+        const adresseOnly = fulltext.split(',')[0].trim() || el.dataset.street || '';
+        adresseInput.value = adresseOnly;
+        document.getElementById('cp').value   = el.dataset.zip  || '';
+        document.getElementById('ville').value = el.dataset.city || '';
+        adresseSuggestionsBox.style.display = 'none';
+        validateCP(el.dataset.zip);
+      });
+    });
+  }catch(e){ adresseSuggestionsBox.style.display = 'none'; }
+}
+
+document.addEventListener('click', e => {
+  if(!adresseSuggestionsBox.contains(e.target) && e.target !== adresseInput){
+    adresseSuggestionsBox.style.display = 'none';
+  }
+});
+
+// ---------- Validation CP ----------
+function validateCP(cp){
+  const cpEl = document.getElementById('cp');
+  const errEl = document.getElementById('cp-error');
+  const val = (cp || cpEl.value || '').trim();
+  const valid = val.startsWith('59') || val.startsWith('62');
+  errEl.style.display = val.length >= 2 && !valid ? 'block' : 'none';
+  return valid || val.length < 2;
+}
+
+document.getElementById('cp').addEventListener('input', e => {
+  validateCP(e.target.value);
+
+});
+
+// ---------- Distance via IGN ----------
+
+
+// ---------- Validation CP à la soumission ----------
+const origSubmit = document.getElementById('rdv-form').onsubmit;
+
+// ---------- Init : charger la config PUIS afficher le calendrier ----------
+// ---------- Photo de la plaque signalétique ----------
+let plaquePhotoDataUrl = null;
+const plaqueCode = 'PLQ' + Date.now() + Math.random().toString(36).slice(2, 8);
+let plaquePollInterval = null;
+
+const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+if(isMobileDevice){
+  document.getElementById('plaque-direct-buttons').style.display = 'flex';
+} else {
+  document.getElementById('plaque-choice-buttons').style.display = 'flex';
+}
+
+function resizeImage(file, maxDim = 1200, quality = 0.75){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.onload = () => {
+        let { width, height } = img;
+        if(width > height && width > maxDim){
+          height = Math.round(height * (maxDim / width));
+          width = maxDim;
+        } else if(height > maxDim){
+          width = Math.round(width * (maxDim / height));
+          height = maxDim;
+        }
+        const canvasEl = document.createElement('canvas');
+        canvasEl.width = width;
+        canvasEl.height = height;
+        const cctx = canvasEl.getContext('2d');
+        cctx.drawImage(img, 0, 0, width, height);
+        resolve(canvasEl.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function showPlaquePreview(dataUrl){
+  plaquePhotoDataUrl = dataUrl;
+  document.getElementById('plaque-preview').src = dataUrl;
+  document.getElementById('plaque-choice-buttons').style.display = 'none';
+  document.getElementById('plaque-direct-buttons').style.display = 'none';
+  document.getElementById('plaque-result').style.display = 'block';
+  const qrModal = document.getElementById('plaque-qr-modal');
+  if(qrModal) qrModal.style.display = 'none';
+  if(plaquePollInterval){ clearInterval(plaquePollInterval); plaquePollInterval = null; }
+}
+
+document.getElementById('plaque-file-input')?.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await resizeImage(file);
+    showPlaquePreview(dataUrl);
+  }catch(err){ console.error('Erreur lecture photo :', err); }
+});
+
+async function handleDirectPlaqueInput(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await resizeImage(file);
+    showPlaquePreview(dataUrl);
+  }catch(err){ console.error('Erreur lecture photo :', err); }
+}
+document.getElementById('plaque-camera-input')?.addEventListener('change', handleDirectPlaqueInput);
+document.getElementById('plaque-gallery-input')?.addEventListener('change', handleDirectPlaqueInput);
+
+function renderPlaqueQrCode(){
+  const qrEl = document.getElementById('plaque-qrcode');
+  if(!qrEl) return;
+  const url = `https://technikhome.fr/envoyer-photo.html?code=${plaqueCode}`;
+  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
+  qrEl.innerHTML = `<img src="${qrImgUrl}" width="160" height="160" alt="QR code" style="display:block;" onerror="this.parentElement.innerHTML='<div style=&quot;color:#333;font-size:0.8rem;padding:0.5rem;max-width:160px;&quot;>QR code indisponible. Merci d\\'utiliser l\\'option PC à la place.</div>'">`;
+}
+
+function startPlaquePolling(){
+  if(plaquePollInterval) return;
+  plaquePollInterval = setInterval(async () => {
+    if(plaquePhotoDataUrl) return;
+    try{
+      const { data } = await sb.from('plaque_photos_temp').select('photo_base64').eq('code', plaqueCode).single();
+      if(data && data.photo_base64){
+        showPlaquePreview(data.photo_base64);
+      }
+    }catch(e){ /* pas encore de photo, on continue de vérifier */ }
+  }, 3000);
+}
+
+document.getElementById('plaque-open-qr-btn')?.addEventListener('click', () => {
+  document.getElementById('plaque-qr-status').textContent = "En attente d'une photo…";
+  renderPlaqueQrCode();
+  startPlaquePolling();
+  document.getElementById('plaque-qr-modal').style.display = 'flex';
+});
+
+document.getElementById('plaque-qr-close-btn')?.addEventListener('click', () => {
+  document.getElementById('plaque-qr-modal').style.display = 'none';
+});
+
+document.getElementById('ouvrir-astuces-plaque-btn')?.addEventListener('click', () => {
+  document.getElementById('astuces-plaque-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+});
+
+document.getElementById('astuces-plaque-close-btn')?.addEventListener('click', () => {
+  document.getElementById('astuces-plaque-modal').style.display = 'none';
+  document.body.style.overflow = '';
+});
+
+document.getElementById('astuces-plaque-modal')?.addEventListener('click', (e) => {
+  if(e.target.id === 'astuces-plaque-modal'){
+    e.target.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+});
+
+document.getElementById('plaque-delete-btn')?.addEventListener('click', async () => {
+  plaquePhotoDataUrl = null;
+  document.getElementById('plaque-preview').src = '';
+  document.getElementById('plaque-result').style.display = 'none';
+  if(isMobileDevice){
+    document.getElementById('plaque-direct-buttons').style.display = 'flex';
+  } else {
+    document.getElementById('plaque-choice-buttons').style.display = 'flex';
+  }
+  document.getElementById('plaque-file-input').value = '';
+  const camInput = document.getElementById('plaque-camera-input');
+  const galInput = document.getElementById('plaque-gallery-input');
+  if(camInput) camInput.value = '';
+  if(galInput) galInput.value = '';
+  try{ await sb.from('plaque_photos_temp').delete().eq('code', plaqueCode); }catch(e){ /* rien à supprimer, pas grave */ }
+});
+
+loadAgendaConfig().then(() => renderDateScroller());
+
+</script>
+<div id="plaque-qr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1.6rem;max-width:340px;width:100%;text-align:center;">
+    <div style="display:flex;justify-content:flex-end;">
+      <button type="button" id="plaque-qr-close-btn" style="background:transparent;border:none;color:var(--gray);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:0.02em;margin-bottom:0.6rem;">Scannez avec votre téléphone</h3>
+    <p style="font-size:0.85rem;color:var(--gray);margin-bottom:1rem;">Ouvrez l'appareil photo de votre téléphone et visez ce code — la photo apparaîtra ici automatiquement.</p>
+    <div id="plaque-qrcode" style="background:#fff;padding:0.8rem;border-radius:10px;display:inline-block;"></div>
+    <p id="plaque-qr-status" style="font-size:0.85rem;color:var(--gray);margin-top:1rem;">En attente d'une photo…</p>
+  </div>
+</div>
+
+
+</body>
+</html>

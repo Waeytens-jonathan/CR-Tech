@@ -3189,6 +3189,11 @@ function showAgendaDetail(appId){
   const telValue = r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(r.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a>` : '';
   const rows = [
     ['Statut', statutLabel],
+    ['Confirmation email', (() => {
+      if(r.email_confirmation_envoye === true) return '__HTML__<span style="color:var(--green,#3fbf6f);">✅ Envoyée avec succès</span>';
+      if(r.email_confirmation_envoye === false) return '__HTML__<span style="color:var(--red,#e0584f);">⚠️ Échec de l\'envoi' + (r.email_confirmation_erreur ? ' — ' + escapeHtml(r.email_confirmation_erreur) : '') + '</span>';
+      return null;
+    })()],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
     ['Type', TYPE_RDV_LABELS[r.type_rdv] || TYPE_RDV_LABELS['diagnostic']],
@@ -6357,6 +6362,33 @@ function getImageDimensions(dataUrl){
 }
 
 // ---------- Export PDF ----------
+// Recompresse une image déjà en mémoire (data URL) — utilisé pour alléger le PDF envoyé par email
+function recompressDataUrl(dataUrl, maxDim, quality){
+  if(!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) return Promise.resolve(dataUrl);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if(width > height && width > maxDim){
+        height = Math.round(height * (maxDim / width));
+        width = maxDim;
+      } else if(height > maxDim){
+        width = Math.round(width * (maxDim / height));
+        height = maxDim;
+      }
+      const canvasEl = document.createElement('canvas');
+      canvasEl.width = width;
+      canvasEl.height = height;
+      const cctx = canvasEl.getContext('2d');
+      cctx.drawImage(img, 0, 0, width, height);
+      resolve(canvasEl.toDataURL('image/jpeg', quality));
+    };
+    // En cas d'échec, on garde l'image d'origine plutôt que de bloquer tout l'envoi
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 async function generatePdfFor(data, mode){
   mode = mode || 'download';
   const { jsPDF } = window.jspdf;
@@ -6365,6 +6397,27 @@ async function generatePdfFor(data, mode){
   const orange = [245,166,35];
   const muted = [120,130,140];
   let y = 18;
+
+  // Pour l'envoi par email, on allège les photos (plus rapide à générer et à envoyer sur mobile).
+  // Le dossier stocké en base garde ses photos en pleine qualité — seule cette copie utilisée
+  // pour CE pdf est réduite.
+  let photosPourPdf = data.photos;
+  let plaquePhotoPourPdf = data.plaquePhoto;
+  let pieceDeposePhotosPourPdf = data.pieceDeposePhotos;
+  if(mode === 'email'){
+    const EMAIL_MAX_DIM = 800, EMAIL_QUALITY = 0.55;
+    const taches = [];
+    if(Array.isArray(data.photos) && data.photos.length){
+      taches.push(Promise.all(data.photos.map(src => recompressDataUrl(src, EMAIL_MAX_DIM, EMAIL_QUALITY))).then(r => photosPourPdf = r));
+    }
+    if(data.plaquePhoto){
+      taches.push(recompressDataUrl(data.plaquePhoto, EMAIL_MAX_DIM, EMAIL_QUALITY).then(r => plaquePhotoPourPdf = r));
+    }
+    if(Array.isArray(data.pieceDeposePhotos) && data.pieceDeposePhotos.length){
+      taches.push(Promise.all(data.pieceDeposePhotos.map(src => recompressDataUrl(src, EMAIL_MAX_DIM, EMAIL_QUALITY))).then(r => pieceDeposePhotosPourPdf = r));
+    }
+    await Promise.all(taches);
+  }
 
   // En-tête
   doc.setFillColor(...navy);
@@ -6438,20 +6491,20 @@ async function generatePdfFor(data, mode){
   line('Marque / Modèle', `${data.marque||''} ${data.modele||''}`);
   line('Numéro de série', data.serie);
   line('Âge approximatif', formatAge(data.age));
-  if(data.plaquePhoto){
+  if(plaquePhotoPourPdf){
     if(y + 50 > 280){ doc.addPage(); y = 18; }
     doc.setFont('helvetica','bold');
     doc.text('Plaque signalétique :', 16, y);
     y += 4;
     try{
-      const dims = await getImageDimensions(data.plaquePhoto);
+      const dims = await getImageDimensions(plaquePhotoPourPdf);
       const maxW = 70, maxH = 50;
       let w = dims.width, h = dims.height;
       const ratio = Math.min(maxW / w, maxH / h);
       w = w * ratio;
       h = h * ratio;
       if(y + h > 280){ doc.addPage(); y = 18; }
-      doc.addImage(data.plaquePhoto, 'JPEG', 16, y, w, h);
+      doc.addImage(plaquePhotoPourPdf, 'JPEG', 16, y, w, h);
       y += h + 4;
     }catch(e){}
     doc.setFont('helvetica','normal');
@@ -6556,7 +6609,7 @@ async function generatePdfFor(data, mode){
   const filename = `${data.ref || 'compte-rendu'}_${(data.nom||'').toUpperCase()}.pdf`;
 
   // Photos
-  if(data.photos && data.photos.length){
+  if(photosPourPdf && photosPourPdf.length){
     doc.addPage();
     y = 18;
     doc.setFont('helvetica','bold');
@@ -6565,7 +6618,7 @@ async function generatePdfFor(data, mode){
     y += 8;
     const imgW = 85, imgH = 65, gap = 8;
     let col = 0;
-    for(const src of data.photos){
+    for(const src of photosPourPdf){
       if(y + imgH > 285){
         doc.addPage();
         y = 18;
@@ -6587,7 +6640,7 @@ async function generatePdfFor(data, mode){
   }
 
   // Photos de la pièce posée
-  if(Array.isArray(data.pieceDeposePhotos) && data.pieceDeposePhotos.length){
+  if(Array.isArray(pieceDeposePhotosPourPdf) && pieceDeposePhotosPourPdf.length){
     doc.addPage();
     y = 18;
     doc.setFont('helvetica','bold');
@@ -6596,7 +6649,7 @@ async function generatePdfFor(data, mode){
     y += 8;
     const imgW = 85, imgH = 65, gap = 8;
     let col = 0;
-    for(const src of data.pieceDeposePhotos){
+    for(const src of pieceDeposePhotosPourPdf){
       if(y + imgH > 285){
         doc.addPage();
         y = 18;
