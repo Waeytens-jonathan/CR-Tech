@@ -971,7 +971,7 @@ async function renderStats(){
   const urssaf = ca * urssafTaux;
   const net = ca - totalFournisseur - totalLivraison - urssaf;
 
-  // Meilleure journée (CA encaissé le plus élevé sur une seule date)
+  // Meilleure journée (CA encaissé le plus élevé sur une seule date, selon la période sélectionnée)
   let meilleureJourDate = null, meilleureJourMontant = 0;
   Object.keys(caParJour).forEach(date => {
     if(caParJour[date] > meilleureJourMontant){
@@ -980,7 +980,7 @@ async function renderStats(){
     }
   });
 
-  // Meilleure journée depuis le début (indépendant de la période sélectionnée)
+  // Meilleure journée depuis le début (le filtre de période n'a pas d'impact sur cette stat)
   const meilleureDepuisDebut = calculerMeilleureJournee(candidats);
 
   // Meilleure journée du mois en cours (indépendant de la période sélectionnée)
@@ -5088,6 +5088,7 @@ function resetForm(){
   renderCommandePieceRows();
   currentId = null;
   document.getElementById('ref-display').textContent = generateRef();
+  applyTerminerStyle(document.getElementById('email-btn'), { documents_envoyes: false });
   updateEmailBtnVisibility();
 }
 
@@ -5095,6 +5096,7 @@ async function loadIntoForm(report){
   await ensureFullReportLoaded(report);
   currentId = report.id;
   document.getElementById('ref-display').textContent = report.ref;
+  applyTerminerStyle(document.getElementById('email-btn'), report);
   fieldIds.forEach(id => {
     const key = id.replace('f-','');
     document.getElementById(id).value = report[key] !== undefined ? report[key] : '';
@@ -5345,7 +5347,14 @@ document.getElementById('email-btn').addEventListener('click', async () => {
 
   try{
     const ok = await terminerEtEnvoyer(data);
-    if(ok) showToast('Compte-rendu et facture enregistrés et envoyés au client ✓');
+    if(ok){
+      showToast('Compte-rendu et facture enregistrés et envoyés au client ✓');
+      data.documents_envoyes = true;
+      const idx = reports.findIndex(rep => rep.id === data.id);
+      if(idx !== -1) reports[idx].documents_envoyes = true;
+      saveReportToSupabase(data);
+      applyTerminerStyle(btn, data);
+    }
   }catch(e){
     console.error('Erreur envoi compte-rendu/facture :', e);
     showToast('Enregistré, mais échec de l\'envoi : ' + (e.message || 'voir console'), true);
