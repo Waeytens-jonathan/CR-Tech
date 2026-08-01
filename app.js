@@ -4901,13 +4901,17 @@ let plaquePhoto = null;
 function renderPlaqueThumb(){
   const wrap = document.getElementById('plaque-thumb-wrap');
   const img = document.getElementById('plaque-thumb-img');
+  const analyzeBtn = document.getElementById('plaque-analyze-btn');
   if(plaquePhoto){
     img.src = plaquePhoto;
     wrap.style.display = 'block';
+    analyzeBtn.style.display = 'inline-flex';
   } else {
     img.src = '';
     wrap.style.display = 'none';
+    analyzeBtn.style.display = 'none';
   }
+  document.getElementById('plaque-analyze-status').style.display = 'none';
 }
 
 document.getElementById('plaque-input').addEventListener('change', async (e) => {
@@ -4916,15 +4920,12 @@ document.getElementById('plaque-input').addEventListener('change', async (e) => 
   try{
     plaquePhoto = await resizeImage(file);
     renderPlaqueThumb();
-    document.getElementById('plaque-analyze-btn').style.display = 'inline-flex';
-    document.getElementById('plaque-analyze-status').style.display = 'none';
   }catch(err){
     console.error('Erreur chargement photo plaque :', err);
     const reader = new FileReader();
     reader.onload = () => {
       plaquePhoto = reader.result;
       renderPlaqueThumb();
-      document.getElementById('plaque-analyze-btn').style.display = 'inline-flex';
     };
     reader.readAsDataURL(file);
   }
@@ -4934,8 +4935,6 @@ document.getElementById('plaque-input').addEventListener('change', async (e) => 
 document.getElementById('remove-plaque').addEventListener('click', () => {
   plaquePhoto = null;
   renderPlaqueThumb();
-  document.getElementById('plaque-analyze-btn').style.display = 'none';
-  document.getElementById('plaque-analyze-status').style.display = 'none';
 });
 
 document.getElementById('plaque-analyze-btn').addEventListener('click', async () => {
