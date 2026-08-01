@@ -149,6 +149,49 @@ async function envoyerRelanceImpaye(r){
   if(btn){ btn.disabled = false; btn.textContent = '📧 Envoyer la relance (48h pour régulariser)'; }
 }
 
+// Montant réellement encaissé sur un dossier (remise et reste à encaisser déduits, remboursement soustrait)
+function caEncaisseRapport(r){
+  const mo = parseFloat(r['cout-mo']) || 0;
+  const pieces = parseFloat(r['cout-pieces']) || 0;
+  const depl = parseFloat(r['cout-deplacement']) || 0;
+  const montantLigne = mo + pieces + depl;
+  const remiseMontant = calculerMontantRemise(r);
+  const montantNetFacture = Math.max(0, montantLigne - remiseMontant);
+  const reste = parseFloat(r['reste-encaisser']) || 0;
+  const encaisseNet = Math.max(0, montantNetFacture - reste);
+  const ratioEncaisse = montantLigne > 0 ? Math.max(0, Math.min(1, encaisseNet / montantLigne)) : 1;
+
+  let moEncaisse = mo * ratioEncaisse;
+  let piecesEncaisse = pieces * ratioEncaisse;
+  let deplEncaisse = depl * ratioEncaisse;
+
+  const remboursementMontant = parseFloat(r['remboursement-montant']) || 0;
+  if(remboursementMontant > 0){
+    if(r['remboursement-categorie'] === 'piece') piecesEncaisse = Math.max(0, piecesEncaisse - remboursementMontant);
+    else if(r['remboursement-categorie'] === 'mo') moEncaisse = Math.max(0, moEncaisse - remboursementMontant);
+    else if(r['remboursement-categorie'] === 'deplacement') deplEncaisse = Math.max(0, deplEncaisse - remboursementMontant);
+  }
+
+  return { moEncaisse, piecesEncaisse, deplEncaisse, total: moEncaisse + piecesEncaisse + deplEncaisse };
+}
+
+// Meilleure journée (CA encaissé le plus élevé) sur un ensemble de dossiers donné
+function calculerMeilleureJournee(rapports){
+  const caParJour = {};
+  rapports.forEach(r => {
+    if(!r.date) return;
+    caParJour[r.date] = (caParJour[r.date] || 0) + caEncaisseRapport(r).total;
+  });
+  let meilleureDate = null, meilleurMontant = 0;
+  Object.keys(caParJour).forEach(date => {
+    if(caParJour[date] > meilleurMontant){
+      meilleurMontant = caParJour[date];
+      meilleureDate = date;
+    }
+  });
+  return { date: meilleureDate, montant: meilleurMontant };
+}
+
 function calculerMontantRemise(r){
   const remiseValeur = parseFloat(r['remise-valeur']) || 0;
   if(remiseValeur <= 0) return 0;
@@ -937,6 +980,15 @@ async function renderStats(){
     }
   });
 
+  // Meilleure journée depuis le début (indépendant de la période sélectionnée)
+  const meilleureDepuisDebut = calculerMeilleureJournee(candidats);
+
+  // Meilleure journée du mois en cours (indépendant de la période sélectionnée)
+  const maintenant = new Date();
+  const debutMoisCourant = `${maintenant.getFullYear()}-${String(maintenant.getMonth()+1).padStart(2,'0')}-01`;
+  const rapportsCeMois = candidats.filter(r => r.date >= debutMoisCourant);
+  const meilleureCeMois = calculerMeilleureJournee(rapportsCeMois);
+
   // Tendance vs période précédente
   let prevCa = null;
   if(prevFiltered){
@@ -996,6 +1048,20 @@ async function renderStats(){
   } else {
     document.getElementById('stat-meilleure-journee-montant').textContent = '—';
     document.getElementById('stat-meilleure-journee-date').textContent = '';
+  }
+  if(meilleureDepuisDebut.date){
+    document.getElementById('stat-meilleure-debut-montant').textContent = formatEur(meilleureDepuisDebut.montant);
+    document.getElementById('stat-meilleure-debut-date').textContent = dateFrLong(meilleureDepuisDebut.date);
+  } else {
+    document.getElementById('stat-meilleure-debut-montant').textContent = '—';
+    document.getElementById('stat-meilleure-debut-date').textContent = '';
+  }
+  if(meilleureCeMois.date){
+    document.getElementById('stat-meilleure-mois-montant').textContent = formatEur(meilleureCeMois.montant);
+    document.getElementById('stat-meilleure-mois-date').textContent = dateFrLong(meilleureCeMois.date);
+  } else {
+    document.getElementById('stat-meilleure-mois-montant').textContent = '—';
+    document.getElementById('stat-meilleure-mois-date').textContent = '';
   }
   document.getElementById('stat-panier-moyen').textContent = formatEur(panierMoyen);
   document.getElementById('stat-taux-non-reparable').textContent = tauxNonReparable + ' %';
