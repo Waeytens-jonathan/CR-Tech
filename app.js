@@ -1587,7 +1587,9 @@ function renderDepotList(){
   listEl.innerHTML = depots.map(d => {
     const badge = d.statut === 'recupere'
       ? '<span class="badge green">Récupéré</span>'
-      : '<span class="badge orange">Déposé</span>';
+      : d.statut === 'abandonne'
+        ? '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;">Abandonné</span>'
+        : '<span class="badge orange">Déposé</span>';
     return `
       <div class="list-item" data-depot-id="${escapeHtml(d.app_id)}" style="cursor:pointer;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
@@ -1620,7 +1622,7 @@ function showDepotDetail(appId){
   try{ depotPhotosArr = d.photos ? JSON.parse(d.photos) : []; }catch(e){ depotPhotosArr = []; }
 
   const rows = [
-    ['Statut', d.statut === 'recupere' ? '<span class="badge green">Récupéré</span>' : '<span class="badge orange">Déposé</span>'],
+    ['Statut', d.statut === 'recupere' ? '<span class="badge green">Récupéré</span>' : d.statut === 'abandonne' ? '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;">Abandonné</span>' : '<span class="badge orange">Déposé</span>'],
     ['Date de dépôt', dateFrLongFromISO(d.date_depot) + (d.heure_depot ? ' à ' + d.heure_depot : '')],
     ['Client', `${d.prenom || ''} ${d.nom || ''}`.trim()],
     ['Téléphone', d.tel],
@@ -1649,13 +1651,20 @@ function showDepotDetail(appId){
   document.getElementById('depot-detail-content').innerHTML = html;
 
   const statutBtn = document.getElementById('depot-detail-statut-btn');
-  statutBtn.textContent = d.statut === 'recupere' ? '↩️ Remettre en "Déposé"' : '📤 Rendre l\'appareil';
+  statutBtn.textContent = (d.statut === 'recupere' || d.statut === 'abandonne') ? '↩️ Remettre en "Déposé"' : '📤 Rendre l\'appareil';
 
   const recuBtn = document.getElementById('depot-detail-recu-btn');
   if(d.statut === 'recupere' && d.signature_recuperation){
     recuBtn.style.display = 'inline-flex';
+    recuBtn.textContent = '📄 Revoir le reçu';
     recuBtn.onclick = () => {
       generateRecuRemisePdf(d, d.signature_recuperation, d.date_recuperation, d.heure_recuperation);
+    };
+  } else if(d.statut === 'abandonne'){
+    recuBtn.style.display = 'inline-flex';
+    recuBtn.textContent = '📄 Revoir l\'attestation';
+    recuBtn.onclick = () => {
+      generateAttestationAbandonPdf(d, d.signature_abandon, d.date_abandon, d.heure_abandon, d.motif_abandon, d.abandon_a_distance);
     };
   } else {
     recuBtn.style.display = 'none';
@@ -1691,7 +1700,7 @@ document.getElementById('depot-detail-delete-btn').addEventListener('click', asy
 
 document.getElementById('depot-detail-statut-btn').addEventListener('click', async () => {
   if(!currentDepot) return;
-  if(currentDepot.statut === 'recupere'){
+  if(currentDepot.statut === 'recupere' || currentDepot.statut === 'abandonne'){
     // Remettre en "Déposé"
     try{
       const { error } = await sb.from(DEPOT_TABLE).update({ statut: 'depose' }).eq('app_id', currentDepot.app_id);
@@ -1716,12 +1725,26 @@ function openRendreAppareilModal(){
   const now = new Date();
   document.getElementById('rendre-date').value = now.toISOString().slice(0,10);
   document.getElementById('rendre-heure').value = now.toTimeString().slice(0,5);
-  const clientName = `${d.prenom||''} ${d.nom||''}`.trim() || 'Client';
-  document.getElementById('rendre-mention').textContent =
-    `Je soussigné(e) ${clientName} reconnaît avoir récupéré l'appareil "${d.appareil||'appareil'}" en date du ${now.toLocaleDateString('fr-FR')} à ${now.toTimeString().slice(0,5)}.`;
+  document.getElementById('rendre-abandon-toggle').checked = false;
+  document.getElementById('rendre-abandon-fields').style.display = 'none';
+  document.getElementById('rendre-abandon-motif').value = '';
+  document.getElementById('rendre-abandon-distance').checked = false;
+  document.getElementById('rendre-signature-wrap').style.display = 'block';
+  document.getElementById('rendre-appareil-confirm').textContent = 'Confirmer la remise ✓';
+  updateRendreMention();
   document.getElementById('rendre-appareil-modal').style.display = 'flex';
   initRendreSignatureCanvas();
 }
+
+document.getElementById('rendre-abandon-toggle')?.addEventListener('change', (e) => {
+  document.getElementById('rendre-abandon-fields').style.display = e.target.checked ? 'block' : 'none';
+  document.getElementById('rendre-appareil-confirm').textContent = e.target.checked ? 'Confirmer l\'abandon ✓' : 'Confirmer la remise ✓';
+  updateRendreMention();
+});
+document.getElementById('rendre-abandon-distance')?.addEventListener('change', (e) => {
+  document.getElementById('rendre-signature-wrap').style.display = e.target.checked ? 'none' : 'block';
+  updateRendreMention();
+});
 
 document.getElementById('rendre-date')?.addEventListener('input', updateRendreMention);
 document.getElementById('rendre-heure')?.addEventListener('input', updateRendreMention);
@@ -1732,8 +1755,15 @@ function updateRendreMention(){
   const heureVal = document.getElementById('rendre-heure').value;
   const dateFmt = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR') : '';
   const clientName = `${d.prenom||''} ${d.nom||''}`.trim() || 'Client';
-  document.getElementById('rendre-mention').textContent =
-    `Je soussigné(e) ${clientName} reconnaît avoir récupéré l'appareil "${d.appareil||'appareil'}" en date du ${dateFmt} à ${heureVal}.`;
+  const estAbandon = document.getElementById('rendre-abandon-toggle').checked;
+  if(estAbandon){
+    const aDistance = document.getElementById('rendre-abandon-distance').checked;
+    document.getElementById('rendre-mention').textContent =
+      `${clientName} déclare, ${aDistance ? 'à distance (téléphone/SMS)' : 'en personne'} le ${dateFmt} à ${heureVal}, ne pas souhaiter récupérer l'appareil "${d.appareil||'appareil'}" et renoncer expressément à sa restitution. Technik-Home est de ce fait libéré de toute obligation de conservation et pourra disposer librement de l'appareil.`;
+  } else {
+    document.getElementById('rendre-mention').textContent =
+      `Je soussigné(e) ${clientName} reconnaît avoir récupéré l'appareil "${d.appareil||'appareil'}" en date du ${dateFmt} à ${heureVal}.`;
+  }
 }
 
 function initRendreSignatureCanvas(){
@@ -1767,6 +1797,97 @@ document.getElementById('rendre-appareil-cancel')?.addEventListener('click', () 
 });
 
 // ---------- Reçu de remise d'appareil (PDF) ----------
+function generateAttestationAbandonPdf(depot, signatureDataUrl, dateVal, heureVal, motif, aDistance){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W = 210, margin = 20;
+  let y = 20;
+
+  try{ doc.addImage('data:image/png;base64,' + LOGO_BASE64, 'PNG', margin, y, 30, 30); }catch(e){}
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(13,27,42);
+  doc.text('TECHNIK-HOME', 58, y+7);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,80,80);
+  doc.text('Jonathan Waeytens — Technicien indépendant', 58, y+13);
+  doc.text('165 rue Emile Zola, App. 1, Bât. A — 62300 Lens', 58, y+18);
+  doc.text('Tél : 07 59 70 54 97 — technikhome.fr', 58, y+23);
+
+  y += 38;
+  doc.setDrawColor(224,88,79); doc.setLineWidth(0.8);
+  doc.line(margin, y, W-margin, y);
+  y += 8;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(13,27,42);
+  doc.text('ATTESTATION D\'ABANDON D\'APPAREIL', W/2, y, {align:'center'});
+  y += 10;
+
+  const dateFr = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'}) : '';
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(40,40,40);
+  const introText = `Je soussigné(e) ${depot.prenom||''} ${depot.nom||''} déclare, ${aDistance ? 'à distance (par téléphone ou SMS)' : 'en personne'} le ${dateFr} à ${heureVal||''}, ne pas souhaiter récupérer l'appareil désigné ci-dessous, actuellement en possession de Technik-Home, et renoncer expressément à sa restitution.`;
+  const introLines = doc.splitTextToSize(introText, W - margin*2);
+  doc.text(introLines, margin, y);
+  y += introLines.length * 5 + 8;
+
+  doc.setFillColor(245,247,250);
+  doc.roundedRect(margin, y, W-margin*2, 22, 3, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(224,88,79);
+  doc.text('CLIENT', margin+4, y+6);
+  doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+  doc.text(`Nom : ${depot.prenom||''} ${depot.nom||''}`, margin+4, y+13);
+  if(depot.tel) doc.text(`Téléphone : ${depot.tel}`, margin+4, y+19);
+  y += 28;
+
+  doc.setFillColor(245,247,250);
+  doc.roundedRect(margin, y, W-margin*2, 22, 3, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(224,88,79);
+  doc.text('APPAREIL ABANDONNÉ', margin+4, y+6);
+  doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+  doc.text(`Appareil : ${depot.appareil||''}`, margin+4, y+13);
+  if(depot.marque || depot.modele) doc.text(`Marque / Modèle : ${depot.marque||''}${depot.modele?' — '+depot.modele:''}`, margin+4, y+19);
+  y += 30;
+
+  if(motif){
+    doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(90,90,90);
+    const motifLines = doc.splitTextToSize(`Précision : ${motif}`, W - margin*2);
+    doc.text(motifLines, margin, y);
+    y += motifLines.length * 5 + 6;
+  }
+
+  doc.setFontSize(9); doc.setTextColor(100,100,100);
+  const mentionText = "Cette attestation vaut renonciation expresse à la restitution de l'appareil. Technik-Home est de ce fait libéré de toute obligation de conservation et de restitution à compter de la date indiquée ci-dessus, et se réserve le droit de disposer librement de l'appareil (recyclage, don, destruction), sans qu'aucune réclamation ne puisse être formulée ultérieurement.";
+  const mentionLines = doc.splitTextToSize(mentionText, W - margin*2);
+  doc.text(mentionLines, margin, y);
+  y += mentionLines.length * 5 + 10;
+
+  doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(40,40,40);
+  doc.text(`Fait à Lens, le ${dateFr}`, margin, y);
+  y += 10;
+
+  if(signatureDataUrl){
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(80,80,80);
+    doc.text('Signature du client', margin, y);
+    y += 4;
+    try{ doc.addImage(signatureDataUrl, 'PNG', margin, y, 70, 25); }catch(e){}
+    y += 30;
+  } else {
+    doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(130,130,130);
+    doc.text(`Confirmation obtenue à distance (téléphone/SMS) — signature non disponible.`, margin, y);
+    y += 15;
+  }
+
+  doc.setDrawColor(224,88,79); doc.setLineWidth(0.5);
+  doc.line(margin, y, W-margin, y);
+  y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(130,130,130);
+  doc.text('Technik-Home — SIRET : 795 114 263 00036 — TVA non applicable, art. 293B du CGI', W/2, y, {align:'center'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('Réparer, c\'est notre nature.', W/2, y+5, {align:'center'});
+
+  const filename = `attestation-abandon-${(depot.nom||'client').replace(/[^a-z0-9]/gi,'')}.pdf`;
+  doc.save(filename);
+}
+
 function generateRecuRemisePdf(depot, signatureDataUrl, dateVal, heureVal){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
@@ -2203,8 +2324,8 @@ function generateFacturePdf(r, numero, lignes, montantTotal, dateEmission, remis
     y += 2;
   }
 
-  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(130,130,130);
-  doc.text('Réparer, c\'est notre nature.', W/2, Math.max(y + 8, 285), {align:'center'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(130,130,130);
+  doc.text('Réparer, c\'est notre nature.', W/2, Math.max(y + 5, 280), {align:'center'});
 
   return doc;
 }
@@ -2877,41 +2998,59 @@ document.getElementById('envoyer-devis-btn').addEventListener('click', async () 
 
 document.getElementById('rendre-appareil-confirm')?.addEventListener('click', async () => {
   if(!currentDepot) return;
+  const estAbandon = document.getElementById('rendre-abandon-toggle').checked;
+  const aDistance = estAbandon && document.getElementById('rendre-abandon-distance').checked;
+  const motif = document.getElementById('rendre-abandon-motif').value.trim();
   const canvas = document.getElementById('rendre-signature-canvas');
-  const signatureDataUrl = canvas.toDataURL('image/png');
+  const signatureDataUrl = aDistance ? null : canvas.toDataURL('image/png');
   const btn = document.getElementById('rendre-appareil-confirm');
+  const dateVal = document.getElementById('rendre-date').value;
+  const heureVal = document.getElementById('rendre-heure').value;
   btn.disabled = true; btn.textContent = 'Validation…';
-  try{
-    const { error } = await sb.from(DEPOT_TABLE).update({
-      statut: 'recupere',
-      date_recuperation: document.getElementById('rendre-date').value,
-      heure_recuperation: document.getElementById('rendre-heure').value,
-      signature_recuperation: signatureDataUrl
-    }).eq('app_id', currentDepot.app_id);
-    if(error) throw error;
-    currentDepot.statut = 'recupere';
-    currentDepot.signature_recuperation = signatureDataUrl;
-    currentDepot.date_recuperation = document.getElementById('rendre-date').value;
-    currentDepot.heure_recuperation = document.getElementById('rendre-heure').value;
-    document.getElementById('rendre-appareil-modal').style.display = 'none';
-    showToast('Appareil rendu ✓');
 
-    // Générer et télécharger automatiquement le reçu signé
+  try{
+    const updatePayload = estAbandon
+      ? {
+          statut: 'abandonne',
+          date_abandon: dateVal,
+          heure_abandon: heureVal,
+          signature_abandon: signatureDataUrl,
+          motif_abandon: motif || null,
+          abandon_a_distance: aDistance
+        }
+      : {
+          statut: 'recupere',
+          date_recuperation: dateVal,
+          heure_recuperation: heureVal,
+          signature_recuperation: signatureDataUrl
+        };
+
+    const { error } = await sb.from(DEPOT_TABLE).update(updatePayload).eq('app_id', currentDepot.app_id);
+    if(error) throw error;
+    Object.assign(currentDepot, updatePayload);
+    document.getElementById('rendre-appareil-modal').style.display = 'none';
+    showToast(estAbandon ? 'Abandon enregistré ✓' : 'Appareil rendu ✓');
+
+    // Générer et télécharger automatiquement le document signé
     try{
-      generateRecuRemisePdf(currentDepot, signatureDataUrl, currentDepot.date_recuperation, currentDepot.heure_recuperation);
+      if(estAbandon){
+        generateAttestationAbandonPdf(currentDepot, signatureDataUrl, dateVal, heureVal, motif, aDistance);
+      } else {
+        generateRecuRemisePdf(currentDepot, signatureDataUrl, dateVal, heureVal);
+      }
     }catch(e){
-      console.error('Erreur génération reçu PDF :', e);
+      console.error('Erreur génération document PDF :', e);
     }
 
-    // Envoyer SMS de confirmation au client
-    const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
-    if(tel){
-      const dateVal = document.getElementById('rendre-date').value;
-      const heureVal = document.getElementById('rendre-heure').value;
-      const dateFmt = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR') : '';
-      const clientName = `${currentDepot.prenom||''} ${currentDepot.nom||''}`.trim() || 'Client';
-      const smsMessage = `Bonjour ${clientName}, nous confirmons la récupération de votre appareil "${currentDepot.appareil||''}" le ${dateFmt} à ${heureVal}. Merci de votre confiance ! Jonathan - Technik-Home - 07 59 70 54 97`;
-      window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(smsMessage);
+    // Envoyer SMS de confirmation au client (uniquement pour une remise classique)
+    if(!estAbandon){
+      const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
+      if(tel){
+        const dateFmt = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR') : '';
+        const clientName = `${currentDepot.prenom||''} ${currentDepot.nom||''}`.trim() || 'Client';
+        const smsMessage = `Bonjour ${clientName}, nous confirmons la récupération de votre appareil "${currentDepot.appareil||''}" le ${dateFmt} à ${heureVal}. Merci de votre confiance ! Jonathan - Technik-Home - 07 59 70 54 97`;
+        window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(smsMessage);
+      }
     }
 
     showDepotDetail(currentDepot.app_id);
@@ -2919,7 +3058,7 @@ document.getElementById('rendre-appareil-confirm')?.addEventListener('click', as
     console.error('Erreur remise appareil :', e);
     showToast('Échec de l\'enregistrement', true);
   }
-  btn.disabled = false; btn.textContent = 'Confirmer la remise ✓';
+  btn.disabled = false; btn.textContent = estAbandon ? 'Confirmer l\'abandon ✓' : 'Confirmer la remise ✓';
 });
 
 document.getElementById('depot-detail-sms-btn').addEventListener('click', () => {
