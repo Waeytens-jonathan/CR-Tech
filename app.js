@@ -1996,7 +1996,7 @@ let devisLight = [];
 
 async function loadDevisLight(){
   try{
-    const { data, error } = await sb.from('devis').select('app_id,numero,rapport_app_id,annee,sequence').order('sequence', { ascending: false });
+    const { data, error } = await sb.from('devis').select('app_id,numero,rapport_app_id,annee,sequence,statut_client,motif_refus,date_reponse_client').order('sequence', { ascending: false });
     if(error) throw error;
     devisLight = data || [];
   }catch(e){
@@ -2857,6 +2857,10 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
       pdf_base64: pdfBase64,
       statut: 'genere'
     };
+    if(!existant){
+      devisRow.token = 'dvt_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
+      devisRow.statut_client = 'en_attente';
+    }
 
     if(existant){
       const { error } = await sb.from('devis').update(devisRow).eq('app_id', devisAppId);
@@ -2902,11 +2906,28 @@ function updateDevisButtons(r){
   const genBtn = document.getElementById('generer-devis-btn');
   const voirBtn = document.getElementById('voir-devis-btn');
   const envoyerBtn = document.getElementById('envoyer-devis-btn');
-  const existant = devisLight.some(d => d.rapport_app_id === r.id);
+  const statutEl = document.getElementById('devis-statut-client');
+  const existantDevis = devisLight.find(d => d.rapport_app_id === r.id);
   genBtn.style.display = 'inline-flex';
-  genBtn.textContent = existant ? '🔄 Régénérer le devis (si le CR a changé)' : '📝 Générer un devis';
-  voirBtn.style.display = existant ? 'inline-flex' : 'none';
-  envoyerBtn.style.display = existant ? 'inline-flex' : 'none';
+  genBtn.textContent = existantDevis ? '🔄 Régénérer le devis (si le CR a changé)' : '📝 Générer un devis';
+  voirBtn.style.display = existantDevis ? 'inline-flex' : 'none';
+  envoyerBtn.style.display = existantDevis ? 'inline-flex' : 'none';
+
+  if(existantDevis && existantDevis.statut_client === 'accepte'){
+    statutEl.style.display = 'block';
+    statutEl.style.background = 'rgba(63,191,111,0.12)';
+    statutEl.style.border = '1px solid rgba(63,191,111,0.3)';
+    statutEl.style.color = 'var(--green,#3fbf6f)';
+    statutEl.innerHTML = `✅ Devis accepté par le client${existantDevis.date_reponse_client ? ' le ' + dateFrLong(existantDevis.date_reponse_client.slice(0,10)) : ''}`;
+  } else if(existantDevis && existantDevis.statut_client === 'refuse'){
+    statutEl.style.display = 'block';
+    statutEl.style.background = 'rgba(224,88,79,0.12)';
+    statutEl.style.border = '1px solid rgba(224,88,79,0.3)';
+    statutEl.style.color = 'var(--red,#e0584f)';
+    statutEl.innerHTML = `❌ Devis refusé par le client${existantDevis.date_reponse_client ? ' le ' + dateFrLong(existantDevis.date_reponse_client.slice(0,10)) : ''}${existantDevis.motif_refus ? '<br><span style="font-weight:400;">Motif : ' + escapeHtml(existantDevis.motif_refus) + '</span>' : ''}`;
+  } else {
+    statutEl.style.display = 'none';
+  }
 }
 
 // Récupère l'email le plus à jour : celui de la fiche client si le dossier y est lié,
@@ -2972,7 +2993,7 @@ document.getElementById('envoyer-devis-btn').addEventListener('click', async () 
   btn.textContent = 'Envoi en cours…';
 
   try{
-    const { data, error } = await sb.from('devis').select('pdf_base64,numero,montant_total').eq('app_id', existant.app_id).single();
+    const { data, error } = await sb.from('devis').select('pdf_base64,numero,montant_total,token').eq('app_id', existant.app_id).single();
     if(error) throw error;
 
     const { error: sendError } = await sb.functions.invoke('send-devis', {
@@ -2982,7 +3003,8 @@ document.getElementById('envoyer-devis-btn').addEventListener('click', async () 
         prenom: r.prenom,
         numero: data.numero,
         montant: data.montant_total,
-        pdf_base64: data.pdf_base64
+        pdf_base64: data.pdf_base64,
+        token: data.token
       }
     });
     if(sendError) throw sendError;
