@@ -3791,6 +3791,106 @@ function nearestNeighborOrder(list, startLat, startLon){
   return ordered;
 }
 
+let carteJourMap = null;
+let carteJourMarkers = [];
+
+document.getElementById('agenda-carte-btn').addEventListener('click', async () => {
+  const iso = dateToLocalISO(getDisplayDate(agendaDayOffset));
+  const dayRdvs = agendaRdvs.filter(r => r.date === iso && r.statut !== 'annule');
+
+  if(!dayRdvs.length){
+    showToast('Aucun RDV ce jour-là', true);
+    return;
+  }
+
+  const btn = document.getElementById('agenda-carte-btn');
+  btn.disabled = true; btn.textContent = '⏳ Chargement…';
+
+  // Géocoder les RDV qui n'ont pas encore de coordonnées enregistrées (même logique que la Tournée)
+  for(const r of dayRdvs){
+    if((r.lat_rdv == null || r.lon_rdv == null) && r.cp && r.ville){
+      try{
+        const q = [r.adresse, r.cp, r.ville].filter(Boolean).join(' ');
+        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1`);
+        const data = await res.json();
+        const point = data.results && data.results[0];
+        if(point && point.x && point.y){
+          r.lat_rdv = parseFloat(point.y);
+          r.lon_rdv = parseFloat(point.x);
+          await sb.from(RDV_TABLE).update({ lat_rdv: r.lat_rdv, lon_rdv: r.lon_rdv }).eq('app_id', r.app_id);
+        }
+      }catch(e){}
+    }
+  }
+
+  btn.disabled = false; btn.textContent = '📍 Carte';
+
+  const dayLabel = getDisplayDate(agendaDayOffset).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+  document.getElementById('carte-jour-titre').textContent = `📍 Interventions du ${dayLabel}`;
+  document.getElementById('carte-jour-modal').style.display = 'flex';
+
+  setTimeout(() => renderCarteJour(dayRdvs), 50);
+});
+
+function renderCarteJour(dayRdvs){
+  const container = document.getElementById('carte-jour-map');
+  if(typeof L === 'undefined') return;
+
+  if(!carteJourMap){
+    carteJourMap = L.map(container, { attributionControl: false }).setView([LENS_COORDS.lat, LENS_COORDS.lon], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(carteJourMap);
+  } else {
+    carteJourMap.invalidateSize();
+  }
+
+  carteJourMarkers.forEach(m => carteJourMap.removeLayer(m));
+  carteJourMarkers = [];
+
+  const geoloc = dayRdvs.filter(r => r.lat_rdv != null && r.lon_rdv != null);
+  const sansCoord = dayRdvs.length - geoloc.length;
+
+  geoloc.forEach(r => {
+    const estEffectue = r.statut === 'effectue';
+    const couleur = estEffectue ? '#3fbf6f' : (r.creneau === 'matin' ? '#1a73c8' : '#f5a623');
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:${couleur};width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>`,
+      iconSize: [16,16],
+      iconAnchor: [8,8]
+    });
+    const marker = L.marker([r.lat_rdv, r.lon_rdv], { icon }).addTo(carteJourMap);
+    const heure = RDV_SLOT_LABELS[r.creneau] || r.creneau || '';
+    marker.bindPopup(`
+      <strong>${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong><br>
+      ${escapeHtml(heure)}<br>
+      ${escapeHtml(r.appareil||'')}<br>
+      ${escapeHtml(r.adresse||'')}${r.ville?', '+escapeHtml(r.ville):''}
+    `);
+    marker.on('click', () => {
+      document.getElementById('carte-jour-modal').style.display = 'none';
+      showAgendaDetail(r.app_id);
+    });
+    carteJourMarkers.push(marker);
+  });
+
+  if(geoloc.length){
+    const bounds = L.latLngBounds(geoloc.map(r => [r.lat_rdv, r.lon_rdv]));
+    carteJourMap.fitBounds(bounds, { padding: [30,30], maxZoom: 14 });
+  }
+
+  const infoEl = document.getElementById('carte-jour-info');
+  infoEl.textContent = sansCoord > 0
+    ? `${geoloc.length} RDV localisé(s) sur la carte — ${sansCoord} sans adresse géolocalisable.`
+    : `${geoloc.length} RDV localisé(s) sur la carte.`;
+}
+
+document.getElementById('carte-jour-close-btn').addEventListener('click', () => {
+  document.getElementById('carte-jour-modal').style.display = 'none';
+});
+document.getElementById('carte-jour-modal').addEventListener('click', (e) => {
+  if(e.target.id === 'carte-jour-modal') e.target.style.display = 'none';
+});
+
 document.getElementById('agenda-optimize-btn').addEventListener('click', async () => {
   const iso = dateToLocalISO(getDisplayDate(agendaDayOffset));
   const dayRdvs = agendaRdvs.filter(r => r.date === iso && r.statut !== 'annule' && r.statut !== 'effectue');
