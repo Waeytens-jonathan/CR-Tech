@@ -3860,15 +3860,30 @@ function renderCarteJour(dayRdvs){
     });
     const marker = L.marker([r.lat_rdv, r.lon_rdv], { icon }).addTo(carteJourMap);
     const heure = RDV_SLOT_LABELS[r.creneau] || r.creneau || '';
+    const nomClient = escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—');
+    const villeAffichee = escapeHtml(r.ville||'');
+    const appareilAffiche = escapeHtml(r.appareil||'');
+
+    // Survol (ordinateur) : aperçu rapide sans avoir à cliquer
+    marker.bindTooltip(`
+      <strong>${nomClient}</strong><br>
+      ${appareilAffiche}${villeAffichee ? ' — ' + villeAffichee : ''}
+    `, { direction: 'top', offset: [0,-10], opacity: 0.95 });
+
+    // Clic / tap (fonctionne pareil sur mobile) : mêmes infos + bouton pour ouvrir la fiche
+    const popupId = 'carte-popup-' + r.app_id;
     marker.bindPopup(`
-      <strong>${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong><br>
+      <strong>${nomClient}</strong><br>
       ${escapeHtml(heure)}<br>
-      ${escapeHtml(r.appareil||'')}<br>
-      ${escapeHtml(r.adresse||'')}${r.ville?', '+escapeHtml(r.ville):''}
+      ${appareilAffiche}<br>
+      ${escapeHtml(r.adresse||'')}${villeAffichee ? ', ' + villeAffichee : ''}
+      <br><button id="${popupId}" style="margin-top:0.4rem;background:var(--orange);color:#0d1b2a;border:none;border-radius:6px;padding:0.35rem 0.7rem;font-weight:600;font-size:0.82rem;cursor:pointer;">Voir la fiche →</button>
     `);
-    marker.on('click', () => {
-      document.getElementById('carte-jour-modal').style.display = 'none';
-      showAgendaDetail(r.app_id);
+    marker.on('popupopen', () => {
+      document.getElementById(popupId)?.addEventListener('click', () => {
+        document.getElementById('carte-jour-modal').style.display = 'none';
+        showAgendaDetail(r.app_id);
+      });
     });
     carteJourMarkers.push(marker);
   });
