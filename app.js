@@ -3864,10 +3864,12 @@ function renderCarteJour(dayRdvs){
     const villeAffichee = escapeHtml(r.ville||'');
     const appareilAffiche = escapeHtml(r.appareil||'');
 
-    // Survol (ordinateur) : aperçu rapide sans avoir à cliquer
+    // Survol (ordinateur) : mêmes infos complètes que la bulle au tap sur mobile
     marker.bindTooltip(`
       <strong>${nomClient}</strong><br>
-      ${appareilAffiche}${villeAffichee ? ' — ' + villeAffichee : ''}
+      ${escapeHtml(heure)}<br>
+      ${appareilAffiche}<br>
+      ${escapeHtml(r.adresse||'')}${villeAffichee ? ', ' + villeAffichee : ''}
     `, { direction: 'top', offset: [0,-10], opacity: 0.95 });
 
     // Clic / tap (fonctionne pareil sur mobile) : mêmes infos + bouton pour ouvrir la fiche
