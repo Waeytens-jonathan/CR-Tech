@@ -1698,6 +1698,11 @@ document.getElementById('depot-detail-delete-btn').addEventListener('click', asy
   }
 });
 
+document.getElementById('depot-detail-fiche-btn')?.addEventListener('click', () => {
+  if(!currentDepot) return;
+  generateFicheIdentificationPdf(currentDepot);
+});
+
 document.getElementById('depot-detail-statut-btn').addEventListener('click', async () => {
   if(!currentDepot) return;
   if(currentDepot.statut === 'recupere' || currentDepot.statut === 'abandonne'){
@@ -1885,6 +1890,84 @@ function generateAttestationAbandonPdf(depot, signatureDataUrl, dateVal, heureVa
   doc.text('Réparer, c\'est notre nature.', W/2, y+5, {align:'center'});
 
   const filename = `attestation-abandon-${(depot.nom||'client').replace(/[^a-z0-9]/gi,'')}.pdf`;
+  doc.save(filename);
+}
+
+function generateFicheIdentificationPdf(depot){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W = 210, margin = 20;
+  let y = 25;
+
+  try{ doc.addImage('data:image/png;base64,' + LOGO_BASE64, 'PNG', margin, y, 32, 32); }catch(e){}
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(13,27,42);
+  doc.text('TECHNIK-HOME', 60, y+8);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,80,80);
+  doc.text('Réparation électroménager à domicile — 07 59 70 54 97', 60, y+15);
+
+  y += 45;
+  doc.setDrawColor(245,166,35); doc.setLineWidth(1);
+  doc.line(margin, y, W-margin, y);
+  y += 12;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(13,27,42);
+  doc.text('FICHE D\'IDENTIFICATION', W/2, y, {align:'center'});
+  y += 16;
+
+  // Bloc client
+  doc.setFillColor(245,247,250);
+  doc.roundedRect(margin, y, W-margin*2, 30, 3, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(245,166,35);
+  doc.text('CLIENT', margin+6, y+8);
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(13,27,42);
+  doc.text(`${depot.prenom||''} ${depot.nom||''}`.trim() || '—', margin+6, y+18);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(60,60,60);
+  doc.text(depot.tel || '', margin+6, y+25);
+  y += 38;
+
+  // Bloc appareil
+  doc.setFillColor(245,247,250);
+  doc.roundedRect(margin, y, W-margin*2, 34, 3, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(245,166,35);
+  doc.text('APPAREIL', margin+6, y+8);
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(13,27,42);
+  doc.text(depot.appareil || '—', margin+6, y+18);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(60,60,60);
+  const marqueModele = [depot.marque, depot.modele].filter(Boolean).join(' — ');
+  if(marqueModele) doc.text(marqueModele, margin+6, y+26);
+  y += 42;
+
+  // Référence + date de dépôt
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(80,80,80);
+  const dateFmt = depot.date_depot ? new Date(depot.date_depot + 'T00:00:00').toLocaleDateString('fr-FR') : '';
+  doc.text(`Réf. dossier : ${depot.app_id || ''}`, margin, y);
+  doc.text(`Déposé le ${dateFmt}${depot.heure_depot ? ' à ' + depot.heure_depot : ''}`, W-margin, y, {align:'right'});
+  y += 14;
+
+  // Zone commentaire
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(13,27,42);
+  doc.text('Commentaire', margin, y);
+  y += 6;
+  doc.setDrawColor(210,210,210); doc.setLineWidth(0.3);
+  for(let i = 0; i < 5; i++){
+    doc.line(margin, y, W-margin, y);
+    y += 9;
+  }
+  y += 6;
+
+  // Zone signature
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(13,27,42);
+  doc.text('Signature', margin, y);
+  y += 4;
+  doc.setDrawColor(180,180,180); doc.setLineWidth(0.5);
+  doc.rect(margin, y, W-margin*2, 32);
+
+  // Pied de page
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150,150,150);
+  doc.text('Technik-Home — SIRET : 795 114 263 00036', W/2, 285, {align:'center'});
+
+  const filename = `fiche-identification-${(depot.nom||'client').replace(/[^a-z0-9]/gi,'')}.pdf`;
   doc.save(filename);
 }
 
