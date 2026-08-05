@@ -1928,15 +1928,15 @@ function generateFicheIdentificationPdf(depot){
 
   // Bloc appareil
   doc.setFillColor(245,247,250);
-  doc.roundedRect(margin, y, W-margin*2, 34, 3, 3, 'F');
+  doc.roundedRect(margin, y, W-margin*2, 40, 3, 3, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(245,166,35);
   doc.text('APPAREIL', margin+6, y+8);
   doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(13,27,42);
   doc.text(depot.appareil || '—', margin+6, y+18);
   doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(60,60,60);
-  const marqueModele = [depot.marque, depot.modele].filter(Boolean).join(' — ');
-  if(marqueModele) doc.text(marqueModele, margin+6, y+26);
-  y += 42;
+  if(depot.marque) doc.text(depot.marque, margin+6, y+26);
+  if(depot.modele) doc.text(depot.modele, margin+6, y+33);
+  y += 48;
 
   // Référence + date de dépôt
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(80,80,80);
@@ -1965,7 +1965,7 @@ function generateFicheIdentificationPdf(depot){
 
   // Pied de page
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150,150,150);
-  doc.text('Technik-Home — SIRET : 795 114 263 00036', W/2, 285, {align:'center'});
+  doc.text('Technik-Home', W/2, 285, {align:'center'});
 
   const filename = `fiche-identification-${(depot.nom||'client').replace(/[^a-z0-9]/gi,'')}.pdf`;
   doc.save(filename);
