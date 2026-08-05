@@ -2412,6 +2412,9 @@ async function terminerEtEnvoyer(r){
   for(const { error } of resultats){
     if(error) throw error;
   }
+  // Marque automatiquement "Facture créée / envoyée" — la case à cocher manuelle
+  // dans Suivi du dossier reste disponible pour les cas particuliers (ex : sans facture générée ici).
+  r['facture-creee'] = true;
   return true;
 }
 
@@ -3401,8 +3404,8 @@ function showAgendaDetail(appId){
   const addrCopie = `${r.adresse||''}${r.adresse2 ? ', ' + r.adresse2 : ''} ${r.cp||''} ${r.ville||''}`.trim();
   if(addrFull){
     html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.4rem;">';
-    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull)}'))">🗺️ Waze</button>`;
-    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie)}'))">📋 Copier adresse</button>`;
+    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull).replace(/'/g,'%27')}'))">🗺️ Waze</button>`;
+    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie).replace(/'/g,'%27')}'))">📋 Copier adresse</button>`;
     html += '</div>';
   }
 
@@ -5517,7 +5520,7 @@ document.getElementById('email-btn').addEventListener('click', async () => {
       showToast('Compte-rendu et facture enregistrés et envoyés au client ✓');
       data.documents_envoyes = true;
       const idx = reports.findIndex(rep => rep.id === data.id);
-      if(idx !== -1) reports[idx].documents_envoyes = true;
+      if(idx !== -1){ reports[idx].documents_envoyes = true; reports[idx]['facture-creee'] = true; }
       saveReportToSupabase(data);
       applyTerminerStyle(btn, data);
     }
@@ -5980,8 +5983,8 @@ function renderDetailContent(r, container){
   const addrCopie = `${r.adresse||''}${r.adresse2 ? ', ' + r.adresse2 : ''} ${r.cp||''} ${r.ville||''}`.trim();
   if(addrFull){
     html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">';
-    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull)}'))">🗺️ Waze</button>`;
-    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie)}'))">📋 Copier adresse</button>`;
+    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull).replace(/'/g,'%27')}'))">🗺️ Waze</button>`;
+    html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie).replace(/'/g,'%27')}'))">📋 Copier adresse</button>`;
 
     html += '</div>';
   }
@@ -6379,7 +6382,7 @@ async function envoyerCrEtFacture(r, btn){
       showToast('Compte-rendu et facture envoyés au client ✓');
       r.documents_envoyes = true;
       const idx = reports.findIndex(rep => rep.id === r.id);
-      if(idx !== -1) reports[idx].documents_envoyes = true;
+      if(idx !== -1){ reports[idx].documents_envoyes = true; reports[idx]['facture-creee'] = true; }
       saveReportToSupabase(r);
       updateTerminerButton(r);
       applyTerminerStyle(btn, r);
