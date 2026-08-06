@@ -7407,7 +7407,7 @@ document.getElementById('pose-piece-add-row-btn').addEventListener('click', () =
 });
 
 function prefillPosePiecePaiement(r){
-  document.getElementById('pose-piece-paiement-statut').value = r['paiement-statut'] || 'Non_paye';
+  document.getElementById('pose-piece-paiement-statut').value = r['paiement-statut'] || 'Paye_total';
   document.getElementById('pose-piece-acompte-montant').value = r['acompte-montant'] || '';
   document.getElementById('pose-piece-paiement-moyen').value = r['paiement-moyen'] || '';
   document.getElementById('pose-piece-paiement-especes').value = r['paiement-especes'] || '';
