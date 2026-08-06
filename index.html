@@ -238,6 +238,7 @@
         <button class="btn btn-secondary" id="agenda-detail-sms-avis">⭐ Avis</button>
         <button class="btn btn-outline" id="agenda-detail-edit-btn">✏️ Modifier</button>
         <button class="btn btn-outline" id="agenda-detail-cancel-btn">🚫 Annuler le RDV</button>
+        <button class="btn btn-outline" id="agenda-detail-absent-btn" style="border-color:#e0584f;color:#e0584f;">🚪 Client absent</button>
         <button class="btn btn-outline" id="agenda-detail-done-btn">✅ Marquer effectué</button>
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
@@ -1484,6 +1485,37 @@
     <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 1rem;">Ce RDV a plusieurs appareils. Choisis celui par lequel tu veux commencer le diagnostic — les autres suivront ensuite.</p>
     <div id="choix-appareil-depart-list" style="display:flex;flex-direction:column;gap:0.6rem;"></div>
     <button class="btn btn-outline" id="choix-appareil-depart-cancel" style="width:100%;margin-top:1rem;">Annuler</button>
+  </div>
+</div>
+
+<div id="client-absent-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;overflow-y:auto;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.6rem;max-width:440px;width:100%;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 0.5rem;color:#e0584f;">🚪 Client absent</h3>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 1rem;">Une preuve photo (porte, sonnette, façade...) et une facture de déplacement seront générées et envoyées au client.</p>
+
+    <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;font-weight:600;">Photo de preuve <span style="font-weight:400;color:var(--text-muted);">(obligatoire)</span></label>
+    <input type="file" id="absent-photo-input" accept="image/*" capture="environment" style="display:none;">
+    <button type="button" id="absent-photo-btn" class="btn btn-outline" style="width:100%;margin-bottom:0.8rem;">📷 Prendre / choisir la photo</button>
+    <div id="absent-photo-thumb-wrap" style="display:none;margin-bottom:0.8rem;">
+      <img id="absent-photo-thumb-img" style="width:100%;border-radius:8px;max-height:200px;object-fit:cover;">
+    </div>
+
+    <div class="field" style="margin-bottom:0.8rem;">
+      <label>Montant du déplacement (€)</label>
+      <input type="number" id="absent-montant-deplacement" step="0.01" min="0" value="25">
+    </div>
+
+    <div class="field" style="margin-bottom:1rem;">
+      <label>Commentaire <span style="font-weight:400;color:var(--text-muted);">(facultatif)</span></label>
+      <textarea id="absent-commentaire" rows="2" placeholder="Ex : personne n'a répondu après plusieurs sonneries"></textarea>
+    </div>
+
+    <button type="button" class="btn btn-outline" id="absent-apercu-btn" style="width:100%;margin-bottom:1rem;border-color:#778;color:#aab;font-size:0.85rem;">👁️ Aperçu de la facture (rien n'est enregistré)</button>
+
+    <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
+      <button class="btn btn-outline" id="absent-cancel-btn">Annuler</button>
+      <button class="btn btn-primary" id="absent-confirm-btn" style="background:#e0584f;border-color:#e0584f;">Confirmer et facturer ✓</button>
+    </div>
   </div>
 </div>
 

@@ -3427,6 +3427,7 @@ function showAgendaDetail(appId){
   let statutLabel = '';
   if(r.statut === 'effectue') statutLabel = '<span class="badge green">✅ Effectué</span>';
   else if(r.statut === 'annule') statutLabel = '<span class="badge red">🚫 Annulé</span>';
+  else if(r.statut === 'absent') statutLabel = '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;">🚪 Client absent</span>';
   else statutLabel = '<span class="badge orange">En attente</span>';
 
   const TYPE_RDV_LABELS = { pose_piece: '🔧 Pose pièce', diagnostic: '🔍 Diagnostic', sav: '🛠️ SAV' };
@@ -3441,6 +3442,10 @@ function showAgendaDetail(appId){
       if(r.email_confirmation_envoye === false) return '__HTML__<span style="color:var(--red,#e0584f);">⚠️ Échec de l\'envoi' + (r.email_confirmation_erreur ? ' — ' + escapeHtml(r.email_confirmation_erreur) : '') + '</span>';
       return null;
     })()],
+    ['Preuve d\'absence', r.statut === 'absent' && r.photo_absence ? '__HTML__' + `
+      <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.4rem;">${r.date_absence ? dateFrLong(r.date_absence) : ''}${r.heure_absence ? ' à ' + r.heure_absence : ''}${r.commentaire_absence ? '<br>' + escapeHtml(r.commentaire_absence) : ''}</div>
+      <img src="${r.photo_absence}" style="max-width:220px;border-radius:8px;display:block;">
+    ` : null],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
     ['Type', TYPE_RDV_LABELS[r.type_rdv] || TYPE_RDV_LABELS['diagnostic']],
@@ -3733,6 +3738,165 @@ document.getElementById('annulation-rdv-confirm-btn').addEventListener('click', 
     console.error('Erreur annulation RDV :', e);
     showToast('Échec de l\'annulation', true);
   }
+});
+
+// --- Client absent ---
+let absentPhotoDataUrl = null;
+
+document.getElementById('agenda-detail-absent-btn')?.addEventListener('click', () => {
+  if(!currentAgendaRdv) return;
+  absentPhotoDataUrl = null;
+  document.getElementById('absent-photo-thumb-wrap').style.display = 'none';
+  document.getElementById('absent-montant-deplacement').value = '25';
+  document.getElementById('absent-commentaire').value = '';
+  document.getElementById('client-absent-modal').style.display = 'flex';
+});
+
+document.getElementById('absent-photo-btn')?.addEventListener('click', () => {
+  document.getElementById('absent-photo-input').click();
+});
+
+document.getElementById('absent-photo-input')?.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    absentPhotoDataUrl = await resizeImage(file);
+  }catch(err){
+    const reader = new FileReader();
+    reader.onload = () => { absentPhotoDataUrl = reader.result; };
+    reader.readAsDataURL(file);
+  }
+  document.getElementById('absent-photo-thumb-img').src = absentPhotoDataUrl;
+  document.getElementById('absent-photo-thumb-wrap').style.display = 'block';
+  e.target.value = '';
+});
+
+document.getElementById('absent-cancel-btn')?.addEventListener('click', () => {
+  document.getElementById('client-absent-modal').style.display = 'none';
+});
+
+document.getElementById('absent-apercu-btn')?.addEventListener('click', () => {
+  if(!currentAgendaRdv) return;
+  const r = currentAgendaRdv;
+  const montantDeplacement = parseFloat(document.getElementById('absent-montant-deplacement').value) || 0;
+
+  try{
+    const faux = {
+      nom: r.nom || '', prenom: r.prenom || '',
+      adresse: r.adresse || '', cp: r.cp || '', ville: r.ville || '',
+      'type-client': r.type_client || 'particulier',
+      'entreprise-nom': r.entreprise_nom || '', 'entreprise-siret': r.entreprise_siret || ''
+    };
+    const lignes = [{ designation: 'Déplacement — Client absent au rendez-vous', quantite: 1, prix_unitaire: montantDeplacement, total: montantDeplacement }];
+    const doc = generateFacturePdf(faux, 'APERÇU-TEST', lignes, montantDeplacement, todayISO(), null);
+    doc.save('apercu-test-facture-absence.pdf');
+    showToast('Aperçu généré — non enregistré, la numérotation n\'a pas bougé');
+  }catch(e){
+    console.error('Erreur aperçu facture absence :', e);
+    showToast('Erreur lors de la génération de l\'aperçu', true);
+  }
+});
+
+document.getElementById('absent-confirm-btn')?.addEventListener('click', async () => {
+  if(!currentAgendaRdv) return;
+  if(!absentPhotoDataUrl){ showToast('La photo de preuve est obligatoire', true); return; }
+
+  const r = currentAgendaRdv;
+  const montantDeplacement = parseFloat(document.getElementById('absent-montant-deplacement').value) || 0;
+  const commentaire = document.getElementById('absent-commentaire').value.trim();
+  const now = new Date();
+  const dateVal = now.toISOString().slice(0,10);
+  const heureVal = now.toTimeString().slice(0,5);
+
+  const btn = document.getElementById('absent-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Traitement en cours…';
+
+  try{
+    // 1. Marquer le RDV comme "absent"
+    const { error: rdvError } = await sb.from(RDV_TABLE).update({
+      statut: 'absent',
+      photo_absence: absentPhotoDataUrl,
+      date_absence: dateVal,
+      heure_absence: heureVal,
+      commentaire_absence: commentaire || null
+    }).eq('app_id', r.app_id);
+    if(rdvError) throw rdvError;
+    Object.assign(r, { statut: 'absent', photo_absence: absentPhotoDataUrl, date_absence: dateVal, heure_absence: heureVal, commentaire_absence: commentaire });
+
+    // 2. Créer un dossier minimal pour tracer l'intervention et pouvoir facturer le déplacement
+    const newReportId = 'r_' + Date.now();
+    const newReport = {
+      id: newReportId,
+      ref: generateRef(),
+      date: r.date || dateVal,
+      heure: r.creneau === 'matin' ? '10:00' : '14:00',
+      technicien: r.technicien || 'Jonathan',
+      nom: r.nom || '', prenom: r.prenom || '',
+      adresse: r.adresse || '', adresse2: r.adresse2 || '', cp: r.cp || '', ville: r.ville || '',
+      tel: r.tel || '', 'tel-interlocuteur': r.tel_interlocuteur || '', email: r.email || '',
+      'type-client': r.type_client || 'particulier',
+      'entreprise-nom': r.entreprise_nom || '', 'entreprise-siret': r.entreprise_siret || '',
+      appareil: r.appareil || '', marque: r.marque || '', modele: r.modele || '',
+      panne: `Client absent lors du rendez-vous du ${dateVal} (${RDV_SLOT_LABELS[r.creneau]||r.creneau||''}).${commentaire ? ' ' + commentaire : ''}`,
+      diagnostic: 'Client absent au moment du rendez-vous — déplacement effectué, intervention non réalisée.',
+      statut: 'Terminée',
+      'cout-mo': '0', 'cout-pieces': '0', 'cout-deplacement': String(montantDeplacement),
+      'cout-total': String(montantDeplacement),
+      'paiement-statut': 'Non_paye', 'reste-encaisser': String(montantDeplacement),
+      rdv_app_id: r.app_id,
+      photos: [absentPhotoDataUrl]
+    };
+
+    const row = reportToRow(newReport);
+    const { error: insertError } = await sb.from(TABLE).insert(row);
+    if(insertError) throw insertError;
+    reports.push(newReport);
+
+    // 3. Générer la facture (déplacement uniquement, désignation explicite)
+    const lignes = [{ designation: 'Déplacement — Client absent au rendez-vous', quantite: 1, prix_unitaire: montantDeplacement, total: montantDeplacement }];
+    const { annee, sequence, numero } = await getNextFactureNumero();
+    const dateEmission = todayISO();
+    const doc = generateFacturePdf(newReport, numero, lignes, montantDeplacement, dateEmission, null);
+    const pdfBase64 = doc.output('datauristring').split(',')[1];
+    const factureAppId = 'fact_' + Date.now();
+
+    const { error: factError } = await sb.from('factures').insert({
+      app_id: factureAppId, numero, annee, sequence,
+      date_emission: dateEmission, date_prestation: newReport.date,
+      rapport_app_id: newReportId,
+      client_nom: newReport.nom, client_prenom: newReport.prenom,
+      client_adresse: newReport.adresse, client_cp: newReport.cp, client_ville: newReport.ville,
+      lignes: JSON.stringify(lignes), montant_total: montantDeplacement,
+      pdf_base64: pdfBase64
+    });
+    if(factError) throw factError;
+    facturesLight.push({ app_id: factureAppId, numero, rapport_app_id: newReportId, annee, sequence });
+    newReport['facture-creee'] = true;
+    await saveReportToSupabase(newReport);
+
+    // 4. Envoyer la facture par email si possible
+    const emailCible = await getEmailAJour(newReport);
+    if(emailCible){
+      try{
+        await sb.functions.invoke('send-facture', {
+          body: { email: emailCible, nom: newReport.nom, prenom: newReport.prenom, numero, montant: montantDeplacement, pdf_base64: pdfBase64 }
+        });
+        showToast('Client marqué absent — facture de déplacement envoyée ✓');
+      }catch(sendErr){
+        console.error('Erreur envoi facture absence :', sendErr);
+        showToast('Absence enregistrée, mais échec de l\'envoi de la facture', true);
+      }
+    } else {
+      showToast('Absence enregistrée — email du client manquant, facture non envoyée', true);
+    }
+
+    document.getElementById('client-absent-modal').style.display = 'none';
+    showAgendaDetail(r.app_id);
+  }catch(e){
+    console.error('Erreur traitement client absent :', e);
+    showToast('Échec de l\'enregistrement : ' + (e.message || 'voir console'), true);
+  }
+  btn.disabled = false; btn.textContent = 'Confirmer et facturer ✓';
 });
 
 document.getElementById('agenda-detail-done-btn').addEventListener('click', async () => {
