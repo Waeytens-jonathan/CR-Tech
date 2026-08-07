@@ -1109,6 +1109,7 @@ async function renderStatsHeatmap(filtered){
     statsHeatMap = L.map(container, { attributionControl: false }).setView([LENS_COORDS.lat, LENS_COORDS.lon], 10);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(statsHeatMap);
   }
+  statsHeatMap.invalidateSize();
 
   // Compter les interventions par ville
   const parVille = {};
@@ -1149,6 +1150,7 @@ async function renderStatsHeatmap(filtered){
 
   if(statsHeatLayer) statsHeatMap.removeLayer(statsHeatLayer);
   if(points.length){
+    statsHeatMap.invalidateSize();
     statsHeatLayer = L.heatLayer(points, { radius: 35, blur: 25, maxZoom: 13, max: Math.max(...points.map(p => p[2])) }).addTo(statsHeatMap);
     const bounds = L.latLngBounds(points.map(p => [p[0], p[1]]));
     statsHeatMap.fitBounds(bounds, { padding: [30,30], maxZoom: 12 });
