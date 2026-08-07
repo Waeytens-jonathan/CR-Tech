@@ -1100,23 +1100,6 @@
       </div>
     </div>
 
-    <div id="sig-overlay" style="display:none; position:fixed; inset:0; background:#fff; z-index:1000; flex-direction:column;">
-      <div class="sig-overlay-inner" style="display:flex; flex-direction:column; width:100%; height:100%;">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.8rem 1rem; border-bottom:1px solid #ddd; flex:none;">
-          <span style="color:#0d1b2a; font-family:'DM Sans', sans-serif; font-weight:500;">Veuillez signer ci-dessous</span>
-          <div style="display:flex; gap:0.6rem;">
-            <button class="btn btn-outline" id="clear-sig-fs" style="color:#0d1b2a;" type="button">Effacer</button>
-            <button class="btn btn-outline" id="cancel-sig-fs" style="color:#0d1b2a;" type="button">Annuler</button>
-            <button class="btn btn-primary" id="validate-sig-fs" type="button">Valider</button>
-          </div>
-        </div>
-        <canvas id="signature-pad-fs" style="flex:1; width:100%; touch-action:none; cursor:crosshair;"></canvas>
-        <div id="sig-rotate-msg" style="display:none; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:1rem; color:#0d1b2a; text-align:center; padding:2rem;">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#0d1b2a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg>
-          <p style="font-size:1rem; font-family:'DM Sans', sans-serif;">Veuillez tourner votre téléphone<br>en mode paysage pour signer</p>
-        </div>
-      </div>
-    </div>
 
     <div class="card step" data-step="9">
       <h2>Validation & envoi</h2>
@@ -1519,6 +1502,23 @@
   </div>
 </div>
 
+    <div id="sig-overlay" style="display:none; position:fixed; inset:0; background:#fff; z-index:10000; flex-direction:column;">
+      <div class="sig-overlay-inner" style="display:flex; flex-direction:column; width:100%; height:100%;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.8rem 1rem; border-bottom:1px solid #ddd; flex:none;">
+          <span style="color:#0d1b2a; font-family:'DM Sans', sans-serif; font-weight:500;">Veuillez signer ci-dessous</span>
+          <div style="display:flex; gap:0.6rem;">
+            <button class="btn btn-outline" id="clear-sig-fs" style="color:#0d1b2a;" type="button">Effacer</button>
+            <button class="btn btn-outline" id="cancel-sig-fs" style="color:#0d1b2a;" type="button">Annuler</button>
+            <button class="btn btn-primary" id="validate-sig-fs" type="button">Valider</button>
+          </div>
+        </div>
+        <canvas id="signature-pad-fs" style="flex:1; width:100%; touch-action:none; cursor:crosshair;"></canvas>
+        <div id="sig-rotate-msg" style="display:none; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:1rem; color:#0d1b2a; text-align:center; padding:2rem;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#0d1b2a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg>
+          <p style="font-size:1rem; font-family:'DM Sans', sans-serif;">Veuillez tourner votre téléphone<br>en mode paysage pour signer</p>
+        </div>
+      </div>
+    </div>
 <div id="carte-jour-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.2rem;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
