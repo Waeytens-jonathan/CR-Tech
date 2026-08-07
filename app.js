@@ -1581,32 +1581,65 @@ function renderDepotList(){
 
   if(!depots.length){
     listEl.innerHTML = '';
+    let dropdown = document.getElementById('depot-recuperes-wrap');
+    if(dropdown) dropdown.style.display = 'none';
     emptyEl.style.display = 'block';
     return;
   }
   emptyEl.style.display = 'none';
 
-  listEl.innerHTML = depots.map(d => {
-    const badge = d.statut === 'recupere'
-      ? '<span class="badge green">Récupéré</span>'
-      : d.statut === 'abandonne'
+  const depotsActifs = depots.filter(d => d.statut !== 'recupere');
+  const depotsRecuperes = depots.filter(d => d.statut === 'recupere');
+
+  if(!depotsActifs.length){
+    listEl.innerHTML = '<div class="empty">Aucun dépôt en cours.</div>';
+  } else {
+    listEl.innerHTML = depotsActifs.map(d => {
+      const badge = d.statut === 'abandonne'
         ? '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;">Abandonné</span>'
         : '<span class="badge orange">Déposé</span>';
-    return `
-      <div class="list-item" data-depot-id="${escapeHtml(d.app_id)}" style="cursor:pointer;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
-          <strong>${escapeHtml(d.prenom || '')} ${escapeHtml(d.nom || '')}</strong>
-          ${badge}
-        </div>
-        <div style="color:#778;font-size:0.88rem;margin-top:0.2rem;">
-          ${escapeHtml(d.appareil || '')} — déposé le ${escapeHtml(d.date_depot || '')}
-        </div>
-      </div>`;
-  }).join('');
+      return `
+        <div class="list-item" data-depot-id="${escapeHtml(d.app_id)}" style="cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
+            <strong>${escapeHtml(d.prenom || '')} ${escapeHtml(d.nom || '')}</strong>
+            ${badge}
+          </div>
+          <div style="color:#778;font-size:0.88rem;margin-top:0.2rem;">
+            ${escapeHtml(d.appareil || '')} — déposé le ${escapeHtml(d.date_depot || '')}
+          </div>
+        </div>`;
+    }).join('');
+  }
 
   listEl.querySelectorAll('[data-depot-id]').forEach(card => {
     card.addEventListener('click', () => showDepotDetail(card.dataset.depotId));
   });
+
+  // Appareils déjà récupérés : liste déroulante compacte plutôt que des fiches pleine largeur
+  let wrap = document.getElementById('depot-recuperes-wrap');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'depot-recuperes-wrap';
+    wrap.style.marginTop = '0.8rem';
+    wrap.innerHTML = `
+      <label style="font-size:0.82rem;color:var(--text-muted);display:block;margin-bottom:0.4rem;">📦 Appareils récupérés</label>
+      <select id="depot-recuperes-select" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></select>
+    `;
+    listEl.parentElement.appendChild(wrap);
+    document.getElementById('depot-recuperes-select').addEventListener('change', (e) => {
+      if(e.target.value) showDepotDetail(e.target.value);
+      e.target.value = '';
+    });
+  }
+
+  const select = document.getElementById('depot-recuperes-select');
+  if(!depotsRecuperes.length){
+    wrap.style.display = 'none';
+  } else {
+    wrap.style.display = 'block';
+    select.innerHTML = `<option value="">${depotsRecuperes.length} appareil${depotsRecuperes.length>1?'s':''} récupéré${depotsRecuperes.length>1?'s':''} — sélectionner…</option>` +
+      depotsRecuperes.map(d => `<option value="${escapeHtml(d.app_id)}">${escapeHtml(d.prenom||'')} ${escapeHtml(d.nom||'')} — ${escapeHtml(d.appareil||'')}</option>`).join('');
+  }
 }
 
 function dateFrLongFromISO(iso){
@@ -1736,7 +1769,7 @@ function openRendreAppareilModal(){
   document.getElementById('rendre-abandon-fields').style.display = 'none';
   document.getElementById('rendre-abandon-motif').value = '';
   document.getElementById('rendre-abandon-distance').checked = false;
-  document.getElementById('rendre-signature-wrap').style.display = 'block';
+  document.getElementById('rendre-signature-wrap').style.display = 'none';
   document.getElementById('rendre-appareil-confirm').textContent = 'Confirmer la remise ✓';
   updateRendreMention();
   document.getElementById('rendre-appareil-modal').style.display = 'flex';
@@ -1746,6 +1779,9 @@ function openRendreAppareilModal(){
 document.getElementById('rendre-abandon-toggle')?.addEventListener('change', (e) => {
   document.getElementById('rendre-abandon-fields').style.display = e.target.checked ? 'block' : 'none';
   document.getElementById('rendre-appareil-confirm').textContent = e.target.checked ? 'Confirmer l\'abandon ✓' : 'Confirmer la remise ✓';
+  // Signature demandée uniquement pour un abandon fait en personne (pas pour une remise normale, ni un abandon à distance)
+  const aDistance = document.getElementById('rendre-abandon-distance').checked;
+  document.getElementById('rendre-signature-wrap').style.display = (e.target.checked && !aDistance) ? 'block' : 'none';
   updateRendreMention();
 });
 document.getElementById('rendre-abandon-distance')?.addEventListener('change', (e) => {
@@ -2031,13 +2067,7 @@ function generateRecuRemisePdf(depot, signatureDataUrl, dateVal, heureVal){
 
   doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(40,40,40);
   doc.text(`Fait à Lens, le ${dateFr}`, margin, y);
-  y += 10;
-
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(80,80,80);
-  doc.text('Signature du client', margin, y);
-  y += 4;
-  try{ doc.addImage(signatureDataUrl, 'PNG', margin, y, 70, 25); }catch(e){}
-  y += 30;
+  y += 15;
 
   doc.setDrawColor(245,166,35); doc.setLineWidth(0.5);
   doc.line(margin, y, W-margin, y);
@@ -3112,7 +3142,8 @@ document.getElementById('rendre-appareil-confirm')?.addEventListener('click', as
   const aDistance = estAbandon && document.getElementById('rendre-abandon-distance').checked;
   const motif = document.getElementById('rendre-abandon-motif').value.trim();
   const canvas = document.getElementById('rendre-signature-canvas');
-  const signatureDataUrl = aDistance ? null : canvas.toDataURL('image/png');
+  const signatureDemandee = estAbandon && !aDistance;
+  const signatureDataUrl = signatureDemandee ? canvas.toDataURL('image/png') : null;
   const btn = document.getElementById('rendre-appareil-confirm');
   const dateVal = document.getElementById('rendre-date').value;
   const heureVal = document.getElementById('rendre-heure').value;
