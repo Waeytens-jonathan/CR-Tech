@@ -4073,6 +4073,7 @@ function nearestNeighborOrder(list, startLat, startLon){
 
 let carteJourMap = null;
 let carteJourMarkers = [];
+let carteJourMaPositionMarker = null;
 
 document.getElementById('agenda-carte-btn').addEventListener('click', async () => {
   const iso = dateToLocalISO(getDisplayDate(agendaDayOffset));
@@ -4125,6 +4126,28 @@ function renderCarteJour(dayRdvs){
 
   carteJourMarkers.forEach(m => carteJourMap.removeLayer(m));
   carteJourMarkers = [];
+
+  // Position actuelle (si l'utilisateur autorise la géolocalisation)
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition((pos) => {
+      if(!carteJourMap) return;
+      const { latitude, longitude } = pos.coords;
+      if(carteJourMaPositionMarker) carteJourMap.removeLayer(carteJourMaPositionMarker);
+      const monIcon = L.divIcon({
+        className: '',
+        html: `<div style="position:relative;width:20px;height:20px;">
+          <div style="position:absolute;inset:0;background:rgba(26,115,200,0.35);border-radius:50%;animation:pulseMaPosition 2s infinite;"></div>
+          <div style="position:absolute;top:4px;left:4px;width:12px;height:12px;background:#1a73c8;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>
+        </div>`,
+        iconSize: [20,20],
+        iconAnchor: [10,10]
+      });
+      carteJourMaPositionMarker = L.marker([latitude, longitude], { icon: monIcon, zIndexOffset: 1000 }).addTo(carteJourMap);
+      carteJourMaPositionMarker.bindTooltip('📍 Vous êtes ici', { direction: 'top', offset: [0,-10] });
+    }, (err) => {
+      console.warn('Géolocalisation indisponible :', err.message);
+    }, { enableHighAccuracy: true, timeout: 8000 });
+  }
 
   const geoloc = dayRdvs.filter(r => r.lat_rdv != null && r.lon_rdv != null);
   const sansCoord = dayRdvs.length - geoloc.length;
@@ -5434,15 +5457,38 @@ async function closeSigOverlay(){
 }
 
 document.getElementById('cancel-sig-fs').addEventListener('click', () => {
+  window._quickSignReportId = null;
   closeSigOverlay();
 });
 
-document.getElementById('validate-sig-fs').addEventListener('click', () => {
+document.getElementById('validate-sig-fs').addEventListener('click', async () => {
   if(!fsCanvasReady){
+    window._quickSignReportId = null;
     closeSigOverlay();
     return;
   }
-  signatureData = canvasFs.toDataURL('image/png');
+  const dataUrl = canvasFs.toDataURL('image/png');
+
+  if(window._quickSignReportId){
+    const reportId = window._quickSignReportId;
+    window._quickSignReportId = null;
+    closeSigOverlay();
+    try{
+      const { error } = await sb.from(TABLE).update({ signature: dataUrl }).eq('app_id', reportId);
+      if(error) throw error;
+      const idx = reports.findIndex(rep => rep.id === reportId);
+      if(idx !== -1) reports[idx].signature = dataUrl;
+      if(currentDetailReport && currentDetailReport.id === reportId) currentDetailReport.signature = dataUrl;
+      showToast('Signature enregistrée ✓');
+      if(currentDetailReport && currentDetailReport.id === reportId) showDetail(currentDetailReport);
+    }catch(e){
+      console.error('Erreur enregistrement signature :', e);
+      showToast('Échec de l\'enregistrement de la signature', true);
+    }
+    return;
+  }
+
+  signatureData = dataUrl;
   updateSigPreview();
   closeSigOverlay();
 });
@@ -6491,6 +6537,10 @@ function renderDetailContent(r, container){
     html += '<div class="detail-section detail-sig"><h3>Signature client</h3>';
     html += `<img src="${r.signature}" alt="Signature client">`;
     html += '</div>';
+  } else if(!r._isDraft){
+    html += '<div class="detail-section">';
+    html += '<button class="btn btn-primary quick-sign-btn" style="width:100%;">✍️ Faire signer le CR</button>';
+    html += '</div>';
   }
 
   c.innerHTML = html;
@@ -6501,6 +6551,11 @@ function renderDetailContent(r, container){
 
   c.querySelector('#quick-remboursement-toggle')?.addEventListener('change', (e) => {
     c.querySelector('#quick-remboursement-fields').style.display = e.target.checked ? 'block' : 'none';
+  });
+
+  c.querySelector('.quick-sign-btn')?.addEventListener('click', () => {
+    window._quickSignReportId = r.id;
+    document.getElementById('fullscreen-sig').click();
   });
 
   c.querySelector('.voir-dossier-origine-btn')?.addEventListener('click', (e) => {
