@@ -4395,6 +4395,9 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
 
   document.querySelector('#view-agenda-new h2').textContent = 'Modifier le rendez-vous';
   document.getElementById('newrdv-save-btn').textContent = 'Enregistrer les modifications';
+  window._newRdvDistanceKm = null;
+  document.getElementById('newrdv-distance-info').style.display = 'none';
+  geocoderEtCalculerDistanceRDV(r.adresse, r.cp, r.ville, r.lat_rdv, r.lon_rdv);
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -4711,6 +4714,24 @@ setupAdresseAutocomplete('newrdv-adresse', 'newrdv-cp', 'newrdv-ville', 'newrdv-
 
 // --- Distance depuis Lens pour le nouveau RDV ---
 const LENS_COORDS = { lon: 2.8275, lat: 50.4322 };
+
+// Calcule la distance depuis Lens à partir d'une adresse déjà connue (préremplissage),
+// en géocodant l'adresse texte si on n'a pas déjà des coordonnées précises.
+async function geocoderEtCalculerDistanceRDV(adresse, cp, ville, latConnu, lonConnu){
+  if(latConnu != null && lonConnu != null){
+    return fetchDistanceRDV(latConnu, lonConnu);
+  }
+  if(!adresse && !cp && !ville) return;
+  try{
+    const q = [adresse, cp, ville].filter(Boolean).join(' ');
+    const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1`);
+    const data = await res.json();
+    const point = data.results && data.results[0];
+    if(point && point.x && point.y){
+      await fetchDistanceRDV(parseFloat(point.y), parseFloat(point.x));
+    }
+  }catch(e){}
+}
 
 async function fetchDistanceRDV(lat, lon){
   const infoEl = document.getElementById('newrdv-distance-info');
@@ -8632,6 +8653,9 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   document.getElementById('newrdv-adresse2').value = r.adresse2 || '';
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
+  window._newRdvDistanceKm = null;
+  document.getElementById('newrdv-distance-info').style.display = 'none';
+  geocoderEtCalculerDistanceRDV(r.adresse, r.cp, r.ville);
   document.getElementById('newrdv-tel').value = r.tel || '';
   document.getElementById('newrdv-tel-interlocuteur').value = r['tel-interlocuteur'] || '';
   document.getElementById('newrdv-type-client').value = r['type-client'] || 'particulier';
@@ -8701,6 +8725,9 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   document.getElementById('newrdv-adresse2').value = r.adresse2 || '';
   document.getElementById('newrdv-cp').value = r.cp || '';
   document.getElementById('newrdv-ville').value = r.ville || '';
+  window._newRdvDistanceKm = null;
+  document.getElementById('newrdv-distance-info').style.display = 'none';
+  geocoderEtCalculerDistanceRDV(r.adresse, r.cp, r.ville);
   document.getElementById('newrdv-tel').value = r.tel || '';
   document.getElementById('newrdv-tel-interlocuteur').value = r['tel-interlocuteur'] || '';
   document.getElementById('newrdv-type-client').value = r['type-client'] || 'particulier';
@@ -9098,6 +9125,9 @@ document.getElementById('client-search') && document.getElementById('client-sear
         document.getElementById('newrdv-adresse2').value = '';
         document.getElementById('newrdv-cp').value      = c.cp      || '';
         document.getElementById('newrdv-ville').value   = c.ville   || '';
+        window._newRdvDistanceKm = null;
+        document.getElementById('newrdv-distance-info').style.display = 'none';
+        geocoderEtCalculerDistanceRDV(c.adresse, c.cp, c.ville);
         input.value = clientDisplayName(c);
         input.dataset.selectedClientId = c.app_id;
         box.style.display = 'none';
