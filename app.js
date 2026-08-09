@@ -5985,7 +5985,7 @@ document.getElementById('email-btn').addEventListener('click', async () => {
       data.documents_envoyes = true;
       const idx = reports.findIndex(rep => rep.id === data.id);
       if(idx !== -1){ reports[idx].documents_envoyes = true; reports[idx]['facture-creee'] = true; }
-      saveReportToSupabase(data);
+      await saveReportToSupabase(data);
       applyTerminerStyle(btn, data);
     }
   }catch(e){
@@ -6856,7 +6856,7 @@ async function envoyerCrEtFacture(r, btn){
       r.documents_envoyes = true;
       const idx = reports.findIndex(rep => rep.id === r.id);
       if(idx !== -1){ reports[idx].documents_envoyes = true; reports[idx]['facture-creee'] = true; }
-      saveReportToSupabase(r);
+      await saveReportToSupabase(r);
       updateTerminerButton(r);
       applyTerminerStyle(btn, r);
     }
