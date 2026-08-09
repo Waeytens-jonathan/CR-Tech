@@ -8776,6 +8776,8 @@ async function loadClients(){
 function renderClientsList(filter){
   const el = document.getElementById('clients-list');
   if(!el) return;
+  const countEl = document.getElementById('clients-total-count');
+  if(countEl) countEl.textContent = `(${allClients.length})`;
   const q = (filter||'').trim().toLowerCase();
   const list = q
     ? allClients.filter(c =>
