@@ -6652,7 +6652,7 @@ function renderDetailContent(r, container){
 
   const savFicheSaveBtn = c.querySelector('#sav-fiche-save-btn');
   if(savFicheSaveBtn){
-    savFicheSaveBtn.addEventListener('click', () => {
+    savFicheSaveBtn.addEventListener('click', async () => {
       const idx = reports.findIndex(rep => rep.id === r.id);
       if(idx === -1){ showToast('Compte-rendu introuvable', true); return; }
       const resolution = c.querySelector('#sav-resolution-text').value.trim();
@@ -6671,14 +6671,14 @@ function renderDetailContent(r, container){
       reports[idx].sav_piece = sav_piece;
       r.sav_resolution = resolution;
       r.sav_piece = sav_piece;
-      saveReportToSupabase(reports[idx]);
+      await saveReportToSupabase(reports[idx]);
       showToast('Fiche SAV enregistrée ✓');
     });
   }
 
   const quickBtn = document.getElementById('quick-update-btn');
   if(quickBtn){
-    quickBtn.addEventListener('click', () => {
+    quickBtn.addEventListener('click', async () => {
       const idx = reports.findIndex(rep => rep.id === r.id);
       if(idx === -1){
         showToast('Compte-rendu introuvable', true);
@@ -6739,7 +6739,12 @@ function renderDetailContent(r, container){
       if(reste < 0) reste = 0;
       reports[idx]['reste-encaisser'] = reste.toFixed(2);
 
-      saveReportToSupabase(reports[idx]);
+      quickBtn.disabled = true;
+      const texteOriginal = quickBtn.textContent;
+      quickBtn.textContent = 'Enregistrement…';
+      await saveReportToSupabase(reports[idx]);
+      quickBtn.disabled = false;
+      quickBtn.textContent = texteOriginal;
       showToast('Dossier mis à jour');
       showDetail(reports[idx]);
     });
@@ -6985,7 +6990,7 @@ function sendSmsArrival(){
   window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(msg);
 }
 
-function deleteDetailPhoto(idx){
+async function deleteDetailPhoto(idx){
   if(!currentDetailReport) return;
   if(!confirm('Supprimer cette photo ?')) return;
   currentDetailReport.photos.splice(idx, 1);
@@ -6994,7 +6999,7 @@ function deleteDetailPhoto(idx){
   if(rIdx !== -1){
     reports[rIdx] = currentDetailReport;
     // localStorage désactivé — données dans Supabase
-    saveReportToSupabase(currentDetailReport);
+    await saveReportToSupabase(currentDetailReport);
   }
   showToast('Photo supprimée');
   showDetail(currentDetailReport);
