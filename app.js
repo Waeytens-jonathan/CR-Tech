@@ -237,6 +237,7 @@ function reportToRow(r){
     notes: r.notes || '',
     commande_piece: !!r['commande-piece'],
     piece_recue: !!r['piece-recue'],
+    piece_suivi_statut: r['piece-suivi-statut'] || null,
     piece_posee: !!r['piece-posee'],
     piece_desc: r['piece-desc'] || '',
     piece_prix: r['piece-cout'] || '',
@@ -338,6 +339,7 @@ function rowToReport(row){
     notes: notes,
     'commande-piece': !!row.commande_piece,
     'piece-recue': !!row.piece_recue,
+    'piece-suivi-statut': row.piece_suivi_statut || '',
     'piece-posee': !!row.piece_posee,
     'piece-desc': row.piece_desc,
     'piece-cout': row.piece_prix,
@@ -399,7 +401,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -6190,6 +6192,25 @@ function renderArchivesPage(dossiersArchives, archiveContainer, nbAffiches){
   }
 }
 
+// Version synchrone de hasScheduledPosePieceRdv, pour l'utiliser dans le rendu de liste (pas d'await possible là-bas)
+function getScheduledPosePieceRdv(r){
+  return agendaRdvs.find(rdv => {
+    if(rdv.type_rdv !== 'pose_piece' || rdv.statut === 'annule') return false;
+    const crLinkMatch = (rdv.note_technicien || '').match(/\[\[cr:([^\]]+)\]\]/);
+    if(crLinkMatch) return crLinkMatch[1] === r.id;
+    const memeClient = (r.client_id && rdv.client_id === r.client_id) || (r.tel && rdv.tel === r.tel);
+    const memeAppareil = (rdv.appareil || '') === (r.appareil || '');
+    return memeClient && memeAppareil;
+  }) || null;
+}
+
+const PIECE_SUIVI_LABELS = {
+  en_commande: { label: '📦 En commande', color: '#f5a623' },
+  en_livraison: { label: '🚚 En livraison', color: '#1a73c8' },
+  recu: { label: '✅ Pièce reçue', color: '#3fbf6f' },
+  posee: { label: '🔧 Pièce posée', color: '#3fbf6f' }
+};
+
 function buildDossierItem(rapports){
   const first = rapports[0];
   const item = document.createElement('div');
@@ -6221,6 +6242,20 @@ function buildDossierItem(rapports){
   }
   if(hasSAV) statutBadge += '<span class="badge red" style="font-size:0.7rem;margin-left:4px;">🛠️ SAV</span>';
   if(rapports.some(r => estEnRetardPaiement(r))) statutBadge += '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;font-size:0.7rem;margin-left:4px;">⚠️ Impayé</span>';
+
+  // RDV de pose-pièce déjà programmé
+  const rdvPosePiece = rapports.some(r => r.statut === 'Attente_piece') ? getScheduledPosePieceRdv(first) : null;
+  if(rdvPosePiece){
+    const dateRdv = rdvPosePiece.date ? new Date(rdvPosePiece.date + 'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric', month:'short'}) : '';
+    statutBadge += `<span class="badge" style="background:rgba(26,115,200,0.18);color:#1a73c8;border:1px solid #1a73c8;font-size:0.7rem;margin-left:4px;">📅 Pose pièce le ${dateRdv}</span>`;
+  }
+
+  // Statut de suivi de la pièce commandée
+  const pieceSuivi = rapports.find(r => r['commande-piece'] && r['piece-suivi-statut']);
+  if(pieceSuivi){
+    const info = PIECE_SUIVI_LABELS[pieceSuivi['piece-suivi-statut']];
+    if(info) statutBadge += `<span class="badge" style="background:${info.color}22;color:${info.color};border:1px solid ${info.color};font-size:0.7rem;margin-left:4px;">${info.label}</span>`;
+  }
 
   // Badges appareils
   const appareilBadges = rapports.map(r =>
@@ -6399,6 +6434,16 @@ function renderDetailContent(r, container){
   html += '</select></div>';
 
   html += '</div>';
+
+  if(r['commande-piece']){
+    const suiviActuel = r['piece-suivi-statut'] || 'en_commande';
+    html += '<div class="field" style="margin-top:0.6rem;"><label>Suivi de la pièce commandée</label>';
+    html += '<select id="quick-piece-suivi">';
+    Object.keys(PIECE_SUIVI_LABELS).forEach(key => {
+      html += `<option value="${key}" ${suiviActuel === key ? 'selected' : ''}>${escapeHtml(PIECE_SUIVI_LABELS[key].label)}</option>`;
+    });
+    html += '</select></div>';
+  }
 
   html += '<div class="field" style="margin-top:0.6rem;"><label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui recevra le technicien)</span></label>';
   html += `<input type="tel" id="quick-tel-interlocuteur" placeholder="Facultatif" value="${escapeHtml(r['tel-interlocuteur']||'')}"></div>`;
@@ -6649,6 +6694,8 @@ function renderDetailContent(r, container){
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
       reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
+      const pieceSuiviEl = document.getElementById('quick-piece-suivi');
+      if(pieceSuiviEl) reports[idx]['piece-suivi-statut'] = pieceSuiviEl.value;
       reports[idx]['type-client'] = typeClientEl.value;
       if(typeClientEl.value === 'professionnel'){
         reports[idx]['entreprise-nom'] = document.getElementById('quick-entreprise-nom').value.trim();
