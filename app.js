@@ -253,6 +253,7 @@ function reportToRow(r){
     paiement_carte: r['paiement-carte'] || null,
     garantie: !!r.garantie,
     facture_creee: !!r['facture-creee'],
+    documents_envoyes: !!r.documents_envoyes,
     conseil_entretien: !!r['conseils-entretien'],
     photos: JSON.stringify(r.photos || []),
     photos_plaque: JSON.stringify(r.plaquePhoto ? [r.plaquePhoto] : []),
@@ -280,7 +281,6 @@ function reportToRow(r){
   if(r['livraison']) extra.livraison = r['livraison'];
   if(r['acompte-montant']) extra.acompte_montant = r['acompte-montant'];
   if(r._draftStep !== undefined) extra._draftStep = r._draftStep;
-  if(r.documents_envoyes) extra.documents_envoyes = true;
   if(r.sav_probleme) extra.sav_probleme = r.sav_probleme;
   if(r.sav_resolution) extra.sav_resolution = r.sav_resolution;
   if(r.sav_piece) extra.sav_piece = r.sav_piece;
@@ -353,7 +353,7 @@ function rowToReport(row){
     'paiement-statut': row.paiement_statue,
     'reste-encaisser': row.reste_encaisser,
     'acompte-montant': extra.acompte_montant || '',
-    documents_envoyes: !!extra.documents_envoyes,
+    documents_envoyes: row.documents_envoyes != null ? !!row.documents_envoyes : !!extra.documents_envoyes,
     sav_probleme: extra.sav_probleme || '',
     sav_resolution: extra.sav_resolution || '',
     sav_piece: extra.sav_piece || null,
@@ -401,7 +401,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -6695,7 +6695,9 @@ function renderDetailContent(r, container){
       reports[idx]['facture-creee'] = factureEl.checked;
       reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
       const pieceSuiviEl = document.getElementById('quick-piece-suivi');
-      if(pieceSuiviEl) reports[idx]['piece-suivi-statut'] = pieceSuiviEl.value;
+      if(reports[idx]['commande-piece']){
+        reports[idx]['piece-suivi-statut'] = (statutEl.value === 'Terminée') ? 'posee' : (pieceSuiviEl ? pieceSuiviEl.value : reports[idx]['piece-suivi-statut']);
+      }
       reports[idx]['type-client'] = typeClientEl.value;
       if(typeClientEl.value === 'professionnel'){
         reports[idx]['entreprise-nom'] = document.getElementById('quick-entreprise-nom').value.trim();
@@ -7697,6 +7699,9 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   reports[idx].pieceDeposeRef = piecesPosees[0].ref;
   reports[idx].pieceDeposePhotos = posePiecePhotos.slice();
   reports[idx].statut = document.getElementById('pose-piece-statut').value;
+  if(reports[idx]['commande-piece'] && reports[idx].statut === 'Terminée'){
+    reports[idx]['piece-suivi-statut'] = 'posee';
+  }
   reports[idx]['paiement-statut'] = document.getElementById('pose-piece-paiement-statut').value;
   reports[idx]['acompte-montant'] = document.getElementById('pose-piece-acompte-montant').value;
   reports[idx]['paiement-moyen'] = document.getElementById('pose-piece-paiement-moyen').value;
