@@ -5815,8 +5815,18 @@ async function saveCurrentReport(){
   }
   if(currentId){
     const idx = reports.findIndex(r => r.id === currentId);
+    const ancien = reports[idx] || {};
     data.id = currentId;
     delete data._isDraft;
+    // Préserver les métadonnées de liaison (RDV, dossier, SAV) si cet enregistrement-ci
+    // ne les redéfinit pas lui-même — évite qu'un 2e "Enregistrer"/"Terminer et envoyer"
+    // efface le lien posé lors du tout premier enregistrement.
+    if(data.rdv_app_id === undefined) data.rdv_app_id = ancien.rdv_app_id || null;
+    if(data.dossier_id === undefined) data.dossier_id = ancien.dossier_id || null;
+    if(data.is_sav === undefined) data.is_sav = ancien.is_sav || false;
+    if(data.parent_app_id === undefined) data.parent_app_id = ancien.parent_app_id || null;
+    if(data.sav_raison === undefined) data.sav_raison = ancien.sav_raison || '';
+    if(data.sav_probleme === undefined) data.sav_probleme = ancien.sav_probleme || '';
     reports[idx] = data;
     if(currentDetailReport && currentDetailReport.id === data.id){
       currentDetailReport = data;
@@ -5846,8 +5856,8 @@ async function saveCurrentReport(){
     if(!data.client_id && window._currentDossierClientId) data.client_id = window._currentDossierClientId;
     window._currentDossierAppId = null;
     window._currentDossierClientId = null;
-  } else {
-    // CR créé directement → créer un dossier automatiquement
+  } else if(!data.dossier_id){
+    // CR créé directement, et pas de dossier déjà connu à préserver → en créer un automatiquement
     const autoDosId = 'dos_' + Date.now();
     try{
       await sb.from(DOSSIERS_TABLE).insert({
