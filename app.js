@@ -614,11 +614,29 @@ const RDV_SLOT_LABELS = { matin: 'Matin · 10h-12h', apresmidi: 'Après-midi · 
 let agendaRdvs = [];
 let currentAgendaRdv = null;
 
+// Colonnes RDV sans les champs lourds (photos/signatures en base64) — utilisé pour
+// le chargement de la liste de l'agenda, beaucoup plus rapide. Les champs lourds sont
+// chargés à la demande (ensureFullRdvLoaded) uniquement à l'ouverture du détail d'un RDV.
+const LIGHT_RDV_COLUMNS = 'app_id,date,creneau,vu,nom,prenom,adresse,adresse2,cp,ville,tel,tel_interlocuteur,type_client,entreprise_nom,entreprise_siret,email,appareil,marque,modele,panne,appareils_supplementaires,note_technicien,type_rdv,distance_km,lat_rdv,lon_rdv,statut,is_sav,sav_parent_app_id,sav_raison,motif_annulation,email_confirmation_envoye,email_confirmation_erreur,date_absence,heure_absence,commentaire_absence,client_id,created_at';
+
+async function ensureFullRdvLoaded(r){
+  if(r._fullyLoaded) return;
+  try{
+    const { data, error } = await sb.from(RDV_TABLE).select('plaque_photo,photo_absence').eq('app_id', r.app_id).single();
+    if(error) throw error;
+    r.plaque_photo = data.plaque_photo || null;
+    r.photo_absence = data.photo_absence || null;
+    r._fullyLoaded = true;
+  }catch(e){
+    console.error('Erreur chargement complet RDV :', e);
+  }
+}
+
 async function loadAgendaFromSupabase(){
   try{
     const { data, error } = await sb
       .from(RDV_TABLE)
-      .select('*')
+      .select(LIGHT_RDV_COLUMNS)
       .order('date', { ascending: true });
     if(error) throw error;
     return data || [];
@@ -648,8 +666,10 @@ function getDisplayDate(offset){
 }
 
 async function renderAgenda(){
-  agendaRdvs = await loadAgendaFromSupabase();
-  agendaMemos = await loadMemosFromSupabase();
+  [agendaRdvs, agendaMemos] = await Promise.all([
+    loadAgendaFromSupabase(),
+    loadMemosFromSupabase()
+  ]);
   updateAgendaBadge();
   renderAgendaList();
 }
@@ -3467,10 +3487,11 @@ async function openReportOrDossier(rep){
   await showDetail(rep);
 }
 
-function showAgendaDetail(appId){
+async function showAgendaDetail(appId){
   const r = agendaRdvs.find(x => x.app_id === appId);
   if(!r) return;
   currentAgendaRdv = r;
+  await ensureFullRdvLoaded(r);
 
   if(!r.vu){
     r.vu = true;
