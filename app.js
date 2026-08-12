@@ -269,6 +269,7 @@ function reportToRow(r){
     client_id: r.client_id || null,
     dossier_id: r.dossier_id || null,
     rdv_app_id: r.rdv_app_id || null,
+    depot_app_id: r.depot_app_id || null,
     is_sav: !!r.is_sav,
     parent_app_id: r.parent_app_id || null,
     sav_raison: r.sav_raison || null,
@@ -381,6 +382,7 @@ function rowToReport(row){
     client_id: row.client_id || null,
     dossier_id: row.dossier_id || null,
     rdv_app_id: row.rdv_app_id || null,
+    depot_app_id: row.depot_app_id || null,
     date_termine: row.date_termine || null,
     date_archivage: row.date_archivage || null,
     is_sav: !!row.is_sav,
@@ -401,7 +403,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -1650,6 +1652,16 @@ function dateFrLongFromISO(iso){
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+// Trouve le CR déjà lié à ce dépôt, s'il existe
+function findLinkedReportForDepot(d){
+  let rep = reports.find(rep => !rep._isDraft && rep.depot_app_id === d.app_id);
+  if(rep) return rep;
+  // Repli pour les dossiers créés avant l'ajout du lien direct : même client, même appareil
+  const memeClient = rep2 => (d.client_id && rep2.client_id === d.client_id) || (d.tel && rep2.tel === d.tel);
+  const memeAppareil = rep2 => (rep2.appareil || '') === (d.appareil || '');
+  return reports.find(rep2 => !rep2._isDraft && memeClient(rep2) && memeAppareil(rep2)) || null;
+}
+
 function showDepotDetail(appId){
   const d = depots.find(x => x.app_id === appId);
   if(!d) return;
@@ -1710,6 +1722,9 @@ function showDepotDetail(appId){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-depot-detail').classList.add('active');
+
+  const createCrBtn = document.getElementById('depot-detail-create-cr');
+  createCrBtn.textContent = findLinkedReportForDepot(d) ? '📂 Voir le compte-rendu' : '📝 Faire le compte-rendu';
 }
 
 document.getElementById('depot-detail-back').addEventListener('click', () => {
@@ -3224,6 +3239,12 @@ document.getElementById('depot-detail-create-cr').addEventListener('click', () =
   if(!currentDepot) return;
   const d = currentDepot;
 
+  const dejaCr = findLinkedReportForDepot(d);
+  if(dejaCr){
+    openReportOrDossier(dejaCr);
+    return;
+  }
+
   resetForm();
   clearDraft();
   document.getElementById('f-nom').value = d.nom || '';
@@ -3239,6 +3260,7 @@ document.getElementById('depot-detail-create-cr').addEventListener('click', () =
   document.getElementById('f-appareil').value = matchAppareilOption(d.appareil);
   autoFillMainOeuvre(document.getElementById('f-appareil').value);
   document.getElementById('f-panne').value = d.description || '';
+  window._creatingFromDepotAppId = d.app_id;
 
   if(d.is_sav && d.sav_parent_app_id){
     window._creatingSavParentAppId = d.sav_parent_app_id;
@@ -5804,6 +5826,10 @@ async function saveCurrentReport(){
     data.rdv_app_id = window._creatingFromRdvAppId;
     window._creatingFromRdvAppId = null;
   }
+  if(window._creatingFromDepotAppId){
+    data.depot_app_id = window._creatingFromDepotAppId;
+    window._creatingFromDepotAppId = null;
+  }
   if(window._creatingSavParentAppId){
     data.is_sav = true;
     data.parent_app_id = window._creatingSavParentAppId;
@@ -5822,6 +5848,7 @@ async function saveCurrentReport(){
     // ne les redéfinit pas lui-même — évite qu'un 2e "Enregistrer"/"Terminer et envoyer"
     // efface le lien posé lors du tout premier enregistrement.
     if(data.rdv_app_id === undefined) data.rdv_app_id = ancien.rdv_app_id || null;
+    if(data.depot_app_id === undefined) data.depot_app_id = ancien.depot_app_id || null;
     if(data.dossier_id === undefined) data.dossier_id = ancien.dossier_id || null;
     if(data.is_sav === undefined) data.is_sav = ancien.is_sav || false;
     if(data.parent_app_id === undefined) data.parent_app_id = ancien.parent_app_id || null;
@@ -7726,6 +7753,19 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
 
   // localStorage désactivé — données dans Supabase
   await saveReportToSupabase(reports[idx]);
+
+  // Si le dossier est terminé, marquer aussi le RDV de pose-pièce associé comme effectué
+  if(reports[idx].statut === 'Terminée'){
+    const rdvLie = getScheduledPosePieceRdv(reports[idx]);
+    if(rdvLie && rdvLie.statut !== 'effectue'){
+      try{
+        await sb.from(RDV_TABLE).update({ statut: 'effectue' }).eq('app_id', rdvLie.app_id);
+        rdvLie.statut = 'effectue';
+      }catch(e){
+        console.error('Erreur mise à jour statut RDV pose-pièce :', e);
+      }
+    }
+  }
 
   // Mettre à jour le stock pour chaque pièce sélectionnée depuis le stock
   for(const row of validRows){
