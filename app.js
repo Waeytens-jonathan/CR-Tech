@@ -201,6 +201,16 @@ function calculerMontantRemise(r){
 }
 
 function reportToRow(r){
+  // Gère la date de clôture (déclenche le compte à rebours d'archivage automatique) de façon
+  // centralisée, ici, pour que ça s'applique peu importe par quel écran le dossier a été
+  // marqué Terminée/Non réparable — pas seulement depuis Suivi du dossier.
+  const estPretPourArchive = ['Terminée','Non_reparable'].includes(r.statut) && !!r['facture-creee'];
+  if(estPretPourArchive && !r.date_termine){
+    r.date_termine = new Date().toISOString();
+  } else if(!estPretPourArchive){
+    r.date_termine = null;
+  }
+
   const row = {
     app_id: r.id,
     ref: r.ref || '',
@@ -6777,14 +6787,7 @@ function renderDetailContent(r, container){
       }
 
       // Le délai d'archivage démarre uniquement quand le dossier est Terminé ET la facture créée
-      const TERMINES = ['Terminée', 'Non_reparable'];
-      const isReadyForArchive = TERMINES.includes(statutEl.value) && factureEl.checked;
-      const wasReadyForArchive = !!reports[idx].date_termine;
-      if(isReadyForArchive && !wasReadyForArchive){
-        reports[idx].date_termine = new Date().toISOString();
-      } else if(!isReadyForArchive){
-        reports[idx].date_termine = null;
-      }
+      // (calculé automatiquement à chaque sauvegarde dans reportToRow, plus besoin de le gérer ici)
 
       const total = parseFloat(reports[idx]['cout-total']) || 0;
       let reste = 0;
