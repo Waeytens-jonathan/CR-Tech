@@ -7987,6 +7987,7 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-alerte-avis-active').checked = params.alerteFauxAvisActive || false;
   document.getElementById('p-alerte-avis-texte').value    = params.alerteFauxAvisTexte || '';
   document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
+  document.getElementById('p-archivage-delai').value = params.archivageDelaiHeures ?? 48;
   document.getElementById('p-numero-facture-override').value = params.numeroFactureOverride ?? '';
   document.getElementById('p-numero-devis-override').value = params.numeroDevisOverride ?? '';
   document.getElementById('p-rib-titulaire').value = params.ribTitulaire ?? '';
@@ -8099,6 +8100,7 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     alerteFauxAvisActive: document.getElementById('p-alerte-avis-active').checked,
     alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
     urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
+    archivageDelaiHeures: parseFloat(document.getElementById('p-archivage-delai').value) || 48,
     numeroFactureOverride: document.getElementById('p-numero-facture-override').value ? parseInt(document.getElementById('p-numero-facture-override').value) : null,
     numeroDevisOverride: document.getElementById('p-numero-devis-override').value ? parseInt(document.getElementById('p-numero-devis-override').value) : null,
     ribTitulaire: document.getElementById('p-rib-titulaire').value.trim(),
@@ -8153,6 +8155,7 @@ async function getAgendaParams(){
       alerteFauxAvisActive: data.alerte_faux_avis_active ?? false,
       alerteFauxAvisTexte:  data.alerte_faux_avis_texte  ?? '',
       urssafTaux: data.urssaf_taux ?? 20,
+      archivageDelaiHeures: data.archivage_delai_heures ?? 48,
       numeroFactureOverride: data.numero_facture_override ?? null,
       numeroDevisOverride: data.numero_devis_override ?? null,
       ribTitulaire: data.rib_titulaire ?? '',
@@ -8206,6 +8209,7 @@ async function saveAgendaParams(params){
     alerte_faux_avis_active: params.alerteFauxAvisActive ?? false,
     alerte_faux_avis_texte:  params.alerteFauxAvisTexte  || null,
     urssaf_taux: params.urssafTaux ?? 20,
+    archivage_delai_heures: params.archivageDelaiHeures ?? 48,
     numero_facture_override: params.numeroFactureOverride ?? null,
     numero_devis_override: params.numeroDevisOverride ?? null,
     rib_titulaire: params.ribTitulaire || null,
@@ -8803,9 +8807,11 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   showToast('RDV pré-rempli — motif SAV : ' + motif);
 });
 
-// Archivage automatique au chargement : CR Terminé ou Non_reparable depuis +24h
+// Archivage automatique au chargement : dossier Terminé/Non_reparable, facturé et payé,
+// depuis plus longtemps que le délai réglé dans Paramètres (48h par défaut)
 async function autoArchiveOldReports(){
   const now = new Date();
+  const delaiHeures = (_agendaConfigCache && _agendaConfigCache.archivageDelaiHeures) ?? 48;
   const toArchive = reports.filter(r => {
     if(!['Terminée','Non_reparable'].includes(r.statut)) return false;
     if(!r['facture-creee']) return false;
@@ -8815,7 +8821,7 @@ async function autoArchiveOldReports(){
     if(!r.date_termine) return false;
     const termineDate = new Date(r.date_termine);
     const diffH = (now - termineDate) / (1000 * 60 * 60);
-    return diffH >= 24;
+    return diffH >= delaiHeures;
   });
   if(!toArchive.length) return;
   const dateArchivage = now.toISOString().slice(0,10);
