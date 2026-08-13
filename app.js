@@ -5002,7 +5002,7 @@ document.addEventListener('visibilitychange', () => {
 // ---------- Libellés partagés ----------
 const STATUT_LABELS = {
   'Terminée':'Terminée — appareil fonctionnel',
-  'Attente_piece':'En cours (attente de pièce)',
+  'Attente_piece':'En attente',
   'Non_reparable':'Non réparable / irréparable'
 };
 const PAIEMENT_LABELS = {
@@ -6100,7 +6100,7 @@ function buildListItem(r){
     switch(r.statut){
       case 'Terminée':     statutBadge = '<span class="badge green">✅ Terminé</span>'; break;
       case 'Non_reparable':statutBadge = '<span class="badge red">❌ Irréparable</span>'; break;
-      case 'Attente_piece':statutBadge = '<span class="badge orange">⏳ Attente pièce</span>'; break;
+      case 'Attente_piece':statutBadge = '<span class="badge orange">⏳ En attente</span>'; break;
       case 'archivé':      statutBadge = '<span class="badge" style="background:rgba(100,100,100,0.15);color:#888;border:1px solid #888;">📦 Archivé</span>'; break;
       default: statutBadge = '<span class="badge orange">🔄 En cours</span>';
     }
@@ -6290,7 +6290,7 @@ function buildDossierItem(rapports){
       statutBadge += `<span style="font-size:0.72rem;color:var(--text-muted);margin-left:4px;">le ${new Date(first.date_archivage).toLocaleDateString('fr-FR')}</span>`;
     }
   } else if(rapports.some(r => r.statut === 'Attente_piece')){
-    statutBadge = '<span class="badge orange">⏳ Attente pièce</span>';
+    statutBadge = '<span class="badge orange">⏳ En attente</span>';
   } else if(rapports.every(r => TERMINES.includes(r.statut))){
     statutBadge = '<span class="badge green">✅ Terminé</span>';
   } else if(rapports.some(r => r.statut === 'Non_reparable')){
