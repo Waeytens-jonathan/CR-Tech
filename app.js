@@ -1115,6 +1115,7 @@ async function renderStats(){
 // ---------- Heatmap des interventions par ville ----------
 const villeCoordsCache = {};
 let statsHeatMap = null;
+let statsHeatMapDejaCentree = false;
 let statsHeatLayer = null;
 
 async function geocodeVille(ville){
@@ -1186,13 +1187,19 @@ async function renderStatsHeatmap(filtered){
   if(points.length){
     statsHeatMap.invalidateSize();
     statsHeatLayer = L.heatLayer(points, { radius: 35, blur: 25, maxZoom: 13, max: Math.max(...points.map(p => p[2])) }).addTo(statsHeatMap);
-    const bounds = L.latLngBounds(points.map(p => [p[0], p[1]]));
-    statsHeatMap.fitBounds(bounds, { padding: [30,30], maxZoom: 12 });
+    if(!statsHeatMapDejaCentree){
+      const bounds = L.latLngBounds(points.map(p => [p[0], p[1]]));
+      statsHeatMap.fitBounds(bounds, { padding: [30,30], maxZoom: 12 });
+      statsHeatMapDejaCentree = true;
+    }
   }
   setTimeout(() => statsHeatMap.invalidateSize(), 200);
 }
 
-document.getElementById('stats-period').addEventListener('change', renderStats);
+document.getElementById('stats-period').addEventListener('change', () => {
+  statsHeatMapDejaCentree = false;
+  renderStats();
+});
 
 // ---------- Stock (embarqué + pièces commandées) ----------
 let stockEmbarque = [];
