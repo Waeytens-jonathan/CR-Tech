@@ -3501,7 +3501,6 @@ async function showAgendaDetail(appId){
   const r = agendaRdvs.find(x => x.app_id === appId);
   if(!r) return;
   currentAgendaRdv = r;
-  await ensureFullRdvLoaded(r);
 
   if(!r.vu){
     r.vu = true;
@@ -3530,9 +3529,9 @@ async function showAgendaDetail(appId){
       if(r.email_confirmation_envoye === false) return '__HTML__<span style="color:var(--red,#e0584f);">⚠️ Échec de l\'envoi' + (r.email_confirmation_erreur ? ' — ' + escapeHtml(r.email_confirmation_erreur) : '') + '</span>';
       return null;
     })()],
-    ['Preuve d\'absence', r.statut === 'absent' && r.photo_absence ? '__HTML__' + `
+    ['Preuve d\'absence', r.statut === 'absent' ? '__HTML__' + `
       <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.4rem;">${r.date_absence ? dateFrLong(r.date_absence) : ''}${r.heure_absence ? ' à ' + r.heure_absence : ''}${r.commentaire_absence ? '<br>' + escapeHtml(r.commentaire_absence) : ''}</div>
-      <img src="${r.photo_absence}" style="max-width:220px;border-radius:8px;display:block;">
+      <div id="absence-photo-zone"><button type="button" class="btn btn-outline voir-photo-absence-btn" style="font-size:0.85rem;padding:0.4rem 0.8rem;">📷 Voir la photo</button></div>
     ` : null],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
@@ -3571,8 +3570,8 @@ async function showAgendaDetail(appId){
     const displayValue = (isStatut || isHtml) ? (isHtml ? value.replace('__HTML__','') : value) : escapeHtml(String(value));
     html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${displayValue}</div></div>`;
   });
-  if(r.plaque_photo){
-    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">Photo de la plaque signalétique</div><img src="${r.plaque_photo}" class="zoomable-photo" style="max-width:180px;border-radius:8px;margin-top:0.4rem;border:1px solid var(--border);cursor:pointer;"></div>`;
+  if(!(r._fullyLoaded && !r.plaque_photo)){
+    html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">Photo de la plaque signalétique</div><div id="plaque-photo-zone" style="margin-top:0.4rem;"><button type="button" class="btn btn-outline voir-photo-plaque-btn" style="font-size:0.85rem;padding:0.4rem 0.8rem;">📷 Voir la photo</button></div></div>`;
   }
 
   // Boutons Waze / Copier adresse
@@ -3586,6 +3585,32 @@ async function showAgendaDetail(appId){
   }
 
   document.getElementById('agenda-detail-content').innerHTML = html;
+
+  document.querySelector('.voir-photo-plaque-btn')?.addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = 'Chargement…';
+    await ensureFullRdvLoaded(r);
+    const zone = document.getElementById('plaque-photo-zone');
+    if(zone){
+      zone.innerHTML = r.plaque_photo
+        ? `<img src="${r.plaque_photo}" class="zoomable-photo" style="max-width:180px;border-radius:8px;border:1px solid var(--border);cursor:pointer;">`
+        : `<span style="color:var(--text-muted);font-size:0.85rem;">Aucune photo disponible</span>`;
+    }
+  });
+
+  document.querySelector('.voir-photo-absence-btn')?.addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = 'Chargement…';
+    await ensureFullRdvLoaded(r);
+    const zone = document.getElementById('absence-photo-zone');
+    if(zone){
+      zone.innerHTML = r.photo_absence
+        ? `<img src="${r.photo_absence}" style="max-width:220px;border-radius:8px;display:block;">`
+        : `<span style="color:var(--text-muted);font-size:0.85rem;">Aucune photo disponible</span>`;
+    }
+  });
 
   // État des boutons selon le statut actuel
   const cancelBtn = document.getElementById('agenda-detail-cancel-btn');
