@@ -627,7 +627,7 @@ let currentAgendaRdv = null;
 // Colonnes RDV sans les champs lourds (photos/signatures en base64) — utilisé pour
 // le chargement de la liste de l'agenda, beaucoup plus rapide. Les champs lourds sont
 // chargés à la demande (ensureFullRdvLoaded) uniquement à l'ouverture du détail d'un RDV.
-const LIGHT_RDV_COLUMNS = 'app_id,date,creneau,vu,nom,prenom,adresse,adresse2,cp,ville,tel,tel_interlocuteur,type_client,entreprise_nom,entreprise_siret,email,appareil,marque,modele,panne,appareils_supplementaires,note_technicien,type_rdv,distance_km,lat_rdv,lon_rdv,statut,is_sav,sav_parent_app_id,sav_raison,motif_annulation,email_confirmation_envoye,email_confirmation_erreur,date_absence,heure_absence,commentaire_absence,client_id,created_at';
+const LIGHT_RDV_COLUMNS = 'app_id,date,creneau,vu,nom,prenom,adresse,adresse2,cp,ville,tel,tel_interlocuteur,type_client,entreprise_nom,entreprise_siret,email,appareil,marque,modele,panne,appareils_supplementaires,note_technicien,type_rdv,distance_km,lat_rdv,lon_rdv,statut,is_sav,sav_parent_app_id,sav_raison,motif_annulation,email_confirmation_envoye,email_confirmation_erreur,date_absence,heure_absence,commentaire_absence,client_id,created_at,has_plaque_photo,has_photo_absence';
 
 async function ensureFullRdvLoaded(r){
   if(r._fullyLoaded) return;
@@ -3531,7 +3531,7 @@ async function showAgendaDetail(appId){
     })()],
     ['Preuve d\'absence', r.statut === 'absent' ? '__HTML__' + `
       <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.4rem;">${r.date_absence ? dateFrLong(r.date_absence) : ''}${r.heure_absence ? ' à ' + r.heure_absence : ''}${r.commentaire_absence ? '<br>' + escapeHtml(r.commentaire_absence) : ''}</div>
-      <div id="absence-photo-zone"><button type="button" class="btn btn-outline voir-photo-absence-btn" style="font-size:0.85rem;padding:0.4rem 0.8rem;">📷 Voir la photo</button></div>
+      <div id="absence-photo-zone">${r.has_photo_absence ? '<button type="button" class="btn btn-outline voir-photo-absence-btn" style="font-size:0.85rem;padding:0.4rem 0.8rem;">📷 Voir la photo</button>' : '<span style="color:var(--text-muted);font-size:0.85rem;">Aucune photo disponible</span>'}</div>
     ` : null],
     ['Date', dateFrLong(r.date)],
     ['Créneau', RDV_SLOT_LABELS[r.creneau] || r.creneau],
@@ -3570,7 +3570,7 @@ async function showAgendaDetail(appId){
     const displayValue = (isStatut || isHtml) ? (isHtml ? value.replace('__HTML__','') : value) : escapeHtml(String(value));
     html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">${escapeHtml(label)}</div><div>${displayValue}</div></div>`;
   });
-  if(!(r._fullyLoaded && !r.plaque_photo)){
+  if(r.has_plaque_photo){
     html += `<div style="margin-bottom:0.7rem;"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#778);">Photo de la plaque signalétique</div><div id="plaque-photo-zone" style="margin-top:0.4rem;"><button type="button" class="btn btn-outline voir-photo-plaque-btn" style="font-size:0.85rem;padding:0.4rem 0.8rem;">📷 Voir la photo</button></div></div>`;
   }
 
