@@ -6140,13 +6140,13 @@ function buildListItem(r){
   return item;
 }
 
-function renderSectionTitle(text, color, toggleArchive){
+function renderSectionTitle(text, color, toggleTargetId){
   const div = document.createElement('div');
-  div.style.cssText = `font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${color};padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;display:flex;justify-content:space-between;align-items:center;${toggleArchive?'cursor:pointer;':''}`;
-  div.innerHTML = `<span>${text}</span>${toggleArchive ? '<span style="font-size:0.75rem;font-weight:400;opacity:0.7;">Afficher ▾</span>' : ''}`;
-  if(toggleArchive){
+  div.style.cssText = `font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${color};padding:0.8rem 0 0.3rem;border-bottom:1px solid var(--border);margin-bottom:0.4rem;display:flex;justify-content:space-between;align-items:center;${toggleTargetId?'cursor:pointer;':''}`;
+  div.innerHTML = `<span>${text}</span>${toggleTargetId ? '<span style="font-size:0.75rem;font-weight:400;opacity:0.7;">Afficher ▾</span>' : ''}`;
+  if(toggleTargetId){
     div.addEventListener('click', () => {
-      const ac = document.getElementById('archive-container');
+      const ac = document.getElementById(toggleTargetId);
       if(!ac) return;
       const open = ac.style.display !== 'none';
       ac.style.display = open ? 'none' : 'block';
@@ -6210,17 +6210,34 @@ function renderList(){
     return { rapports, first, globalStatut, hasSAV };
   });
 
-  const dossiersEncours  = dossierItems.filter(d => d.globalStatut === 'encours' || d.globalStatut === 'sav');
-  const dossiersTermines = dossierItems.filter(d => d.globalStatut === 'terminé');
+  const dossiersEncoursTous  = dossierItems.filter(d => d.globalStatut === 'encours' || d.globalStatut === 'sav');
+  const dossiersTerminesTous = dossierItems.filter(d => d.globalStatut === 'terminé');
   const dossiersArchives = dossierItems.filter(d => d.globalStatut === 'archivé');
+
+  // Les dossiers impayés sont regroupés à part (peu importe qu'ils soient en cours ou terminés),
+  // pour ne pas les afficher deux fois et gagner de la place dans les sections normales.
+  const estImpaye = d => d.rapports.some(r => estEnRetardPaiement(r));
+  const dossiersImpayes  = dossierItems.filter(d => d.globalStatut !== 'archivé' && estImpaye(d));
+  const dossiersEncours  = dossiersEncoursTous.filter(d => !estImpaye(d));
+  const dossiersTermines = dossiersTerminesTous.filter(d => !estImpaye(d));
 
   dossiersEncours.sort((a,b) => (b.first.date||'').localeCompare(a.first.date||''));
   dossiersTermines.sort((a,b) => (b.first.date||'').localeCompare(a.first.date||''));
+  dossiersImpayes.sort((a,b) => (b.first.date||'').localeCompare(a.first.date||''));
   dossiersArchives.sort((a,b) => (b.first.date_archivage||b.first.date||'').localeCompare(a.first.date_archivage||a.first.date||''));
 
   if(drafts.length > 0){
     container.appendChild(renderSectionTitle('✏️ Brouillons (' + drafts.length + ')', '#f5a623'));
     drafts.forEach(r => container.appendChild(buildDossierItem([r])));
+  }
+  if(dossiersImpayes.length > 0){
+    const impayesTitle = renderSectionTitle(`⚠️ Impayés (${dossiersImpayes.length})`, '#e0584f', 'impayes-container');
+    container.appendChild(impayesTitle);
+    const impayesContainer = document.createElement('div');
+    impayesContainer.id = 'impayes-container';
+    impayesContainer.style.display = 'none';
+    container.appendChild(impayesContainer);
+    dossiersImpayes.forEach(d => impayesContainer.appendChild(buildDossierItem(d.rapports)));
   }
   if(dossiersEncours.length > 0){
     container.appendChild(renderSectionTitle('🔄 En cours (' + dossiersEncours.length + ')', '#1a73c8'));
@@ -6231,7 +6248,7 @@ function renderList(){
     dossiersTermines.forEach(d => container.appendChild(buildDossierItem(d.rapports)));
   }
   if(dossiersArchives.length > 0){
-    const archiveTitle = renderSectionTitle(`📦 Archivés (${dossiersArchives.length})`, '#888', true);
+    const archiveTitle = renderSectionTitle(`📦 Archivés (${dossiersArchives.length})`, '#888', 'archive-container');
     container.appendChild(archiveTitle);
     const archiveContainer = document.createElement('div');
     archiveContainer.id = 'archive-container';
