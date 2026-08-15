@@ -7007,7 +7007,7 @@ document.getElementById('detail-avis-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
   const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
   if(!tel){ showToast('Numéro manquant', true); return; }
-  const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+  const message = (_agendaConfigCache && _agendaConfigCache.messageAvis) || "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
   window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
 });
 
@@ -8045,6 +8045,7 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-alerte-avis-texte').value    = params.alerteFauxAvisTexte || '';
   document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
   document.getElementById('p-archivage-delai').value = params.archivageDelaiHeures ?? 48;
+  document.getElementById('p-message-avis').value = params.messageAvis ?? "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
   document.getElementById('p-numero-facture-override').value = params.numeroFactureOverride ?? '';
   document.getElementById('p-numero-devis-override').value = params.numeroDevisOverride ?? '';
   document.getElementById('p-rib-titulaire').value = params.ribTitulaire ?? '';
@@ -8158,6 +8159,7 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
     urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
     archivageDelaiHeures: parseFloat(document.getElementById('p-archivage-delai').value) || 48,
+    messageAvis: document.getElementById('p-message-avis').value.trim(),
     numeroFactureOverride: document.getElementById('p-numero-facture-override').value ? parseInt(document.getElementById('p-numero-facture-override').value) : null,
     numeroDevisOverride: document.getElementById('p-numero-devis-override').value ? parseInt(document.getElementById('p-numero-devis-override').value) : null,
     ribTitulaire: document.getElementById('p-rib-titulaire').value.trim(),
@@ -8213,6 +8215,7 @@ async function getAgendaParams(){
       alerteFauxAvisTexte:  data.alerte_faux_avis_texte  ?? '',
       urssafTaux: data.urssaf_taux ?? 20,
       archivageDelaiHeures: data.archivage_delai_heures ?? 48,
+      messageAvis: data.message_avis || null,
       numeroFactureOverride: data.numero_facture_override ?? null,
       numeroDevisOverride: data.numero_devis_override ?? null,
       ribTitulaire: data.rib_titulaire ?? '',
@@ -8267,6 +8270,7 @@ async function saveAgendaParams(params){
     alerte_faux_avis_texte:  params.alerteFauxAvisTexte  || null,
     urssaf_taux: params.urssafTaux ?? 20,
     archivage_delai_heures: params.archivageDelaiHeures ?? 48,
+    message_avis: params.messageAvis || null,
     numero_facture_override: params.numeroFactureOverride ?? null,
     numero_devis_override: params.numeroDevisOverride ?? null,
     rib_titulaire: params.ribTitulaire || null,
@@ -8654,7 +8658,7 @@ async function renderDossierAppareilContent(r){
   actionsDiv.querySelector('.doss-avis-btn')?.addEventListener('click', () => {
     const tel = (r.tel || '').replace(/[^\d+]/g, '');
     if(!tel){ showToast('Numéro manquant', true); return; }
-    const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+    const message = (_agendaConfigCache && _agendaConfigCache.messageAvis) || "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
     window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
   });
   el.querySelector('.doss-pose-btn')?.addEventListener('click', () => {
