@@ -1122,11 +1122,16 @@ async function geocodeVille(ville){
   const key = ville.trim().toLowerCase();
   if(villeCoordsCache[key] !== undefined) return villeCoordsCache[key];
   try{
-    const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(ville + ', France')}&type=StreetAddress&maximumResponses=1`);
+    const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(ville + ', France')}&type=StreetAddress&maximumResponses=1&terr=METROPOLE`);
     const data = await res.json();
     const point = data.results && data.results[0];
-    if(point && point.x && point.y){
-      villeCoordsCache[key] = { lat: point.y, lon: point.x };
+    const lat = point ? parseFloat(point.y) : null;
+    const lon = point ? parseFloat(point.x) : null;
+    // Filet de sécurité : rejeter tout résultat hors de la France métropolitaine
+    // (évite qu'une ville mal orthographiée ne pointe vers un DOM-TOM et déforme la carte)
+    const dansMetropole = lat != null && lon != null && lat >= 41 && lat <= 51.5 && lon >= -5.5 && lon <= 9.7;
+    if(dansMetropole){
+      villeCoordsCache[key] = { lat, lon };
     } else {
       villeCoordsCache[key] = null;
     }
