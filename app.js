@@ -5372,6 +5372,52 @@ document.getElementById('calc-modal-close').addEventListener('click', () => {
 // ---------- Commande de pièce(s) — lignes multiples ----------
 let commandePieceRows = [];
 
+// --- Tarifs de livraison réglables ---
+let tarifsLivraisonRows = [];
+
+function defaultTarifsLivraison(){
+  return [{ label: 'Standard', prix: 10 }, { label: '24h', prix: 12 }];
+}
+
+function renderTarifsLivraisonRows(){
+  const container = document.getElementById('p-livraison-rows');
+  if(!container) return;
+  container.innerHTML = tarifsLivraisonRows.map((t, i) => `
+    <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
+      <input type="text" class="tarif-livraison-label" data-i="${i}" placeholder="Ex : Express" value="${escapeHtml(t.label||'')}" style="flex:1;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);">
+      <input type="number" class="tarif-livraison-prix" data-i="${i}" step="0.01" min="0" placeholder="Prix €" value="${t.prix ?? ''}" style="width:90px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);">
+      <button type="button" class="tarif-livraison-del" data-i="${i}" style="background:none;border:none;color:#e0584f;cursor:pointer;font-size:1.1rem;">✕</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('.tarif-livraison-label').forEach(el => el.addEventListener('input', e => {
+    tarifsLivraisonRows[+e.target.dataset.i].label = e.target.value;
+  }));
+  container.querySelectorAll('.tarif-livraison-prix').forEach(el => el.addEventListener('input', e => {
+    tarifsLivraisonRows[+e.target.dataset.i].prix = parseFloat(e.target.value) || 0;
+  }));
+  container.querySelectorAll('.tarif-livraison-del').forEach(el => el.addEventListener('click', e => {
+    tarifsLivraisonRows.splice(+e.target.dataset.i, 1);
+    renderTarifsLivraisonRows();
+  }));
+}
+
+document.getElementById('p-livraison-add-btn')?.addEventListener('click', () => {
+  tarifsLivraisonRows.push({ label: '', prix: 0 });
+  renderTarifsLivraisonRows();
+});
+
+// Remplit le menu déroulant "Livraison" du formulaire de commande de pièce avec les tarifs réglés
+function populerSelectLivraison(){
+  const sel = document.getElementById('f-livraison');
+  if(!sel) return;
+  const valeurActuelle = sel.value;
+  const tarifs = (_agendaConfigCache && _agendaConfigCache.tarifsLivraison && _agendaConfigCache.tarifsLivraison.length)
+    ? _agendaConfigCache.tarifsLivraison
+    : defaultTarifsLivraison();
+  sel.innerHTML = tarifs.map((t, i) => `<option value="${i}">${escapeHtml(t.label||'Sans nom')} (${(t.prix||0).toFixed(2)}€)</option>`).join('');
+  if([...sel.options].some(o => o.value === valeurActuelle)) sel.value = valeurActuelle;
+}
+
 function newCommandePieceRow(prefill){
   return Object.assign({ id: 'cp' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', ref: '', prixFournisseur: '' }, prefill || {});
 }
@@ -5412,7 +5458,11 @@ document.getElementById('commande-piece-add-row-btn').addEventListener('click', 
 });
 
 function recalculerPrixPiece(){
-  const livraison = document.getElementById('f-livraison').value === '24h' ? 12 : 10;
+  const tarifs = (_agendaConfigCache && _agendaConfigCache.tarifsLivraison && _agendaConfigCache.tarifsLivraison.length)
+    ? _agendaConfigCache.tarifsLivraison
+    : defaultTarifsLivraison();
+  const idxLivraison = parseInt(document.getElementById('f-livraison').value, 10);
+  const livraison = tarifs[idxLivraison] ? (parseFloat(tarifs[idxLivraison].prix) || 0) : (tarifs[0] ? tarifs[0].prix : 10);
   const validRows = commandePieceRows.filter(r => r.nom.trim() || parseFloat(r.prixFournisseur) > 0);
 
   const totalFournisseur = validRows.reduce((s,r) => s + (parseFloat(r.prixFournisseur)||0), 0);
@@ -5790,7 +5840,8 @@ function resetForm(){
   document.getElementById('f-heure').value = new Date().toTimeString().slice(0,5);
   document.getElementById('f-technicien').value = 'Jonathan';
   document.getElementById('f-statut').value = 'Terminée';
-  document.getElementById('f-livraison').value = 'standard';
+  populerSelectLivraison();
+  document.getElementById('f-livraison').value = '0';
   document.getElementById('f-paiement-statut').value = 'Paye_total';
   document.getElementById('f-paiement-statut').disabled = false;
   document.getElementById('f-reste-encaisser').value = '0.00';
@@ -5822,6 +5873,7 @@ async function loadIntoForm(report){
   currentId = report.id;
   document.getElementById('ref-display').textContent = report.ref;
   applyTerminerStyle(document.getElementById('email-btn'), report);
+  populerSelectLivraison();
   fieldIds.forEach(id => {
     const key = id.replace('f-','');
     document.getElementById(id).value = report[key] !== undefined ? report[key] : '';
@@ -8054,6 +8106,8 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
   document.getElementById('p-archivage-delai').value = params.archivageDelaiHeures ?? 48;
   document.getElementById('p-message-avis').value = params.messageAvis ?? "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+  tarifsLivraisonRows = (params.tarifsLivraison && params.tarifsLivraison.length) ? params.tarifsLivraison.map(t => ({...t})) : defaultTarifsLivraison();
+  renderTarifsLivraisonRows();
   document.getElementById('p-numero-facture-override').value = params.numeroFactureOverride ?? '';
   document.getElementById('p-numero-devis-override').value = params.numeroDevisOverride ?? '';
   document.getElementById('p-rib-titulaire').value = params.ribTitulaire ?? '';
@@ -8168,6 +8222,7 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
     archivageDelaiHeures: parseFloat(document.getElementById('p-archivage-delai').value) || 48,
     messageAvis: document.getElementById('p-message-avis').value.trim(),
+    tarifsLivraison: tarifsLivraisonRows.filter(t => t.label.trim()),
     numeroFactureOverride: document.getElementById('p-numero-facture-override').value ? parseInt(document.getElementById('p-numero-facture-override').value) : null,
     numeroDevisOverride: document.getElementById('p-numero-devis-override').value ? parseInt(document.getElementById('p-numero-devis-override').value) : null,
     ribTitulaire: document.getElementById('p-rib-titulaire').value.trim(),
@@ -8224,6 +8279,7 @@ async function getAgendaParams(){
       urssafTaux: data.urssaf_taux ?? 20,
       archivageDelaiHeures: data.archivage_delai_heures ?? 48,
       messageAvis: data.message_avis || null,
+      tarifsLivraison: data.tarifs_livraison || null,
       numeroFactureOverride: data.numero_facture_override ?? null,
       numeroDevisOverride: data.numero_devis_override ?? null,
       ribTitulaire: data.rib_titulaire ?? '',
@@ -8279,6 +8335,7 @@ async function saveAgendaParams(params){
     urssaf_taux: params.urssafTaux ?? 20,
     archivage_delai_heures: params.archivageDelaiHeures ?? 48,
     message_avis: params.messageAvis || null,
+    tarifs_livraison: params.tarifsLivraison || null,
     numero_facture_override: params.numeroFactureOverride ?? null,
     numero_devis_override: params.numeroDevisOverride ?? null,
     rib_titulaire: params.ribTitulaire || null,

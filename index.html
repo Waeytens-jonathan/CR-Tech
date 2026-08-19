@@ -971,10 +971,7 @@
           <input type="hidden" id="f-pieces-commandees-json">
           <div class="field" style="margin-bottom:0.8rem;">
             <label>Livraison (pour l'ensemble de la commande)</label>
-            <select id="f-livraison">
-              <option value="standard">Standard (10€)</option>
-              <option value="24h">24h (12€)</option>
-            </select>
+            <select id="f-livraison"></select>
           </div>
           <label style="font-size:0.85rem;display:block;margin-bottom:0.4rem;">Pièce(s) à commander</label>
           <div id="commande-piece-rows" style="margin-bottom:0.6rem;"></div>
@@ -1298,6 +1295,16 @@
           <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Délai avant archivage automatique (heures)</label>
           <input type="number" id="p-archivage-delai" min="1" step="1" style="width:140px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
           <p style="font-size:0.75rem;color:var(--text-muted);margin:0.5rem 0 0;">Un dossier Terminé et intégralement payé est archivé automatiquement passé ce délai (48h par défaut). L'archivage se déclenche à l'ouverture de l'app.</p>
+        </div>
+      </div>
+
+      <!-- TARIFS LIVRAISON -->
+      <div class="settings-section" data-section="livraison">
+        <div class="settings-section-header"><h3>🚚 Tarifs de livraison des pièces</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-body">
+          <div id="p-livraison-rows" style="margin-bottom:0.6rem;"></div>
+          <button type="button" class="btn btn-outline" id="p-livraison-add-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;">+ Ajouter un tarif</button>
+          <p style="font-size:0.75rem;color:var(--text-muted);margin:0.6rem 0 0;">Ces options apparaissent dans le menu déroulant "Livraison" lors d'une commande de pièce.</p>
         </div>
       </div>
 
