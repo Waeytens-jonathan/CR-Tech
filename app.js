@@ -3810,7 +3810,7 @@ document.getElementById('agenda-detail-sms-avis').addEventListener('click', () =
   if(!currentAgendaRdv) return;
   const tel = (currentAgendaRdv.tel || '').replace(/[^\d+]/g, '');
   if(!tel){ showToast('Numéro manquant', true); return; }
-  const message = "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
+  const message = (_agendaConfigCache && _agendaConfigCache.messageAvis) || "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
   window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
 });
 
