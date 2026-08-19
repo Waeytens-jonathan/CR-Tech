@@ -2740,7 +2740,7 @@ document.getElementById('apercu-test-devis-btn').addEventListener('click', () =>
       return;
     }
     const lignes = lignesInit.map(l => ({
-      designation: l.description ? `${l.designation} — ${l.description}${l.garantie ? ' (Garantie : '+l.garantie+')' : ''}` : l.designation,
+      designation: l.description ? `${l.designation} — ${l.description}` : l.designation,
       quantite: l.quantite,
       prix_unitaire: l.prix_unitaire,
       total: l.total
@@ -2885,7 +2885,7 @@ document.getElementById('generer-devis-btn').addEventListener('click', () => {
   devisEditRows = lignesInit.length
     ? lignesInit.map(l => newDevisRow({
         designation: l.description
-          ? `${l.designation} — ${l.description}${l.garantie ? ' (Garantie : '+l.garantie+')' : ''}`
+          ? `${l.designation} — ${l.description}`
           : l.designation,
         quantite: l.quantite, prix_unitaire: l.prix_unitaire
       }))
