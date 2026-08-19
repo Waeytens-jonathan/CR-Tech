@@ -5880,6 +5880,14 @@ function collectFormData(){
   data.plaquePhoto = plaquePhoto;
   data.signature = signatureData || null;
   data.stockPieces = selectedStockPieces.slice();
+  // Reconstituer le tableau structuré des pièces commandées en mémoire dès maintenant
+  // (sinon il ne se recompose qu'après un rechargement depuis Supabase, et un devis/facture
+  // généré dans la foulée retombe sur le texte combiné en une seule ligne).
+  try{
+    data.piecesCommandees = data['pieces-commandees-json'] ? JSON.parse(data['pieces-commandees-json']) : [];
+  }catch(e){
+    data.piecesCommandees = [];
+  }
   return data;
 }
 
