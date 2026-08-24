@@ -5510,21 +5510,53 @@ function populerSelectLivraison(){
 }
 
 function newCommandePieceRow(prefill){
-  return Object.assign({ id: 'cp' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', ref: '', prixFournisseur: '' }, prefill || {});
+  return Object.assign({
+    id: 'cp' + Date.now() + Math.random().toString(36).slice(2,7),
+    nom: '', ref: '',
+    modePrix: 'reel',        // 'reco' = prix de vente conseillé, 'reel' = prix réellement payé (HT + TVA) — mode par défaut pour des stats fiables
+    prixFournisseur: '',    // utilisé en mode 'reco'
+    prixHt: '', tva: 20     // utilisés en mode 'reel'
+  }, prefill || {});
+}
+
+// Coût réel de la pièce pour cette ligne, peu importe le mode choisi
+function coutReelLigne(row){
+  if(row.modePrix === 'reel'){
+    const ht = parseFloat(row.prixHt) || 0;
+    const tva = parseFloat(row.tva);
+    return ht * (1 + (isNaN(tva) ? 20 : tva) / 100);
+  }
+  return parseFloat(row.prixFournisseur) || 0;
 }
 
 function renderCommandePieceRows(){
   const container = document.getElementById('commande-piece-rows');
   if(!container) return;
   container.innerHTML = commandePieceRows.map((row, i) => `
-    <div class="cp-row" data-row-id="${row.id}" style="display:flex;gap:0.5rem;margin-bottom:0.5rem;align-items:flex-start;">
+    <div class="cp-row" data-row-id="${row.id}" style="display:flex;gap:0.5rem;margin-bottom:0.9rem;align-items:flex-start;padding-bottom:0.6rem;border-bottom:1px solid var(--border);">
       <div style="flex:1;">
         <input type="text" class="cp-row-nom" placeholder="Désignation" value="${escapeHtml(row.nom)}"
           style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
         <input type="text" class="cp-row-ref" placeholder="Référence (optionnel)" value="${escapeHtml(row.ref||'')}"
-          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.4rem;">
-        <input type="number" class="cp-row-prix" placeholder="Prix d'achat fournisseur (€)" step="0.01" min="0" value="${row.prixFournisseur}"
-          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+          style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.5rem;">
+
+        <div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;">
+          <button type="button" class="cp-row-mode-btn" data-mode="reco" style="flex:1;padding:0.4rem;border-radius:8px;border:1px solid ${row.modePrix==='reco'?'var(--orange)':'var(--border)'};background:${row.modePrix==='reco'?'rgba(245,166,35,0.12)':'transparent'};color:${row.modePrix==='reco'?'var(--orange)':'var(--text-muted)'};font-size:0.78rem;cursor:pointer;">Prix conseillé</button>
+          <button type="button" class="cp-row-mode-btn" data-mode="reel" style="flex:1;padding:0.4rem;border-radius:8px;border:1px solid ${row.modePrix==='reel'?'var(--orange)':'var(--border)'};background:${row.modePrix==='reel'?'rgba(245,166,35,0.12)':'transparent'};color:${row.modePrix==='reel'?'var(--orange)':'var(--text-muted)'};font-size:0.78rem;cursor:pointer;">Prix réel payé</button>
+        </div>
+
+        ${row.modePrix === 'reel' ? `
+          <div style="display:flex;gap:0.4rem;margin-bottom:0.3rem;">
+            <input type="number" class="cp-row-prix-ht" placeholder="Prix HT (€)" step="0.01" min="0" value="${row.prixHt}"
+              style="flex:1;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+            <input type="number" class="cp-row-tva" placeholder="TVA %" step="0.1" min="0" value="${row.tva}"
+              style="width:80px;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+          </div>
+          <div style="font-size:0.8rem;color:var(--text-muted);">→ Prix réel payé (TTC) : <strong>${coutReelLigne(row).toFixed(2)} €</strong></div>
+        ` : `
+          <input type="number" class="cp-row-prix" placeholder="Prix de vente conseillé (€)" step="0.01" min="0" value="${row.prixFournisseur}"
+            style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+        `}
       </div>
       ${commandePieceRows.length > 1 ? `<button type="button" class="cp-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
     </div>`).join('');
@@ -5534,7 +5566,16 @@ function renderCommandePieceRows(){
     const row = commandePieceRows.find(r => r.id === id);
     rowEl.querySelector('.cp-row-nom').addEventListener('input', e => { row.nom = e.target.value; recalculerPrixPiece(); });
     rowEl.querySelector('.cp-row-ref').addEventListener('input', e => { row.ref = e.target.value; recalculerPrixPiece(); });
-    rowEl.querySelector('.cp-row-prix').addEventListener('input', e => { row.prixFournisseur = e.target.value; recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-prix')?.addEventListener('input', e => { row.prixFournisseur = e.target.value; recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-prix-ht')?.addEventListener('input', e => { row.prixHt = e.target.value; renderCommandePieceRows(); recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-tva')?.addEventListener('input', e => { row.tva = e.target.value; renderCommandePieceRows(); recalculerPrixPiece(); });
+    rowEl.querySelectorAll('.cp-row-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        row.modePrix = btn.dataset.mode;
+        renderCommandePieceRows();
+        recalculerPrixPiece();
+      });
+    });
     rowEl.querySelector('.cp-row-remove')?.addEventListener('click', () => {
       commandePieceRows = commandePieceRows.filter(r => r.id !== id);
       renderCommandePieceRows();
@@ -5554,11 +5595,11 @@ function recalculerPrixPiece(){
     : defaultTarifsLivraison();
   const idxLivraison = parseInt(document.getElementById('f-livraison').value, 10);
   const livraison = tarifs[idxLivraison] ? (parseFloat(tarifs[idxLivraison].prix) || 0) : (tarifs[0] ? tarifs[0].prix : 10);
-  const validRows = commandePieceRows.filter(r => r.nom.trim() || parseFloat(r.prixFournisseur) > 0);
+  const validRows = commandePieceRows.filter(r => r.nom.trim() || coutReelLigne(r) > 0);
 
-  const totalFournisseur = validRows.reduce((s,r) => s + (parseFloat(r.prixFournisseur)||0), 0);
+  const totalFournisseur = validRows.reduce((s,r) => s + coutReelLigne(r), 0);
   const totalFacture = validRows.reduce((s,r) => {
-    const pf = parseFloat(r.prixFournisseur) || 0;
+    const pf = coutReelLigne(r);
     return s + (pf > 0 ? calculerPrixVente(pf, 0) : 0);
   }, 0) + (totalFournisseur > 0 ? livraison : 0);
 
@@ -5570,7 +5611,7 @@ function recalculerPrixPiece(){
     .filter(Boolean).join(', ');
   document.getElementById('f-pieces-commandees-json').value = JSON.stringify(
     validRows.filter(r => r.nom.trim()).map(r => {
-      const pf = parseFloat(r.prixFournisseur) || 0;
+      const pf = coutReelLigne(r);
       return { nom: cleanNom(r.nom), ref: cleanRef(r.ref), prixVente: pf > 0 ? calculerPrixVente(pf, 0) : 0 };
     })
   );
@@ -5980,7 +6021,7 @@ async function loadIntoForm(report){
   document.getElementById('commande-piece-fields').style.display = report['commande-piece'] ? 'block' : 'none';
   // Rétrocompatibilité : anciens CR n'ont qu'une désignation/prix agrégés, pas de lignes détaillées
   if(report['piece-desc'] || report['prix-fournisseur']){
-    commandePieceRows = [newCommandePieceRow({ nom: report['piece-desc'] || '', prixFournisseur: report['prix-fournisseur'] || '' })];
+    commandePieceRows = [newCommandePieceRow({ nom: report['piece-desc'] || '', prixFournisseur: report['prix-fournisseur'] || '', modePrix: 'reco' })];
   } else {
     commandePieceRows = [];
   }
