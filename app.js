@@ -6827,18 +6827,25 @@ function renderDetailContent(r, container){
   }
 
   html += '<div class="detail-section"><h3>Facturation</h3>';
+
+  html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:0.6rem 0.9rem;margin-bottom:0.8rem;">';
   html += dRow('Main d\'œuvre', r['cout-mo'] ? parseFloat(r['cout-mo']).toFixed(2) + ' €' : '—');
   html += dRow('Pièces facturées', r['cout-pieces'] ? parseFloat(r['cout-pieces']).toFixed(2) + ' €' : '—');
   html += dRow('Déplacement', r['cout-deplacement'] ? parseFloat(r['cout-deplacement']).toFixed(2) + ' €' : '—');
-  html += dRow('Total', `<strong>${r['cout-total'] ? parseFloat(r['cout-total']).toFixed(2) + ' €' : '—'}</strong>`, false);
+  html += `<div class="detail-row" style="border-top:1px solid var(--border);border-bottom:none;padding-top:0.5rem;margin-top:0.2rem;"><span class="dlabel" style="font-weight:600;">Total</span><span class="dvalue" style="font-size:1.1rem;font-weight:700;">${r['cout-total'] ? parseFloat(r['cout-total']).toFixed(2) + ' €' : '—'}</span></div>`;
+  html += '</div>';
+
+  html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:0.6rem 0.9rem;">';
   html += dRow('Statut paiement', escapeHtml(PAIEMENT_LABELS[r['paiement-statut']] || r['paiement-statut'] || ''));
   if(r['paiement-statut'] === 'Acompte'){
     html += dRow('Montant acompte', r['acompte-montant'] ? parseFloat(r['acompte-montant']).toFixed(2) + ' €' : '—');
   }
   html += dRow('Moyen de paiement', escapeHtml(r['paiement-moyen']));
   const reste = parseFloat(r['reste-encaisser']) || 0;
-  html += dRow('Reste à encaisser', `<strong style="color:${reste > 0 ? 'var(--orange)' : 'inherit'}">${reste.toFixed(2)} €</strong>`);
-  html += dRow('Facture créée', r['facture-creee'] ? 'Oui' : 'Non');
+  html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Reste à encaisser</span><span class="dvalue" style="font-weight:700;color:${reste > 0 ? 'var(--orange)' : 'var(--green,#3fbf6f)'};">${reste.toFixed(2)} €</span></div>`;
+  html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Facture créée</span><span class="dvalue" style="font-weight:600;color:${r['facture-creee'] ? 'var(--green,#3fbf6f)' : 'var(--orange)'};">${r['facture-creee'] ? 'Oui' : 'Non'}</span></div>`;
+  html += '</div>';
+
   html += '</div>';
 
   html += '<div class="detail-section"><h3>Notes</h3>';
