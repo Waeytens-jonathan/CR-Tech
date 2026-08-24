@@ -5351,7 +5351,7 @@ function renderCalcRows(){
           style="width:80px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
         ${calcRows.length > 1 ? `<button type="button" class="cc-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
       </div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.6rem;">→ Coût réel (TTC) : <strong>${coutReelCalcRow(row).toFixed(2)} €</strong></div>
+      <div class="cc-row-cout-reel-preview" style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.6rem;">→ Coût réel (TTC) : <strong>${coutReelCalcRow(row).toFixed(2)} €</strong></div>
 
       <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem;">Prix conseillé <span style="opacity:0.7;">(facultatif)</span></label>
       <input type="number" class="cc-row-conseille" placeholder="Prix conseillé (€)" min="0" step="0.01" value="${row.prixConseille}"
@@ -5367,8 +5367,16 @@ function renderCalcRows(){
   container.querySelectorAll('.cc-row').forEach(rowEl => {
     const id = rowEl.dataset.rowId;
     const row = calcRows.find(r => r.id === id);
-    rowEl.querySelector('.cc-row-prix-ht').addEventListener('input', e => { row.prixHt = e.target.value; renderCalcRows(); recalcQuickCalc(); });
-    rowEl.querySelector('.cc-row-tva').addEventListener('input', e => { row.tva = e.target.value; renderCalcRows(); recalcQuickCalc(); });
+    rowEl.querySelector('.cc-row-prix-ht').addEventListener('input', e => {
+      row.prixHt = e.target.value;
+      rowEl.querySelector('.cc-row-cout-reel-preview').innerHTML = `→ Coût réel (TTC) : <strong>${coutReelCalcRow(row).toFixed(2)} €</strong>`;
+      recalcQuickCalc();
+    });
+    rowEl.querySelector('.cc-row-tva').addEventListener('input', e => {
+      row.tva = e.target.value;
+      rowEl.querySelector('.cc-row-cout-reel-preview').innerHTML = `→ Coût réel (TTC) : <strong>${coutReelCalcRow(row).toFixed(2)} €</strong>`;
+      recalcQuickCalc();
+    });
     rowEl.querySelector('.cc-row-conseille').addEventListener('input', e => { row.prixConseille = e.target.value; recalcQuickCalc(); });
     rowEl.querySelectorAll('.cc-row-base-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -5603,7 +5611,7 @@ function renderCommandePieceRows(){
           <input type="number" class="cp-row-tva" placeholder="TVA %" step="0.1" min="0" value="${row.tva}"
             style="width:80px;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
         </div>
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.7rem;">→ Coût réel (TTC) : <strong>${coutReelLigne(row).toFixed(2)} €</strong></div>
+        <div class="cp-row-cout-reel-preview" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.7rem;">→ Coût réel (TTC) : <strong>${coutReelLigne(row).toFixed(2)} €</strong></div>
 
         <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Prix de vente conseillé <span style="opacity:0.7;">(facultatif)</span></label>
         <input type="number" class="cp-row-conseille" placeholder="Prix conseillé (€)" step="0.01" min="0" value="${row.prixConseille}"
@@ -5614,7 +5622,7 @@ function renderCommandePieceRows(){
           <button type="button" class="cp-row-base-btn" data-base="ttc" style="flex:1;padding:0.4rem;border-radius:8px;border:1px solid ${row.baseMarge==='ttc'?'var(--orange)':'var(--border)'};background:${row.baseMarge==='ttc'?'rgba(245,166,35,0.12)':'transparent'};color:${row.baseMarge==='ttc'?'var(--orange)':'var(--text-muted)'};font-size:0.78rem;cursor:pointer;">Coût réel (TTC)</button>
           <button type="button" class="cp-row-base-btn" data-base="conseille" style="flex:1;padding:0.4rem;border-radius:8px;border:1px solid ${row.baseMarge==='conseille'?'var(--orange)':'var(--border)'};background:${row.baseMarge==='conseille'?'rgba(245,166,35,0.12)':'transparent'};color:${row.baseMarge==='conseille'?'var(--orange)':'var(--text-muted)'};font-size:0.78rem;cursor:pointer;">Prix conseillé</button>
         </div>
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;">→ Prix facturé au client : <strong>${(baseMargeLigne(row) > 0 ? calculerPrixVente(baseMargeLigne(row), 0) : 0).toFixed(2)} €</strong></div>
+        <div class="cp-row-facture-preview" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;">→ Prix facturé au client : <strong>${(baseMargeLigne(row) > 0 ? calculerPrixVente(baseMargeLigne(row), 0) : 0).toFixed(2)} €</strong></div>
       </div>
       ${commandePieceRows.length > 1 ? `<button type="button" class="cp-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
     </div>`).join('');
@@ -5624,9 +5632,13 @@ function renderCommandePieceRows(){
     const row = commandePieceRows.find(r => r.id === id);
     rowEl.querySelector('.cp-row-nom').addEventListener('input', e => { row.nom = e.target.value; recalculerPrixPiece(); });
     rowEl.querySelector('.cp-row-ref').addEventListener('input', e => { row.ref = e.target.value; recalculerPrixPiece(); });
-    rowEl.querySelector('.cp-row-prix-ht').addEventListener('input', e => { row.prixHt = e.target.value; renderCommandePieceRows(); recalculerPrixPiece(); });
-    rowEl.querySelector('.cp-row-tva').addEventListener('input', e => { row.tva = e.target.value; renderCommandePieceRows(); recalculerPrixPiece(); });
-    rowEl.querySelector('.cp-row-conseille').addEventListener('input', e => { row.prixConseille = e.target.value; renderCommandePieceRows(); recalculerPrixPiece(); });
+    function majApercusLigne(){
+      rowEl.querySelector('.cp-row-cout-reel-preview').innerHTML = `→ Coût réel (TTC) : <strong>${coutReelLigne(row).toFixed(2)} €</strong>`;
+      rowEl.querySelector('.cp-row-facture-preview').innerHTML = `→ Prix facturé au client : <strong>${(baseMargeLigne(row) > 0 ? calculerPrixVente(baseMargeLigne(row), 0) : 0).toFixed(2)} €</strong>`;
+    }
+    rowEl.querySelector('.cp-row-prix-ht').addEventListener('input', e => { row.prixHt = e.target.value; majApercusLigne(); recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-tva').addEventListener('input', e => { row.tva = e.target.value; majApercusLigne(); recalculerPrixPiece(); });
+    rowEl.querySelector('.cp-row-conseille').addEventListener('input', e => { row.prixConseille = e.target.value; majApercusLigne(); recalculerPrixPiece(); });
     rowEl.querySelectorAll('.cp-row-base-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         row.baseMarge = btn.dataset.base;
