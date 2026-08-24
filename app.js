@@ -2551,23 +2551,26 @@ async function getOuGenererFacture(r){
 
 // Envoie le compte-rendu ET la facture au client, en parallèle pour aller plus vite.
 // Génère la facture si elle n'existe pas encore. Ne fait rien tant que le dossier n'est pas terminé.
-async function terminerEtEnvoyer(r){
+// Prépare tout ce qui est nécessaire à l'envoi (PDF + facture) — purement local/rapide,
+// séparé de l'envoi réseau lui-même pour permettre la reprise sans tout regénérer.
+async function preparerEnvoi(r){
   if(!['Terminée','Non_reparable'].includes(r.statut)){
-    showToast('Le dossier doit être marqué "Terminée" avant de pouvoir envoyer', true);
-    return false;
+    throw new Error('Le dossier doit être marqué "Terminée" avant de pouvoir envoyer');
   }
   const emailCible = await getEmailAJour(r);
-  if(!emailCible){ showToast('Email du client manquant', true); return false; }
+  if(!emailCible) throw new Error('Email du client manquant');
 
-  // Génération du PDF du CR et récupération/génération de la facture en parallèle
-  // (les deux sont indépendants l'un de l'autre, pas besoin d'attendre l'un pour commencer l'autre)
   const [pdfBytes, facture] = await Promise.all([
     generatePdfFor(r, 'email'),
     getOuGenererFacture(r)
   ]);
   const pdfBase64Cr = arrayBufferToBase64(pdfBytes);
+  return { emailCible, pdfBase64Cr, facture };
+}
 
-  // Envoi des deux emails en parallèle plutôt que l'un après l'autre
+// L'envoi réseau proprement dit — seule partie qui peut échouer sur un réseau faible,
+// et donc la seule qu'on relance en cas de reprise (pas besoin de régénérer le PDF).
+async function envoyerEmailsPrepares(r, { emailCible, pdfBase64Cr, facture }){
   const envois = [
     sb.functions.invoke('send-compte-rendu', {
       body: {
@@ -2581,15 +2584,103 @@ async function terminerEtEnvoyer(r){
       body: { email: emailCible, nom: r.nom, prenom: r.prenom, numero: facture.numero, montant: facture.montant_total, pdf_base64: facture.pdf_base64 }
     }));
   }
-
   const resultats = await Promise.all(envois);
   for(const { error } of resultats){
     if(error) throw error;
   }
-  // Marque automatiquement "Facture créée / envoyée" — la case à cocher manuelle
-  // dans Suivi du dossier reste disponible pour les cas particuliers (ex : sans facture générée ici).
+}
+
+async function finaliserEnvoiReussi(r){
+  r.documents_envoyes = true;
   r['facture-creee'] = true;
-  return true;
+  const idx = reports.findIndex(rep => rep.id === r.id);
+  if(idx !== -1){ reports[idx].documents_envoyes = true; reports[idx]['facture-creee'] = true; }
+  await saveReportToSupabase(r);
+  // Rafraîchir les boutons concernés, s'ils sont visibles à l'écran à ce moment-là
+  if(currentDetailReport && currentDetailReport.id === r.id){
+    updateTerminerButton(r);
+    applyTerminerStyle(document.getElementById('detail-email-btn'), r);
+  }
+  if(currentId === r.id){
+    applyTerminerStyle(document.getElementById('email-btn'), r);
+  }
+  renderList();
+}
+
+// --- Envoi en arrière-plan avec reprise automatique en cas d'échec ---
+window._envoisEnCours = {};
+
+function renderEnvoiBanner(){
+  const banner = document.getElementById('envoi-banner');
+  const liste = document.getElementById('envoi-banner-liste');
+  if(!banner || !liste) return;
+  const entries = Object.entries(window._envoisEnCours);
+  if(!entries.length){ banner.style.display = 'none'; return; }
+  banner.style.display = 'block';
+  liste.innerHTML = entries.map(([id, e]) => {
+    if(e.statut === 'echec'){
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.3rem 0;">
+        <span style="font-size:0.85rem;color:#e0584f;">⚠️ ${escapeHtml(e.ref||'')} — échec d'envoi</span>
+        <button class="btn btn-outline retry-envoi-btn" data-id="${id}" style="font-size:0.78rem;padding:0.3rem 0.6rem;border-color:#e0584f;color:#e0584f;">Réessayer</button>
+      </div>`;
+    }
+    return `<div style="font-size:0.85rem;color:var(--blue,#1a73c8);padding:0.3rem 0;">📤 ${escapeHtml(e.ref||'')} — ${e.statut === 'preparation' ? 'préparation…' : 'envoi en cours…'}</div>`;
+  }).join('');
+  liste.querySelectorAll('.retry-envoi-btn').forEach(btn => {
+    btn.addEventListener('click', () => reessayerEnvoi(btn.dataset.id));
+  });
+}
+
+async function lancerEnvoiEnArrierePlan(r){
+  window._envoisEnCours[r.id] = { ref: r.ref, statut: 'preparation', r };
+  renderEnvoiBanner();
+  try{
+    const prep = await preparerEnvoi(r);
+    window._envoisEnCours[r.id] = { ref: r.ref, statut: 'envoi', r, ...prep };
+    renderEnvoiBanner();
+    await envoyerEmailsPrepares(r, prep);
+    delete window._envoisEnCours[r.id];
+    renderEnvoiBanner();
+    await finaliserEnvoiReussi(r);
+    showToast(`✓ Compte-rendu et facture envoyés (${r.ref})`);
+  }catch(e){
+    console.error('Erreur envoi en arrière-plan :', e);
+    const entree = window._envoisEnCours[r.id] || { ref: r.ref, r };
+    entree.statut = 'echec';
+    entree.erreur = e.message || 'Erreur inconnue';
+    window._envoisEnCours[r.id] = entree;
+    renderEnvoiBanner();
+    showToast(`⚠️ Échec de l'envoi (${r.ref}) — réessaie depuis le bandeau en bas`, true);
+  }
+}
+
+async function reessayerEnvoi(reportId){
+  const entree = window._envoisEnCours[reportId];
+  if(!entree) return;
+  const r = entree.r;
+
+  if(entree.pdfBase64Cr){
+    // Le PDF et la facture sont déjà prêts : on relance uniquement l'envoi réseau
+    entree.statut = 'envoi';
+    renderEnvoiBanner();
+    try{
+      await envoyerEmailsPrepares(r, entree);
+      delete window._envoisEnCours[reportId];
+      renderEnvoiBanner();
+      await finaliserEnvoiReussi(r);
+      showToast(`✓ Compte-rendu et facture envoyés (${r.ref})`);
+    }catch(e){
+      console.error('Erreur reprise envoi :', e);
+      entree.statut = 'echec';
+      entree.erreur = e.message || 'Erreur inconnue';
+      renderEnvoiBanner();
+      showToast(`⚠️ Toujours en échec pour ${r.ref}`, true);
+    }
+  } else {
+    // Rien n'avait pu être préparé (ex : pas d'email) → on repart de zéro
+    delete window._envoisEnCours[reportId];
+    lancerEnvoiEnArrierePlan(r);
+  }
 }
 
 document.getElementById('generer-facture-btn').addEventListener('click', async () => {
@@ -6141,26 +6232,12 @@ document.getElementById('email-btn').addEventListener('click', async () => {
   btn.textContent = 'Enregistrement…';
 
   const data = await saveCurrentReport();
-  if(!data){ btn.disabled = false; btn.textContent = '✅ Terminer et envoyer (CR + facture)'; return; }
-
-  btn.textContent = 'Envoi en cours…';
-
-  try{
-    const ok = await terminerEtEnvoyer(data);
-    if(ok){
-      showToast('Compte-rendu et facture enregistrés et envoyés au client ✓');
-      data.documents_envoyes = true;
-      const idx = reports.findIndex(rep => rep.id === data.id);
-      if(idx !== -1){ reports[idx].documents_envoyes = true; reports[idx]['facture-creee'] = true; }
-      await saveReportToSupabase(data);
-      applyTerminerStyle(btn, data);
-    }
-  }catch(e){
-    console.error('Erreur envoi compte-rendu/facture :', e);
-    showToast('Enregistré, mais échec de l\'envoi : ' + (e.message || 'voir console'), true);
-  }
   btn.disabled = false;
   btn.textContent = '✅ Terminer et envoyer (CR + facture)';
+  if(!data) return;
+
+  showToast('Enregistré — envoi du compte-rendu et de la facture en arrière-plan');
+  lancerEnvoiEnArrierePlan(data);
   avancerAppareilSuivantOuTerminer();
 });
 
@@ -7073,28 +7150,8 @@ document.getElementById('detail-avis-btn').addEventListener('click', () => {
 
 async function envoyerCrEtFacture(r, btn){
   if(!confirm('Confirmer l\'envoi du compte-rendu et de la facture au client ?')) return;
-
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Envoi…';
-
-  try{
-    const ok = await terminerEtEnvoyer(r);
-    if(ok){
-      showToast('Compte-rendu et facture envoyés au client ✓');
-      r.documents_envoyes = true;
-      const idx = reports.findIndex(rep => rep.id === r.id);
-      if(idx !== -1){ reports[idx].documents_envoyes = true; reports[idx]['facture-creee'] = true; }
-      await saveReportToSupabase(r);
-      updateTerminerButton(r);
-      applyTerminerStyle(btn, r);
-    }
-  }catch(e){
-    console.error('Erreur envoi compte-rendu/facture :', e);
-    showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true);
-  }
-  btn.disabled = false;
-  btn.textContent = originalText;
+  showToast('Envoi lancé en arrière-plan — tu peux continuer à utiliser l\'app');
+  lancerEnvoiEnArrierePlan(r);
 }
 
 document.getElementById('detail-email-btn').addEventListener('click', async () => {
