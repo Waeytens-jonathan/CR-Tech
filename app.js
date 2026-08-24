@@ -5318,7 +5318,9 @@ const BAREME_MARGE = [
 function calculerPrixVente(prixFournisseur, fraisLivraison){
   const palier = BAREME_MARGE.find(p => prixFournisseur >= p.min && prixFournisseur < p.max) || BAREME_MARGE[BAREME_MARGE.length - 1];
   const prixAvecMarge = prixFournisseur * (1 + palier.taux);
-  return Math.round((prixAvecMarge + (fraisLivraison || 0)) * 100) / 100;
+  // Arrondi à l'euro le plus proche pour le prix facturé au client (pas de centimes) :
+  // < 0,50 → arrondi en dessous, ≥ 0,50 → arrondi au-dessus
+  return Math.round(prixAvecMarge + (fraisLivraison || 0));
 }
 
 // ---------- Calculatrice rapide (indépendante des comptes-rendus) ----------
@@ -5329,13 +5331,13 @@ function newCalcRow(){
 }
 
 function coutReelCalcRow(row){
-  const ht = parseFloat(row.prixHt) || 0;
-  const tva = parseFloat(row.tva);
+  const ht = parseNumFr(row.prixHt) || 0;
+  const tva = parseNumFr(row.tva);
   return ht * (1 + (isNaN(tva) ? 20 : tva) / 100);
 }
 
 function baseMargeCalcRow(row){
-  return row.baseMarge === 'conseille' ? (parseFloat(row.prixConseille) || 0) : coutReelCalcRow(row);
+  return row.baseMarge === 'conseille' ? (parseNumFr(row.prixConseille) || 0) : coutReelCalcRow(row);
 }
 
 function renderCalcRows(){
@@ -5345,16 +5347,16 @@ function renderCalcRows(){
     <div class="cc-row" data-row-id="${row.id}" style="margin-bottom:0.9rem;padding-bottom:0.6rem;border-bottom:1px solid var(--border);">
       <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem;">Prix réellement payé</label>
       <div style="display:flex;gap:0.4rem;margin-bottom:0.3rem;">
-        <input type="number" class="cc-row-prix-ht" placeholder="Prix HT (€)" min="0" step="0.01" value="${row.prixHt}"
+        <input type="text" inputmode="decimal" class="cc-row-prix-ht" placeholder="Prix HT (€)" value="${row.prixHt}"
           style="flex:1;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-        <input type="number" class="cc-row-tva" placeholder="TVA %" min="0" step="0.1" value="${row.tva}"
+        <input type="text" inputmode="decimal" class="cc-row-tva" placeholder="TVA %" value="${row.tva}"
           style="width:80px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
         ${calcRows.length > 1 ? `<button type="button" class="cc-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
       </div>
       <div class="cc-row-cout-reel-preview" style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.6rem;">→ Coût réel (TTC) : <strong>${coutReelCalcRow(row).toFixed(2)} €</strong></div>
 
       <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem;">Prix conseillé <span style="opacity:0.7;">(facultatif)</span></label>
-      <input type="number" class="cc-row-conseille" placeholder="Prix conseillé (€)" min="0" step="0.01" value="${row.prixConseille}"
+      <input type="text" inputmode="decimal" class="cc-row-conseille" placeholder="Prix conseillé (€)" value="${row.prixConseille}"
         style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:0.5rem;">
 
       <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem;">Ma marge s'applique sur :</label>
@@ -5582,15 +5584,21 @@ function newCommandePieceRow(prefill){
 }
 
 // Coût réel de la pièce (TTC, sans marge) — toujours basé sur HT+TVA, utilisé pour le CA/stats
+// Accepte la virgule comme séparateur décimal (usage français), en plus du point
+function parseNumFr(str){
+  if(str === null || str === undefined) return NaN;
+  return parseFloat(String(str).replace(',', '.'));
+}
+
 function coutReelLigne(row){
-  const ht = parseFloat(row.prixHt) || 0;
-  const tva = parseFloat(row.tva);
+  const ht = parseNumFr(row.prixHt) || 0;
+  const tva = parseNumFr(row.tva);
   return ht * (1 + (isNaN(tva) ? 20 : tva) / 100);
 }
 
 // Base sur laquelle la marge est appliquée pour obtenir le prix facturé au client
 function baseMargeLigne(row){
-  return row.baseMarge === 'conseille' ? (parseFloat(row.prixConseille) || 0) : coutReelLigne(row);
+  return row.baseMarge === 'conseille' ? (parseNumFr(row.prixConseille) || 0) : coutReelLigne(row);
 }
 
 function renderCommandePieceRows(){
@@ -5606,15 +5614,15 @@ function renderCommandePieceRows(){
 
         <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Prix réellement payé</label>
         <div style="display:flex;gap:0.4rem;margin-bottom:0.3rem;">
-          <input type="number" class="cp-row-prix-ht" placeholder="Prix HT (€)" step="0.01" min="0" value="${row.prixHt}"
+          <input type="text" inputmode="decimal" class="cp-row-prix-ht" placeholder="Prix HT (€)" value="${row.prixHt}"
             style="flex:1;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
-          <input type="number" class="cp-row-tva" placeholder="TVA %" step="0.1" min="0" value="${row.tva}"
+          <input type="text" inputmode="decimal" class="cp-row-tva" placeholder="TVA %" value="${row.tva}"
             style="width:80px;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
         </div>
         <div class="cp-row-cout-reel-preview" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.7rem;">→ Coût réel (TTC) : <strong>${coutReelLigne(row).toFixed(2)} €</strong></div>
 
         <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Prix de vente conseillé <span style="opacity:0.7;">(facultatif)</span></label>
-        <input type="number" class="cp-row-conseille" placeholder="Prix conseillé (€)" step="0.01" min="0" value="${row.prixConseille}"
+        <input type="text" inputmode="decimal" class="cp-row-conseille" placeholder="Prix conseillé (€)" value="${row.prixConseille}"
           style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:0.6rem;">
 
         <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Ma marge s'applique sur :</label>
