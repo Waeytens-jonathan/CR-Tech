@@ -1237,18 +1237,226 @@ async function loadStockPieces(){
   }
 }
 
+let stockAtelier = [];
+
+async function loadStockAtelier(){
+  try{
+    const { data, error } = await sb.from('stock_atelier').select('*').order('nom', { ascending: true });
+    if(error) throw error;
+    return data || [];
+  }catch(e){
+    console.error('Erreur chargement stock atelier :', e);
+    showToast('Connexion au cloud impossible (stock atelier)', true);
+    return [];
+  }
+}
+
+const STOCK_ATELIER_TYPE_LABELS = {
+  achetee: { label: 'Achetée', couleur: '#1a73c8' },
+  reemploi: { label: 'Réemploi', couleur: '#8a5cf6' },
+  consommable: { label: 'Consommable', couleur: '#888' },
+  composant: { label: 'Composant', couleur: '#f5a623' }
+};
+
+function renderStockAtelierList(){
+  const container = document.getElementById('stock-atelier-list');
+  const emptyEl = document.getElementById('stock-atelier-empty-msg');
+  const q = (document.getElementById('stock-atelier-search').value || '').trim().toLowerCase();
+
+  const filtres = stockAtelier.filter(p => {
+    if(!q) return true;
+    return (p.nom||'').toLowerCase().includes(q) || (p.precision||'').toLowerCase().includes(q);
+  });
+
+  if(!stockAtelier.length){
+    container.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  if(!filtres.length){
+    container.innerHTML = '<div class="empty">Aucun résultat pour cette recherche.</div>';
+    return;
+  }
+
+  container.innerHTML = filtres.map(p => {
+    const typeInfo = STOCK_ATELIER_TYPE_LABELS[p.type] || STOCK_ATELIER_TYPE_LABELS.achetee;
+    const enAlerte = (p.quantite ?? 0) <= (p.seuil_alerte ?? 0);
+    return `
+      <div class="list-item" style="cursor:pointer;${enAlerte ? 'border-color:#e05252;' : ''}" data-app-id="${escapeHtml(p.app_id)}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+          <div style="min-width:0;flex:1;">
+            <strong>${escapeHtml(p.nom||'')}</strong>${p.precision ? ' <span style="color:var(--text-muted);font-size:0.85rem;">— ' + escapeHtml(p.precision) + '</span>' : ''}
+            <div style="margin-top:0.3rem;">
+              <span class="badge" style="background:${typeInfo.couleur}22;color:${typeInfo.couleur};border:1px solid ${typeInfo.couleur};font-size:0.7rem;">${typeInfo.label}</span>
+              ${enAlerte ? '<span class="badge" style="background:rgba(224,82,82,0.2);color:#e05252;border:1px solid #e05252;font-size:0.7rem;margin-left:4px;">⚠️ Stock faible</span>' : ''}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;" class="stock-atelier-qte-controls" data-app-id="${escapeHtml(p.app_id)}">
+            <button type="button" class="sa-qte-btn" data-delta="-1" data-app-id="${escapeHtml(p.app_id)}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1.1rem;cursor:pointer;">−</button>
+            <span style="min-width:24px;text-align:center;font-weight:700;${enAlerte?'color:#e05252;':''}">${p.quantite ?? 0}</span>
+            <button type="button" class="sa-qte-btn" data-delta="1" data-app-id="${escapeHtml(p.app_id)}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1.1rem;cursor:pointer;">+</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.list-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if(e.target.closest('.stock-atelier-qte-controls')) return;
+      openStockAtelierEdit(el.dataset.appId);
+    });
+  });
+  container.querySelectorAll('.sa-qte-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const appId = btn.dataset.appId;
+      const delta = parseInt(btn.dataset.delta, 10);
+      await ajusterQuantiteAtelier(appId, delta);
+    });
+  });
+}
+
+async function ajusterQuantiteAtelier(appId, delta){
+  const item = stockAtelier.find(p => p.app_id === appId);
+  if(!item) return;
+  const nouvelleQte = Math.max(0, (item.quantite ?? 0) + delta);
+  item.quantite = nouvelleQte;
+  renderStockAtelierList();
+  try{
+    const { error } = await sb.from('stock_atelier').update({ quantite: nouvelleQte }).eq('app_id', appId);
+    if(error) throw error;
+  }catch(e){
+    console.error('Erreur mise à jour quantité atelier :', e);
+    showToast('Échec de la mise à jour', true);
+  }
+}
+
+document.getElementById('stock-atelier-search').addEventListener('input', renderStockAtelierList);
+
+// --- Édition d'une pièce du stock atelier ---
+let editingStockAtelierAppId = null;
+
+document.getElementById('sae-type').addEventListener('change', (e) => {
+  const estComposant = e.target.value === 'composant';
+  document.getElementById('sae-composant-fields').style.display = estComposant ? 'block' : 'none';
+});
+
+function openStockAtelierEdit(appId){
+  editingStockAtelierAppId = appId;
+  const item = appId ? stockAtelier.find(p => p.app_id === appId) : null;
+
+  document.getElementById('stock-atelier-edit-title').textContent = item ? 'Modifier la pièce' : 'Ajouter une pièce';
+  document.getElementById('sae-nom').value = item ? (item.nom || '') : '';
+  document.getElementById('sae-type').value = item ? (item.type || 'achetee') : 'achetee';
+  document.getElementById('sae-quantite').value = item ? (item.quantite ?? 1) : 1;
+  document.getElementById('sae-seuil').value = item ? (item.seuil_alerte ?? 2) : 2;
+
+  const estComposant = document.getElementById('sae-type').value === 'composant';
+  document.getElementById('sae-composant-fields').style.display = estComposant ? 'block' : 'none';
+  if(estComposant && item){
+    // La précision d'un composant est stockée au format "valeur / tension"
+    const [valeur, tension] = (item.precision || '').split(' / ');
+    document.getElementById('sae-valeur').value = valeur || '';
+    document.getElementById('sae-tension').value = tension || '';
+    document.getElementById('sae-precision').value = '';
+  } else {
+    document.getElementById('sae-precision').value = item ? (item.precision || '') : '';
+    document.getElementById('sae-valeur').value = '';
+    document.getElementById('sae-tension').value = '';
+  }
+
+  document.getElementById('stock-atelier-delete-btn').style.display = item ? 'block' : 'none';
+
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-stock-atelier-edit').classList.add('active');
+}
+
+document.getElementById('stock-atelier-new-btn').addEventListener('click', () => openStockAtelierEdit(null));
+
+document.getElementById('stock-atelier-edit-back').addEventListener('click', () => {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-stock-atelier').classList.add('active');
+});
+
+document.getElementById('stock-atelier-save-btn').addEventListener('click', async () => {
+  const nom = document.getElementById('sae-nom').value.trim();
+  if(!nom){ showToast('Merci de renseigner un nom', true); return; }
+
+  const type = document.getElementById('sae-type').value;
+  const precision = type === 'composant'
+    ? [document.getElementById('sae-valeur').value.trim(), document.getElementById('sae-tension').value.trim()].filter(Boolean).join(' / ')
+    : document.getElementById('sae-precision').value.trim();
+
+  const row = {
+    nom,
+    precision: precision || null,
+    type,
+    quantite: parseInt(document.getElementById('sae-quantite').value, 10) || 0,
+    seuil_alerte: parseInt(document.getElementById('sae-seuil').value, 10) || 0
+  };
+
+  const btn = document.getElementById('stock-atelier-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enregistrement…';
+
+  try{
+    if(editingStockAtelierAppId){
+      const { error } = await sb.from('stock_atelier').update(row).eq('app_id', editingStockAtelierAppId);
+      if(error) throw error;
+    } else {
+      row.app_id = 'sta_' + Date.now();
+      const { error } = await sb.from('stock_atelier').insert(row);
+      if(error) throw error;
+    }
+    showToast('Enregistré ✓');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-stock-atelier').classList.add('active');
+    stockAtelier = await loadStockAtelier();
+    renderStockAtelierList();
+  }catch(e){
+    console.error('Erreur enregistrement stock atelier :', e);
+    showToast('Échec de l\'enregistrement', true);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Enregistrer';
+});
+
+document.getElementById('stock-atelier-delete-btn').addEventListener('click', async () => {
+  if(!editingStockAtelierAppId) return;
+  if(!confirm('Supprimer définitivement cette pièce du stock atelier ?')) return;
+  try{
+    const { error } = await sb.from('stock_atelier').delete().eq('app_id', editingStockAtelierAppId);
+    if(error) throw error;
+    showToast('Pièce supprimée');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-stock-atelier').classList.add('active');
+    stockAtelier = await loadStockAtelier();
+    renderStockAtelierList();
+  }catch(e){
+    console.error('Erreur suppression stock atelier :', e);
+    showToast('Échec de la suppression', true);
+  }
+});
+
 async function renderStock(){
   document.getElementById('stock-embarque-list').innerHTML = '<div class="empty">Chargement…</div>';
   document.getElementById('stock-pieces-list').innerHTML = '<div class="empty">Chargement…</div>';
+  document.getElementById('stock-atelier-list').innerHTML = '<div class="empty">Chargement…</div>';
 
   stockEmbarque = await loadStockEmbarque();
   stockPieces = await loadStockPieces();
+  stockAtelier = await loadStockAtelier();
 
   renderStockEmbarqueList();
   renderStockPiecesList();
+  renderStockAtelierList();
 
   document.getElementById('stock-menu-embarque-count').textContent = stockEmbarque.length + ' pièce' + (stockEmbarque.length > 1 ? 's' : '');
   document.getElementById('stock-menu-pieces-count').textContent = stockPieces.length + ' pièce' + (stockPieces.length > 1 ? 's' : '');
+  const nbAlerte = stockAtelier.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
+  document.getElementById('stock-menu-atelier-count').textContent = stockAtelier.length + ' pièce' + (stockAtelier.length > 1 ? 's' : '') + (nbAlerte ? ` · ⚠️ ${nbAlerte}` : '');
 }
 
 function goToStockSubview(viewId){
@@ -1259,6 +1467,8 @@ function goToStockSubview(viewId){
 
 document.getElementById('stock-menu-embarque-btn').addEventListener('click', () => goToStockSubview('view-stock-embarque'));
 document.getElementById('stock-menu-pieces-btn').addEventListener('click', () => goToStockSubview('view-stock-pieces'));
+document.getElementById('stock-menu-atelier-btn').addEventListener('click', () => goToStockSubview('view-stock-atelier'));
+document.getElementById('stock-atelier-back').addEventListener('click', backToStockMenu);
 
 function backToStockMenu(){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));

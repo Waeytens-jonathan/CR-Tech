@@ -482,6 +482,10 @@
           <span>📥 Pièces commandées</span>
           <span id="stock-menu-pieces-count" style="color:var(--text-muted);font-size:0.85rem;"></span>
         </button>
+        <button class="btn btn-outline" id="stock-menu-atelier-btn" style="width:100%;padding:1.1rem;font-size:1rem;display:flex;justify-content:space-between;align-items:center;">
+          <span>🏭 Stock atelier</span>
+          <span id="stock-menu-atelier-count" style="color:var(--text-muted);font-size:0.85rem;"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -507,6 +511,69 @@
       <h2 style="margin:0 0 0.9rem;">📥 Stock pièces (commandées)</h2>
       <div id="stock-pieces-list"></div>
       <div class="empty" id="stock-pieces-empty-msg" style="display:none;">Aucune pièce en stock pour le moment.</div>
+    </div>
+  </div>
+
+  <div class="view" id="view-stock-atelier">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
+        <button class="btn btn-outline" id="stock-atelier-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
+        <button class="btn btn-primary" id="stock-atelier-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Ajouter</button>
+      </div>
+      <h2 style="margin:0 0 0.9rem;">🏭 Stock atelier</h2>
+      <input type="text" id="stock-atelier-search" placeholder="🔍 Rechercher une pièce (nom ou précision)…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:1rem;font-size:0.9rem;">
+      <div id="stock-atelier-list"></div>
+      <div class="empty" id="stock-atelier-empty-msg" style="display:none;">Aucune pièce dans le stock atelier pour le moment.</div>
+    </div>
+  </div>
+
+  <div class="view" id="view-stock-atelier-edit">
+    <div class="card">
+      <button class="btn btn-outline" id="stock-atelier-edit-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;margin-bottom:0.9rem;">← Retour</button>
+      <h2 id="stock-atelier-edit-title" style="margin:0 0 1rem;">Ajouter une pièce</h2>
+
+      <div class="field" style="margin-bottom:0.8rem;">
+        <label>Nom</label>
+        <input type="text" id="sae-nom" placeholder="ex : Joystick, Courroie, Filtre à eau…">
+      </div>
+      <div class="field" style="margin-bottom:0.8rem;">
+        <label>Précision / compatibilité <span style="font-weight:400;color:var(--text-muted);">(facultatif)</span></label>
+        <input type="text" id="sae-precision" placeholder="ex : PS5, Bosch WAT28440FF, Ø32mm…">
+      </div>
+      <div class="field" style="margin-bottom:0.8rem;">
+        <label>Type</label>
+        <select id="sae-type">
+          <option value="achetee">Pièce achetée en avance</option>
+          <option value="reemploi">Pièce de réemploi</option>
+          <option value="consommable">Consommable</option>
+          <option value="composant">Composant électronique</option>
+        </select>
+      </div>
+      <div id="sae-composant-fields" style="display:none;">
+        <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">
+          <div class="field">
+            <label>Valeur</label>
+            <input type="text" id="sae-valeur" placeholder="ex : 100µF, 220Ω, 10kΩ…">
+          </div>
+          <div class="field">
+            <label>Tension</label>
+            <input type="text" id="sae-tension" placeholder="ex : 25V, 400V…">
+          </div>
+        </div>
+      </div>
+      <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1.2rem;">
+        <div class="field">
+          <label>Quantité</label>
+          <input type="number" id="sae-quantite" min="0" step="1" value="1">
+        </div>
+        <div class="field">
+          <label>Seuil d'alerte</label>
+          <input type="number" id="sae-seuil" min="0" step="1" value="2">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="stock-atelier-save-btn" style="width:100%;margin-bottom:0.6rem;">Enregistrer</button>
+      <button class="btn btn-outline" id="stock-atelier-delete-btn" style="width:100%;color:var(--red,#e05252);display:none;">🗑️ Supprimer cette pièce</button>
     </div>
   </div>
 
