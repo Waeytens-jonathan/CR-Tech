@@ -6985,7 +6985,7 @@ function renderDetailContent(r, container){
     html += '</div>';
   }
   html += dRow('Téléphone', r.tel ? `<a href="tel:${escapeHtml(r.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(r.tel)}</a> <a href="tel:${escapeHtml(r.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(r.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a>` : '');
-  html += dRow('Email', escapeHtml(r.email));
+  html += `<div class="detail-row"><span class="dlabel">Email</span><span class="dvalue" id="detail-email-value">${escapeHtml(r.email)}</span></div>`;
   html += dRow('Technicien', escapeHtml(r.technicien));
   html += '</div>';
 
@@ -7273,6 +7273,17 @@ async function showDetail(r){
   updateDevisButtons(r);
   updateTerminerButton(r);
   window.scrollTo({top:0, behavior:'smooth'});
+
+  // Si l'email affiché diffère de celui, à jour, de la fiche client liée, on le corrige à l'écran
+  // (sans bloquer l'ouverture du CR — se met à jour dès que la réponse arrive)
+  if(r.client_id){
+    getEmailAJour(r).then(emailAJour => {
+      if(emailAJour && emailAJour !== r.email && currentDetailReport === r){
+        const el = document.getElementById('detail-email-value');
+        if(el) el.textContent = emailAJour;
+      }
+    });
+  }
 }
 
 function updateTerminerButton(r){
