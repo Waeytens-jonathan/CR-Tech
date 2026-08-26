@@ -537,17 +537,25 @@
         <input type="text" id="sae-nom" placeholder="ex : Joystick, Courroie, Filtre à eau…">
       </div>
       <div class="field" style="margin-bottom:0.8rem;">
-        <label>Précision / compatibilité <span style="font-weight:400;color:var(--text-muted);">(facultatif)</span></label>
-        <input type="text" id="sae-precision" placeholder="ex : PS5, Bosch WAT28440FF, Ø32mm…">
-      </div>
-      <div class="field" style="margin-bottom:0.8rem;">
-        <label>Type</label>
-        <select id="sae-type">
-          <option value="achetee">Pièce achetée en avance</option>
-          <option value="reemploi">Pièce de réemploi</option>
-          <option value="consommable">Consommable</option>
+        <label>Catégorie</label>
+        <select id="sae-categorie">
+          <option value="piece">Pièce</option>
           <option value="composant">Composant électronique</option>
         </select>
+      </div>
+      <div id="sae-piece-fields">
+        <div class="field" style="margin-bottom:0.8rem;">
+          <label>Type de pièce</label>
+          <select id="sae-type">
+            <option value="achetee">Pièce achetée en avance</option>
+            <option value="reemploi">Pièce de réemploi</option>
+            <option value="consommable">Consommable</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0.8rem;">
+          <label>Précision / compatibilité <span style="font-weight:400;color:var(--text-muted);">(facultatif)</span></label>
+          <input type="text" id="sae-precision" placeholder="ex : PS5, Bosch WAT28440FF, Ø32mm…">
+        </div>
       </div>
       <div id="sae-composant-fields" style="display:none;">
         <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">

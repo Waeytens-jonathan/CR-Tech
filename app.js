@@ -1338,8 +1338,9 @@ document.getElementById('stock-atelier-search').addEventListener('input', render
 // --- Édition d'une pièce du stock atelier ---
 let editingStockAtelierAppId = null;
 
-document.getElementById('sae-type').addEventListener('change', (e) => {
+document.getElementById('sae-categorie').addEventListener('change', (e) => {
   const estComposant = e.target.value === 'composant';
+  document.getElementById('sae-piece-fields').style.display = estComposant ? 'none' : 'block';
   document.getElementById('sae-composant-fields').style.display = estComposant ? 'block' : 'none';
 });
 
@@ -1349,19 +1350,23 @@ function openStockAtelierEdit(appId){
 
   document.getElementById('stock-atelier-edit-title').textContent = item ? 'Modifier la pièce' : 'Ajouter une pièce';
   document.getElementById('sae-nom').value = item ? (item.nom || '') : '';
-  document.getElementById('sae-type').value = item ? (item.type || 'achetee') : 'achetee';
   document.getElementById('sae-quantite').value = item ? (item.quantite ?? 1) : 1;
   document.getElementById('sae-seuil').value = item ? (item.seuil_alerte ?? 2) : 2;
 
-  const estComposant = document.getElementById('sae-type').value === 'composant';
+  const estComposant = item ? item.type === 'composant' : false;
+  document.getElementById('sae-categorie').value = estComposant ? 'composant' : 'piece';
+  document.getElementById('sae-piece-fields').style.display = estComposant ? 'none' : 'block';
   document.getElementById('sae-composant-fields').style.display = estComposant ? 'block' : 'none';
-  if(estComposant && item){
+
+  if(estComposant){
     // La précision d'un composant est stockée au format "valeur / tension"
     const [valeur, tension] = (item.precision || '').split(' / ');
     document.getElementById('sae-valeur').value = valeur || '';
     document.getElementById('sae-tension').value = tension || '';
+    document.getElementById('sae-type').value = 'achetee';
     document.getElementById('sae-precision').value = '';
   } else {
+    document.getElementById('sae-type').value = item ? (item.type || 'achetee') : 'achetee';
     document.getElementById('sae-precision').value = item ? (item.precision || '') : '';
     document.getElementById('sae-valeur').value = '';
     document.getElementById('sae-tension').value = '';
@@ -1384,8 +1389,9 @@ document.getElementById('stock-atelier-save-btn').addEventListener('click', asyn
   const nom = document.getElementById('sae-nom').value.trim();
   if(!nom){ showToast('Merci de renseigner un nom', true); return; }
 
-  const type = document.getElementById('sae-type').value;
-  const precision = type === 'composant'
+  const estComposant = document.getElementById('sae-categorie').value === 'composant';
+  const type = estComposant ? 'composant' : document.getElementById('sae-type').value;
+  const precision = estComposant
     ? [document.getElementById('sae-valeur').value.trim(), document.getElementById('sae-tension').value.trim()].filter(Boolean).join(' / ')
     : document.getElementById('sae-precision').value.trim();
 
