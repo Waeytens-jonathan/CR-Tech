@@ -3628,9 +3628,12 @@ async function showAgendaDetail(appId){
   const rows = [
     ['Statut', statutLabel],
     ['Confirmation email', (() => {
-      if(r.email_confirmation_envoye === true) return '__HTML__<span style="color:var(--green,#3fbf6f);">✅ Envoyée avec succès</span>';
-      if(r.email_confirmation_envoye === false) return '__HTML__<span style="color:var(--red,#e0584f);">⚠️ Échec de l\'envoi' + (r.email_confirmation_erreur ? ' — ' + escapeHtml(r.email_confirmation_erreur) : '') + '</span>';
-      return null;
+      const statutHtml = r.email_confirmation_envoye === true
+        ? '<span style="color:var(--green,#3fbf6f);">✅ Envoyée avec succès</span>'
+        : r.email_confirmation_envoye === false
+          ? '<span style="color:var(--red,#e0584f);">⚠️ Échec de l\'envoi' + (r.email_confirmation_erreur ? ' — ' + escapeHtml(r.email_confirmation_erreur) : '') + '</span>'
+          : '<span style="color:var(--text-muted);">Non envoyée</span>';
+      return '__HTML__' + statutHtml + '<br><button type="button" id="renvoyer-confirmation-btn" class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-top:0.4rem;">🔁 Renvoyer la confirmation</button>';
     })()],
     ['Preuve d\'absence', r.statut === 'absent' ? '__HTML__' + `
       <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.4rem;">${r.date_absence ? dateFrLong(r.date_absence) : ''}${r.heure_absence ? ' à ' + r.heure_absence : ''}${r.commentaire_absence ? '<br>' + escapeHtml(r.commentaire_absence) : ''}</div>
@@ -3688,6 +3691,38 @@ async function showAgendaDetail(appId){
   }
 
   document.getElementById('agenda-detail-content').innerHTML = html;
+
+  document.getElementById('renvoyer-confirmation-btn')?.addEventListener('click', async (e) => {
+    const btn = e.target;
+    if(!r.email){
+      showToast('Aucun email renseigné pour ce client — corrige-le avant de renvoyer', true);
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Envoi…';
+    try{
+      const { error } = await sb.functions.invoke('send-rdv-confirmation', {
+        body: {
+          app_id: r.app_id,
+          nom: r.nom, prenom: r.prenom, email: r.email, tel: r.tel,
+          date: r.date, creneau: r.creneau,
+          adresse: r.adresse, cp: r.cp, ville: r.ville,
+          appareil: r.appareil, panne: r.panne
+        }
+      });
+      if(error) throw error;
+      r.email_confirmation_envoye = true;
+      r.email_confirmation_erreur = null;
+      showToast('Confirmation renvoyée ✓');
+      showAgendaDetail(r.app_id);
+    }catch(err){
+      console.error('Erreur renvoi confirmation :', err);
+      r.email_confirmation_envoye = false;
+      r.email_confirmation_erreur = err.message || 'Erreur inconnue';
+      showToast('Échec de l\'envoi — voir le détail sous "Confirmation email"', true);
+      showAgendaDetail(r.app_id);
+    }
+  });
 
   document.querySelector('.voir-photo-plaque-btn')?.addEventListener('click', async (e) => {
     const btn = e.target;
