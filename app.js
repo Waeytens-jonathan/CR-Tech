@@ -9820,7 +9820,7 @@ async function renderClientDevisList(c){
         </div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.6rem;">
           <button class="btn btn-outline client-devis-voir-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📄 Voir le PDF</button>
-          <button class="btn btn-outline client-devis-envoyer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📧 Envoyer</button>
+          <button class="btn btn-outline client-devis-envoyer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;${d.statut==='envoye'?'color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);':''}">${d.statut==='envoye'?'✅ Envoyé':'📧 Envoyer'}</button>
           ${d.statut_client === 'accepte' ? (
             d.facture_app_id
               ? `<span class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);">✅ Déjà transformé en facture</span>`
@@ -9839,7 +9839,18 @@ async function renderClientDevisList(c){
     container.querySelectorAll('.client-devis-envoyer-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const d = liste.find(x => x.app_id === btn.dataset.appId);
-        if(d) await envoyerDevisClient(d, c);
+        if(!d) return;
+        btn.disabled = true;
+        btn.textContent = 'Envoi…';
+        const ok = await envoyerDevisClient(d, c);
+        btn.disabled = false;
+        if(ok){
+          btn.textContent = '✅ Envoyé';
+          btn.style.color = 'var(--green,#3fbf6f)';
+          btn.style.borderColor = 'var(--green,#3fbf6f)';
+        } else {
+          btn.textContent = '📧 Envoyer';
+        }
       });
     });
     container.querySelectorAll('.client-devis-transformer-btn').forEach(btn => {
@@ -9863,7 +9874,7 @@ function telechargerPdfBase64(base64, filename){
 }
 
 async function envoyerDevisClient(d, c){
-  if(!c.email){ showToast('Email du client manquant — complétez sa fiche', true); return; }
+  if(!c.email){ showToast('Email du client manquant — complétez sa fiche', true); return false; }
   showToast('Envoi en cours…');
   try{
     const { error } = await sb.functions.invoke('send-devis', {
@@ -9879,10 +9890,13 @@ async function envoyerDevisClient(d, c){
     });
     if(error) throw error;
     await sb.from('devis').update({ statut: 'envoye' }).eq('app_id', d.app_id);
+    d.statut = 'envoye';
     showToast('Devis envoyé au client par email ✓');
+    return true;
   }catch(e){
     console.error('Erreur envoi devis client :', e);
     showToast('Échec de l\'envoi du devis', true);
+    return false;
   }
 }
 
