@@ -1446,23 +1446,35 @@ document.getElementById('stock-atelier-delete-btn').addEventListener('click', as
   }
 });
 
+function isMobileViewport(){
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
 async function renderStock(){
   document.getElementById('stock-embarque-list').innerHTML = '<div class="empty">Chargement…</div>';
   document.getElementById('stock-pieces-list').innerHTML = '<div class="empty">Chargement…</div>';
-  document.getElementById('stock-atelier-list').innerHTML = '<div class="empty">Chargement…</div>';
 
   stockEmbarque = await loadStockEmbarque();
   stockPieces = await loadStockPieces();
-  stockAtelier = await loadStockAtelier();
 
   renderStockEmbarqueList();
   renderStockPiecesList();
-  renderStockAtelierList();
 
   document.getElementById('stock-menu-embarque-count').textContent = stockEmbarque.length + ' pièce' + (stockEmbarque.length > 1 ? 's' : '');
   document.getElementById('stock-menu-pieces-count').textContent = stockPieces.length + ' pièce' + (stockPieces.length > 1 ? 's' : '');
-  const nbAlerte = stockAtelier.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
-  document.getElementById('stock-menu-atelier-count').textContent = stockAtelier.length + ' pièce' + (stockAtelier.length > 1 ? 's' : '') + (nbAlerte ? ` · ⚠️ ${nbAlerte}` : '');
+
+  // Stock atelier : réservé à l'écran large, on ne charge même pas les données sur mobile
+  const atelierBtn = document.getElementById('stock-menu-atelier-btn');
+  if(isMobileViewport()){
+    atelierBtn.style.display = 'none';
+  } else {
+    atelierBtn.style.display = 'flex';
+    document.getElementById('stock-atelier-list').innerHTML = '<div class="empty">Chargement…</div>';
+    stockAtelier = await loadStockAtelier();
+    renderStockAtelierList();
+    const nbAlerte = stockAtelier.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
+    document.getElementById('stock-menu-atelier-count').textContent = stockAtelier.length + ' pièce' + (stockAtelier.length > 1 ? 's' : '') + (nbAlerte ? ` · ⚠️ ${nbAlerte}` : '');
+  }
 }
 
 function goToStockSubview(viewId){
