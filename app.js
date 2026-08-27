@@ -3148,6 +3148,7 @@ function updateFactureButtons(r){
 
 // ==================== ÉDITEUR DE DEVIS ====================
 let devisEditRows = [];
+let devisModalClientContext = null; // objet client si on crée un devis depuis sa fiche, sinon null (mode CR)
 
 function newDevisRow(prefill){
   return Object.assign({ id: 'dv' + Date.now() + Math.random().toString(36).slice(2,7), designation: '', quantite: 1, prix_unitaire: 0 }, prefill || {});
@@ -3200,6 +3201,7 @@ document.getElementById('devis-modal-close').addEventListener('click', () => {
 
 document.getElementById('generer-devis-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
+  devisModalClientContext = null;
   const lignesInit = buildFactureLignes(currentDetailReport);
   devisEditRows = lignesInit.length
     ? lignesInit.map(l => newDevisRow({
@@ -3212,6 +3214,13 @@ document.getElementById('generer-devis-btn').addEventListener('click', () => {
   renderDevisRows();
   document.getElementById('devis-modal').style.display = 'flex';
 });
+
+function ouvrirDevisPourClient(c){
+  devisModalClientContext = c;
+  devisEditRows = [newDevisRow()];
+  renderDevisRows();
+  document.getElementById('devis-modal').style.display = 'flex';
+}
 
 function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
   const { jsPDF } = window.jspdf;
@@ -3311,8 +3320,9 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
 }
 
 document.getElementById('devis-generer-final-btn').addEventListener('click', async () => {
-  if(!currentDetailReport) return;
-  const r = currentDetailReport;
+  const modeClient = !!devisModalClientContext;
+  if(!modeClient && !currentDetailReport) return;
+  const r = modeClient ? devisModalClientContext : currentDetailReport;
   const validRows = devisEditRows.filter(row => row.designation.trim());
   if(!validRows.length){ showToast('Ajoutez au moins une ligne au devis', true); return; }
 
@@ -3324,25 +3334,32 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
     const lignes = validRows.map(row => ({ designation: row.designation.trim(), quantite: row.quantite, prix_unitaire: row.prix_unitaire, total: row.quantite * row.prix_unitaire }));
     const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
     const dateEmission = todayISO();
-    const existant = devisLight.find(d => d.rapport_app_id === r.id);
+    // Un devis "client" (formation, etc.) est toujours un nouveau devis — pas de régénération
+    // sur un numéro existant, contrairement au devis lié à un CR
+    const existant = modeClient ? null : devisLight.find(d => d.rapport_app_id === r.id);
 
     let numero, annee, sequence, devisAppId;
     if(existant){
-      // Régénération : on garde le même numéro, on remplace juste le contenu
       numero = existant.numero; annee = existant.annee; sequence = existant.sequence; devisAppId = existant.app_id;
     } else {
       ({ annee, sequence, numero } = await getNextDevisNumero());
       devisAppId = 'devis_' + Date.now();
     }
 
-    const doc = generateDevisPdf(r, numero, lignes, montantTotal, dateEmission);
+    // Pour le mode client, on adapte les clés attendues par generateDevisPdf
+    const donneesPourPdf = modeClient
+      ? { nom: r.nom, prenom: r.prenom, adresse: r.adresse, cp: r.cp, ville: r.ville, 'type-client': r.type_client, 'entreprise-nom': r.entreprise_nom, 'entreprise-siret': r.entreprise_siret }
+      : r;
+
+    const doc = generateDevisPdf(donneesPourPdf, numero, lignes, montantTotal, dateEmission);
     const pdfBase64 = doc.output('datauristring').split(',')[1];
 
     const devisRow = {
       app_id: devisAppId,
       numero, annee, sequence,
       date_emission: dateEmission,
-      rapport_app_id: r.id,
+      rapport_app_id: modeClient ? null : r.id,
+      client_id: modeClient ? r.app_id : (r.client_id || null),
       client_nom: r.nom || '',
       client_prenom: r.prenom || '',
       client_adresse: r.adresse || '',
@@ -3365,12 +3382,16 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
     } else {
       const { error } = await sb.from('devis').insert(devisRow);
       if(error) throw error;
-      devisLight.push({ app_id: devisAppId, numero, rapport_app_id: r.id, annee, sequence });
+      if(!modeClient) devisLight.push({ app_id: devisAppId, numero, rapport_app_id: r.id, annee, sequence });
       showToast(`Devis ${numero} généré et enregistré ✓`);
     }
 
     document.getElementById('devis-modal').style.display = 'none';
-    updateDevisButtons(r);
+    if(modeClient){
+      await renderClientDevisList(r);
+    } else {
+      updateDevisButtons(r);
+    }
   }catch(e){
     console.error('Erreur génération devis :', e);
     showToast('Erreur lors de la génération du devis', true);
@@ -9642,6 +9663,14 @@ async function showClientDetail(appId){
       ${c.email  ? `<div class="detail-row"><span>Email</span><span><a href="mailto:${escapeHtml(c.email)}" style="color:var(--blue);">${escapeHtml(c.email)}</a></span></div>` : ''}
       ${c.adresse? `<div class="detail-row"><span>Adresse</span><span>${escapeHtml(c.adresse)}, ${escapeHtml(c.cp||'')} ${escapeHtml(c.ville||'')}</span></div>` : ''}
       ${c.note   ? `<div class="detail-row"><span>Note</span><span>${escapeHtml(c.note)}</span></div>` : ''}
+    </div>
+
+    <div class="detail-section" style="margin-top:1.2rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+        <h3 style="margin:0;">📝 Devis</h3>
+        <button class="btn btn-primary" id="client-nouveau-devis-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;">+ Créer un devis</button>
+      </div>
+      <div id="client-devis-list"></div>
     </div>`;
 
   content.querySelectorAll('.client-couleur-btn').forEach(btn => {
@@ -9714,6 +9743,144 @@ async function showClientDetail(appId){
 
   document.getElementById('client-detail-edit-btn').onclick = () => openClientForm(appId);
   document.getElementById('client-detail-delete-btn').onclick = () => deleteClient(appId);
+
+  document.getElementById('client-nouveau-devis-btn').onclick = () => ouvrirDevisPourClient(c);
+  await renderClientDevisList(c);
+}
+
+const DEVIS_STATUT_INFO = {
+  en_attente: { label: '⏳ En attente', couleur: '#f5a623' },
+  accepte:    { label: '✅ Accepté', couleur: '#3fbf6f' },
+  refuse:     { label: '❌ Refusé', couleur: '#e05252' }
+};
+
+async function renderClientDevisList(c){
+  const container = document.getElementById('client-devis-list');
+  container.innerHTML = '<div class="empty">Chargement…</div>';
+  try{
+    const { data, error } = await sb.from('devis').select('*').eq('client_id', c.app_id).order('created_at', { ascending: false });
+    if(error) throw error;
+    const liste = data || [];
+    if(!liste.length){
+      container.innerHTML = '<div class="empty">Aucun devis pour ce client.</div>';
+      return;
+    }
+    container.innerHTML = liste.map(d => {
+      const info = DEVIS_STATUT_INFO[d.statut_client] || DEVIS_STATUT_INFO.en_attente;
+      return `
+      <div class="list-item" style="margin-bottom:0.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+          <div>
+            <strong>Devis ${escapeHtml(d.numero||'')}</strong>
+            <div style="font-size:0.82rem;color:var(--text-muted);">${d.montant_total ? parseFloat(d.montant_total).toFixed(2)+' €' : ''} · ${d.date_emission ? dateFrLong(d.date_emission) : ''}</div>
+            ${d.statut_client === 'refuse' && d.motif_refus ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">Motif : ${escapeHtml(d.motif_refus)}</div>` : ''}
+          </div>
+          <span class="badge" style="background:${info.couleur}22;color:${info.couleur};border:1px solid ${info.couleur};font-size:0.75rem;white-space:nowrap;">${info.label}</span>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.6rem;">
+          <button class="btn btn-outline client-devis-voir-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📄 Voir le PDF</button>
+          <button class="btn btn-outline client-devis-envoyer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📧 Envoyer</button>
+          ${d.statut_client === 'accepte' ? (
+            d.facture_app_id
+              ? `<span class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);">✅ Déjà transformé en facture</span>`
+              : `<button class="btn btn-primary client-devis-transformer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">🧾 Transformer en facture</button>`
+          ) : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    container.querySelectorAll('.client-devis-voir-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const d = liste.find(x => x.app_id === btn.dataset.appId);
+        if(d) telechargerPdfBase64(d.pdf_base64, `devis-${d.numero}.pdf`);
+      });
+    });
+    container.querySelectorAll('.client-devis-envoyer-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const d = liste.find(x => x.app_id === btn.dataset.appId);
+        if(d) await envoyerDevisClient(d, c);
+      });
+    });
+    container.querySelectorAll('.client-devis-transformer-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const d = liste.find(x => x.app_id === btn.dataset.appId);
+        if(d) await transformerDevisEnFacture(d, c);
+      });
+    });
+  }catch(e){
+    console.error('Erreur chargement devis client :', e);
+    container.innerHTML = '<div class="empty">Erreur de chargement.</div>';
+  }
+}
+
+function telechargerPdfBase64(base64, filename){
+  if(!base64) return;
+  const link = document.createElement('a');
+  link.href = 'data:application/pdf;base64,' + base64;
+  link.download = filename;
+  link.click();
+}
+
+async function envoyerDevisClient(d, c){
+  if(!c.email){ showToast('Email du client manquant — complétez sa fiche', true); return; }
+  showToast('Envoi en cours…');
+  try{
+    const { error } = await sb.functions.invoke('send-devis', {
+      body: {
+        email: c.email,
+        nom: c.nom,
+        prenom: c.prenom,
+        numero: d.numero,
+        montant: d.montant_total,
+        pdf_base64: d.pdf_base64,
+        token: d.token
+      }
+    });
+    if(error) throw error;
+    await sb.from('devis').update({ statut: 'envoye' }).eq('app_id', d.app_id);
+    showToast('Devis envoyé au client par email ✓');
+  }catch(e){
+    console.error('Erreur envoi devis client :', e);
+    showToast('Échec de l\'envoi du devis', true);
+  }
+}
+
+async function transformerDevisEnFacture(d, c){
+  if(!confirm(`Transformer le devis ${d.numero} en facture ? Une nouvelle facture sera créée avec les mêmes lignes.`)) return;
+  try{
+    let lignes;
+    try{ lignes = JSON.parse(d.lignes); }catch(e){ lignes = []; }
+    if(!lignes.length){ showToast('Ce devis n\'a aucune ligne exploitable', true); return; }
+
+    const montantTotal = lignes.reduce((s,l) => s + (parseFloat(l.total) || 0), 0);
+    const dateEmission = todayISO();
+    const { annee, sequence, numero } = await getNextFactureNumero();
+    const factureAppId = 'fact_' + Date.now();
+
+    const donneesPourPdf = { nom: c.nom, prenom: c.prenom, adresse: c.adresse, cp: c.cp, ville: c.ville, 'type-client': c.type_client, 'entreprise-nom': c.entreprise_nom, 'entreprise-siret': c.entreprise_siret };
+    const doc = generateFacturePdf(donneesPourPdf, numero, lignes, montantTotal, dateEmission, null);
+    const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+    const { error } = await sb.from('factures').insert({
+      app_id: factureAppId, numero, annee, sequence,
+      date_emission: dateEmission, date_prestation: dateEmission,
+      client_id: c.app_id,
+      client_nom: c.nom || '', client_prenom: c.prenom || '',
+      client_adresse: c.adresse || '', client_cp: c.cp || '', client_ville: c.ville || '',
+      lignes: JSON.stringify(lignes), montant_total: montantTotal,
+      pdf_base64: pdfBase64
+    });
+    if(error) throw error;
+
+    await sb.from('devis').update({ facture_app_id: factureAppId }).eq('app_id', d.app_id);
+
+    showToast(`Facture ${numero} créée à partir du devis ✓`);
+    telechargerPdfBase64(pdfBase64, `facture-${numero}.pdf`);
+    await renderClientDevisList(c);
+  }catch(e){
+    console.error('Erreur transformation devis en facture :', e);
+    showToast('Échec de la transformation en facture', true);
+  }
 }
 
 // --- Formulaire ---
