@@ -3151,31 +3151,45 @@ let devisEditRows = [];
 let devisModalClientContext = null; // objet client si on crée un devis depuis sa fiche, sinon null (mode CR)
 
 function newDevisRow(prefill){
-  return Object.assign({ id: 'dv' + Date.now() + Math.random().toString(36).slice(2,7), designation: '', quantite: 1, prix_unitaire: 0 }, prefill || {});
+  return Object.assign({ id: 'dv' + Date.now() + Math.random().toString(36).slice(2,7), titre: '', description: '', quantite: 1, unite: 'unité', prix_unitaire: 0, remise: 0 }, prefill || {});
 }
 
 function renderDevisRows(){
   const container = document.getElementById('devis-rows');
   if(!container) return;
   container.innerHTML = devisEditRows.map(row => `
-    <div class="dv-row" data-row-id="${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:0.6rem;margin-bottom:0.5rem;">
-      <input type="text" class="dv-row-designation" placeholder="Désignation" value="${escapeHtml(row.designation)}"
-        style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;margin-bottom:0.4rem;">
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.5rem;align-items:center;">
-        <input type="number" class="dv-row-qte" min="1" step="1" value="${row.quantite}" placeholder="Qté"
-          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
-        <input type="number" class="dv-row-prix" min="0" step="0.01" value="${row.prix_unitaire}" placeholder="Prix unit. (€)"
-          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
+    <div class="dv-row" data-row-id="${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:0.7rem;margin-bottom:0.6rem;">
+      <input type="text" class="dv-row-titre" placeholder="Titre (ex : Formation utilisation four à pizza)" value="${escapeHtml(row.titre)}"
+        style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;margin-bottom:0.4rem;font-weight:600;">
+      <textarea class="dv-row-description" placeholder="Description (facultatif)" rows="2"
+        style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;box-sizing:border-box;margin-bottom:0.4rem;font-family:inherit;resize:vertical;">${escapeHtml(row.description||'')}</textarea>
+      <div style="display:grid;grid-template-columns:0.8fr 1fr 1fr 0.8fr auto;gap:0.4rem;align-items:center;">
+        <input type="number" class="dv-row-qte" min="0" step="1" value="${row.quantite}" placeholder="Qté"
+          style="padding:0.5rem 0.5rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;box-sizing:border-box;">
+        <select class="dv-row-unite" style="padding:0.5rem 0.4rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+          ${['unité','heure','pièce','forfait','jour','m²','km'].map(u => `<option value="${u}" ${row.unite===u?'selected':''}>${u}</option>`).join('')}
+        </select>
+        <input type="number" class="dv-row-prix" min="0" step="0.01" value="${row.prix_unitaire}" placeholder="Prix (€)"
+          style="padding:0.5rem 0.5rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;box-sizing:border-box;">
+        <input type="number" class="dv-row-remise" min="0" max="100" step="1" value="${row.remise}" placeholder="Remise %"
+          style="padding:0.5rem 0.5rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;box-sizing:border-box;">
         <button type="button" class="dv-row-remove btn btn-outline" style="padding:0.5rem 0.6rem;color:var(--red,#e05252);">✕</button>
       </div>
+      <div class="dv-row-total-ligne" style="text-align:right;font-size:0.78rem;color:var(--text-muted);margin-top:0.35rem;">Total : ${(row.quantite*row.prix_unitaire*(1-row.remise/100)).toFixed(2)} €</div>
     </div>`).join('');
 
   container.querySelectorAll('.dv-row').forEach(rowEl => {
     const id = rowEl.dataset.rowId;
     const row = devisEditRows.find(r => r.id === id);
-    rowEl.querySelector('.dv-row-designation').addEventListener('input', e => { row.designation = e.target.value; });
-    rowEl.querySelector('.dv-row-qte').addEventListener('input', e => { row.quantite = parseFloat(e.target.value)||1; recalcDevisTotal(); });
-    rowEl.querySelector('.dv-row-prix').addEventListener('input', e => { row.prix_unitaire = parseFloat(e.target.value)||0; recalcDevisTotal(); });
+    const majLigne = () => {
+      rowEl.querySelector('.dv-row-total-ligne').textContent = 'Total : ' + (row.quantite*row.prix_unitaire*(1-row.remise/100)).toFixed(2) + ' €';
+    };
+    rowEl.querySelector('.dv-row-titre').addEventListener('input', e => { row.titre = e.target.value; });
+    rowEl.querySelector('.dv-row-description').addEventListener('input', e => { row.description = e.target.value; });
+    rowEl.querySelector('.dv-row-qte').addEventListener('input', e => { row.quantite = parseFloat(e.target.value)||0; majLigne(); recalcDevisTotal(); });
+    rowEl.querySelector('.dv-row-unite').addEventListener('change', e => { row.unite = e.target.value; });
+    rowEl.querySelector('.dv-row-prix').addEventListener('input', e => { row.prix_unitaire = parseFloat(e.target.value)||0; majLigne(); recalcDevisTotal(); });
+    rowEl.querySelector('.dv-row-remise').addEventListener('input', e => { row.remise = Math.min(100, Math.max(0, parseFloat(e.target.value)||0)); majLigne(); recalcDevisTotal(); });
     rowEl.querySelector('.dv-row-remove').addEventListener('click', () => {
       devisEditRows = devisEditRows.filter(r => r.id !== id);
       renderDevisRows();
@@ -3186,7 +3200,7 @@ function renderDevisRows(){
 }
 
 function recalcDevisTotal(){
-  const total = devisEditRows.reduce((s,r) => s + (r.quantite * r.prix_unitaire), 0);
+  const total = devisEditRows.reduce((s,r) => s + (r.quantite * r.prix_unitaire * (1 - r.remise/100)), 0);
   const el = document.getElementById('devis-total-affiche');
   if(el) el.textContent = total.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
 }
@@ -3202,13 +3216,13 @@ document.getElementById('devis-modal-close').addEventListener('click', () => {
 document.getElementById('generer-devis-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
   devisModalClientContext = null;
+  document.getElementById('devis-modal-subtitle').textContent = 'Pré-rempli depuis le compte-rendu — modifiez librement avant de générer.';
   const lignesInit = buildFactureLignes(currentDetailReport);
   devisEditRows = lignesInit.length
     ? lignesInit.map(l => newDevisRow({
-        designation: l.description
-          ? `${l.designation} — ${l.description}`
-          : l.designation,
-        quantite: l.quantite, prix_unitaire: l.prix_unitaire
+        titre: l.designation,
+        description: l.description || '',
+        quantite: l.quantite, unite: 'unité', prix_unitaire: l.prix_unitaire, remise: 0
       }))
     : [newDevisRow()];
   renderDevisRows();
@@ -3217,6 +3231,7 @@ document.getElementById('generer-devis-btn').addEventListener('click', () => {
 
 function ouvrirDevisPourClient(c){
   devisModalClientContext = c;
+  document.getElementById('devis-modal-subtitle').textContent = `Devis libre pour ${clientDisplayName(c)} — ajoutez vos lignes.`;
   devisEditRows = [newDevisRow()];
   renderDevisRows();
   document.getElementById('devis-modal').style.display = 'flex';
@@ -3278,20 +3293,38 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
   doc.rect(margin, y, W-margin*2, 8, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
   doc.text('Désignation', margin+3, y+5.5);
-  doc.text('Qté', W-margin-45, y+5.5);
-  doc.text('Prix unit.', W-margin-32, y+5.5);
-  doc.text('Total', W-margin-12, y+5.5, {align:'right'});
+  doc.text('Qté', W-margin-62, y+5.5);
+  doc.text('Prix unit.', W-margin-44, y+5.5);
+  doc.text('Remise', W-margin-26, y+5.5);
+  doc.text('Total', W-margin-3, y+5.5, {align:'right'});
   y += 8;
 
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40);
   lignes.forEach((l, i) => {
-    const desLines = doc.splitTextToSize(l.designation, 95);
-    const rowHeight = Math.max(7, desLines.length * 5 + 2);
+    const titre = l.titre || l.designation || '';
+    const titreLines = doc.splitTextToSize(titre, 85);
+    const descLines = l.description ? doc.splitTextToSize(l.description, 85) : [];
+    const rowHeight = Math.max(7, (titreLines.length + descLines.length) * 4.6 + 2);
     if(i % 2 === 1){ doc.setFillColor(248,249,250); doc.rect(margin, y, W-margin*2, rowHeight, 'F'); }
-    doc.text(desLines, margin+3, y+5);
-    doc.text(String(l.quantite), W-margin-45, y+5);
-    doc.text(l.prix_unitaire.toFixed(2)+' €', W-margin-32, y+5);
-    doc.text((l.quantite*l.prix_unitaire).toFixed(2)+' €', W-margin-3, y+5, {align:'right'});
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text(titreLines, margin+3, y+5);
+    let yDesc = y + 5 + titreLines.length * 4.6;
+    if(descLines.length){
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
+      doc.text(descLines, margin+3, yDesc);
+      doc.setTextColor(40,40,40); doc.setFontSize(9);
+    }
+
+    const qteUnite = `${l.quantite}${l.unite ? ' ' + l.unite : ''}`;
+    const remiseTxt = l.remise ? `-${l.remise}%` : '—';
+    doc.setFont('helvetica','normal');
+    doc.text(qteUnite, W-margin-62, y+5);
+    doc.text((l.prix_unitaire||0).toFixed(2)+' €', W-margin-44, y+5);
+    doc.text(remiseTxt, W-margin-26, y+5);
+    doc.setFont('helvetica','bold');
+    doc.text((l.total ?? (l.quantite*l.prix_unitaire)).toFixed(2)+' €', W-margin-3, y+5, {align:'right'});
+    doc.setFont('helvetica','normal');
     y += rowHeight;
   });
 
@@ -3323,7 +3356,7 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
   const modeClient = !!devisModalClientContext;
   if(!modeClient && !currentDetailReport) return;
   const r = modeClient ? devisModalClientContext : currentDetailReport;
-  const validRows = devisEditRows.filter(row => row.designation.trim());
+  const validRows = devisEditRows.filter(row => row.titre.trim());
   if(!validRows.length){ showToast('Ajoutez au moins une ligne au devis', true); return; }
 
   const btn = document.getElementById('devis-generer-final-btn');
@@ -3331,7 +3364,15 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
   btn.textContent = 'Génération…';
 
   try{
-    const lignes = validRows.map(row => ({ designation: row.designation.trim(), quantite: row.quantite, prix_unitaire: row.prix_unitaire, total: row.quantite * row.prix_unitaire }));
+    const lignes = validRows.map(row => ({
+      titre: row.titre.trim(),
+      description: (row.description||'').trim(),
+      quantite: row.quantite,
+      unite: row.unite,
+      prix_unitaire: row.prix_unitaire,
+      remise: row.remise,
+      total: row.quantite * row.prix_unitaire * (1 - row.remise/100)
+    }));
     const montantTotal = lignes.reduce((s,l) => s + l.total, 0);
     const dateEmission = todayISO();
     // Un devis "client" (formation, etc.) est toujours un nouveau devis — pas de régénération
