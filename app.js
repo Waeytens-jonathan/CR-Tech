@@ -643,17 +643,25 @@ async function ensureFullRdvLoaded(r){
 }
 
 async function loadAgendaFromSupabase(){
-  try{
-    const { data, error } = await sb
-      .from(RDV_TABLE)
-      .select(LIGHT_RDV_COLUMNS)
-      .order('date', { ascending: true });
-    if(error) throw error;
-    return data || [];
-  }catch(e){
-    console.error('Erreur chargement agenda :', e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
-    showToast('Connexion au cloud impossible (agenda)', true);
-    return [];
+  for(let tentative = 1; tentative <= 2; tentative++){
+    try{
+      const { data, error } = await sb
+        .from(RDV_TABLE)
+        .select(LIGHT_RDV_COLUMNS)
+        .order('date', { ascending: true });
+      if(error) throw error;
+      return data || [];
+    }catch(e){
+      console.error(`Erreur chargement agenda (tentative ${tentative}) :`, e, JSON.stringify(e, Object.getOwnPropertyNames(e)));
+      if(tentative === 1){
+        // Souvent un simple aléa réseau (réveil de l'appareil, reconnexion en cours) —
+        // on laisse une seconde et on retente une fois avant d'afficher une erreur
+        await new Promise(resolve => setTimeout(resolve, 1200));
+      } else {
+        showToast('Connexion au cloud impossible (agenda)', true);
+        return [];
+      }
+    }
   }
 }
 
