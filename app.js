@@ -33,7 +33,58 @@ const SUPABASE_ANON_KEY = 'sb_publishable_EKs2eR3Du9MYSnUgeTFtBQ_vnOOFqHt';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ---------- Authentification ----------
-// --- Suggestions de domaine email (gmail.com, hotmail.com, etc.) ---
+// --- Suggestions de marques d'appareils ---
+const MARQUES_SUGGEREES = ['Bosch','Samsung','Whirlpool','LG','Siemens','Electrolux','Beko','Candy','Indesit','Miele','Brandt','De Dietrich','Thomson','Continental Edison','Haier','Hisense','Philips','Sony','Panasonic','Ariston','Hotpoint','Smeg','AEG','Bauknecht','Faure','Vedette','Sauter','Rosières','Scholtès','Zanussi','Fagor','Liebherr','Gorenje','Sharp','Toshiba','Daewoo','Dyson','Rowenta','Moulinex','Tefal','SEB','Karcher','Delonghi','Krups','Nespresso','Magimix'];
+
+// Fonction générique de suggestion par préfixe — prend un élément directement (pas juste un id),
+// pour pouvoir être appelée sur des champs créés dynamiquement (lignes d'appareils supplémentaires)
+function attachTextSuggestions(input, options){
+  if(!input || input._suggestAttached) return;
+  input._suggestAttached = true;
+  const dropdown = document.createElement('div');
+  dropdown.className = 'text-suggest-dropdown';
+  dropdown.style.cssText = 'position:fixed;z-index:10000;background:var(--card-bg,#162233);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;display:none;box-shadow:0 4px 16px rgba(0,0,0,0.35);';
+  document.body.appendChild(dropdown);
+
+  function positionDropdown(){
+    const rect = input.getBoundingClientRect();
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.width = Math.max(rect.width, 160) + 'px';
+  }
+
+  function renderSuggestions(){
+    const val = input.value.trim().toLowerCase();
+    if(!val){ dropdown.style.display = 'none'; return; }
+    const matches = options.filter(o => o.toLowerCase().startsWith(val) && o.toLowerCase() !== val);
+    if(!matches.length){ dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = matches.slice(0,8).map(o => `<div class="text-suggest-item" data-val="${escapeHtml(o)}" style="padding:0.5rem 0.7rem;cursor:pointer;font-size:0.88rem;color:var(--text);">${escapeHtml(o)}</div>`).join('');
+    dropdown.querySelectorAll('.text-suggest-item').forEach(item => {
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        input.value = item.dataset.val;
+        dropdown.style.display = 'none';
+        input.dispatchEvent(new Event('input', {bubbles:true}));
+        input.dispatchEvent(new Event('change', {bubbles:true}));
+      });
+      item.addEventListener('mouseenter', () => { item.style.background = 'rgba(255,255,255,0.08)'; });
+      item.addEventListener('mouseleave', () => { item.style.background = 'transparent'; });
+    });
+    positionDropdown();
+    dropdown.style.display = 'block';
+  }
+
+  input.addEventListener('input', renderSuggestions);
+  input.addEventListener('focus', renderSuggestions);
+  input.addEventListener('blur', () => { setTimeout(() => { dropdown.style.display = 'none'; }, 150); });
+  window.addEventListener('scroll', () => { if(dropdown.style.display === 'block') positionDropdown(); }, true);
+}
+
+function attachMarqueSuggestions(inputId){
+  attachTextSuggestions(document.getElementById(inputId), MARQUES_SUGGEREES);
+}
+
+['f-marque','newrdv-marque'].forEach(attachMarqueSuggestions);
 const EMAIL_DOMAINES_SUGGERES = ['gmail.com','hotmail.com','hotmail.fr','outlook.com','outlook.fr','yahoo.fr','yahoo.com','orange.fr','free.fr','laposte.net','wanadoo.fr','sfr.fr','icloud.com','live.fr'];
 
 function attachEmailSuggestions(inputId){
@@ -4601,6 +4652,7 @@ function renderNewrdvAppareilsSupRows(){
     el.addEventListener('input', () => { row.appareilAutre = el.value; });
   });
   container.querySelectorAll('.as-marque').forEach(el => {
+    attachTextSuggestions(el, MARQUES_SUGGEREES);
     el.addEventListener('input', () => {
       const row = newrdvAppareilsSup.find(r => r.id === el.dataset.id);
       if(row) row.marque = el.value;
