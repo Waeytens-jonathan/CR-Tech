@@ -92,6 +92,7 @@ function joursDepuisIntervention(r){
   return Math.floor((Date.now() - new Date(r.date + 'T00:00:00').getTime()) / 86400000);
 }
 function estEnRetardPaiement(r){
+  if(r['exclu-impaye']) return false;
   if(!r.date) return false;
   if(r['paiement-statut'] === 'Gratuit') return false;
   const reste = parseFloat(r['reste-encaisser']) || 0;
@@ -263,6 +264,7 @@ function reportToRow(r){
     paiement_carte: r['paiement-carte'] || null,
     garantie: !!r.garantie,
     facture_creee: !!r['facture-creee'],
+    exclu_impaye: !!r['exclu-impaye'],
     documents_envoyes: !!r.documents_envoyes,
     conseil_entretien: !!r['conseils-entretien'],
     photos: JSON.stringify(r.photos || []),
@@ -373,6 +375,7 @@ function rowToReport(row){
     'paiement-carte': row.paiement_carte || '',
     garantie: !!row.garantie,
     'facture-creee': !!row.facture_creee,
+    'exclu-impaye': !!row.exclu_impaye,
     'conseils-entretien': !!row.conseil_entretien,
     photos: photos,
     plaquePhoto: plaquePhotoArr[0] || null,
@@ -413,7 +416,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,exclu_impaye,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -7230,6 +7233,11 @@ function renderDetailContent(r, container){
     html += '</select></div>';
   }
 
+  html += '<div class="checkbox-row" style="margin-top:0.8rem;">';
+  html += `<input type="checkbox" id="quick-exclu-impaye" ${r['exclu-impaye'] ? 'checked' : ''}>`;
+  html += '<label for="quick-exclu-impaye">Ne pas compter comme impayé <span style="font-weight:400;color:var(--text-muted);">(ex : en attente d\'une pièce, reste à encaisser normal)</span></label>';
+  html += '</div>';
+
   html += '<div class="field" style="margin-top:0.6rem;"><label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui recevra le technicien)</span></label>';
   html += `<input type="tel" id="quick-tel-interlocuteur" placeholder="Facultatif" value="${escapeHtml(r['tel-interlocuteur']||'')}"></div>`;
 
@@ -7485,6 +7493,7 @@ function renderDetailContent(r, container){
       reports[idx].statut = statutEl.value;
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
+      reports[idx]['exclu-impaye'] = document.getElementById('quick-exclu-impaye').checked;
       reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
       const pieceSuiviEl = document.getElementById('quick-piece-suivi');
       if(reports[idx]['commande-piece']){
