@@ -2521,13 +2521,14 @@ function buildFactureLignes(r){
       lignes.push({ designation: 'Pièce', description: desc + (refClean ? ` (Réf. ${refClean})` : ''), garantie: p.garantie || '3 mois', quantite: 1, prix_unitaire: prixLigne, total: prixLigne });
     });
   } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
-    r.piecesCommandees.forEach(p => {
+    const piecesFacturables = r.piecesCommandees.filter(p => p.statutClient !== 'refusee');
+    piecesFacturables.forEach(p => {
       const prix = parseFloat(p.prixVente) || 0;
       const nomClean = cleanNom(p.nom) || 'Pièce détachée';
       const refClean = cleanRef(p.ref);
       lignes.push({ designation: 'Pièce', description: nomClean + (refClean ? ` (Réf. ${refClean})` : ''), garantie: '3 mois', quantite: 1, prix_unitaire: prix, total: prix });
     });
-    const sommePieces = r.piecesCommandees.reduce((s,p) => s + (parseFloat(p.prixVente) || 0), 0);
+    const sommePieces = piecesFacturables.reduce((s,p) => s + (parseFloat(p.prixVente) || 0), 0);
     const livraisonRestante = coutPieces - sommePieces;
     if(livraisonRestante > 0.01){
       lignes.push({ designation: 'Livraison pièce', description: '', quantite: 1, prix_unitaire: livraisonRestante, total: livraisonRestante });
@@ -5979,7 +5980,9 @@ function newCommandePieceRow(prefill){
     nom: '', ref: '',
     prixHt: '', tva: 20,     // toujours saisis → donnent le coût réel (TTC), utilisé pour le CA/stats
     prixConseille: '',       // toujours saisi, facultatif
-    baseMarge: 'ttc'         // 'ttc' = marge sur le coût réel, 'conseille' = marge sur le prix conseillé — détermine le prix facturé au client
+    baseMarge: 'ttc',        // 'ttc' = marge sur le coût réel, 'conseille' = marge sur le prix conseillé — détermine le prix facturé au client
+    statutClient: 'acceptee', // 'acceptee' ou 'refusee' — la pièce reste dans le CR mais n'est pas facturée si refusée
+    motifRefus: ''
   }, prefill || {});
 }
 
@@ -6031,6 +6034,17 @@ function renderCommandePieceRows(){
           <button type="button" class="cp-row-base-btn" data-base="conseille" style="flex:1;padding:0.4rem;border-radius:8px;border:1px solid ${row.baseMarge==='conseille'?'var(--orange)':'var(--border)'};background:${row.baseMarge==='conseille'?'rgba(245,166,35,0.12)':'transparent'};color:${row.baseMarge==='conseille'?'var(--orange)':'var(--text-muted)'};font-size:0.78rem;cursor:pointer;">Prix conseillé</button>
         </div>
         <div class="cp-row-facture-preview" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;">→ Prix facturé au client : <strong>${(baseMargeLigne(row) > 0 ? calculerPrixVente(baseMargeLigne(row), 0) : 0).toFixed(2)} €</strong></div>
+
+        <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-top:0.7rem;margin-bottom:0.3rem;">Cette pièce est :</label>
+        <div style="display:flex;gap:0.4rem;">
+          <button type="button" class="cp-row-statut-btn" data-statut="acceptee" style="flex:1;padding:0.4rem;border-radius:8px;border:1px solid ${row.statutClient==='acceptee'?'var(--green,#3fbf6f)':'var(--border)'};background:${row.statutClient==='acceptee'?'rgba(63,191,111,0.12)':'transparent'};color:${row.statutClient==='acceptee'?'var(--green,#3fbf6f)':'var(--text-muted)'};font-size:0.78rem;cursor:pointer;">✅ Acceptée</button>
+          <button type="button" class="cp-row-statut-btn" data-statut="refusee" style="flex:1;padding:0.4rem;border-radius:8px;border:1px solid ${row.statutClient==='refusee'?'#e05252':'var(--border)'};background:${row.statutClient==='refusee'?'rgba(224,82,82,0.12)':'transparent'};color:${row.statutClient==='refusee'?'#e05252':'var(--text-muted)'};font-size:0.78rem;cursor:pointer;">❌ Refusée par le client</button>
+        </div>
+        ${row.statutClient === 'refusee' ? `
+          <input type="text" class="cp-row-motif" placeholder="Motif du refus (facultatif) : ex. trop cher…" value="${escapeHtml(row.motifRefus||'')}"
+            style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;margin-top:0.5rem;">
+          <div style="font-size:0.75rem;color:#e05252;margin-top:0.35rem;">Cette pièce ne sera pas comptée dans le montant facturé au client.</div>
+        ` : ''}
       </div>
       ${commandePieceRows.length > 1 ? `<button type="button" class="cp-row-remove btn btn-outline" style="padding:0.5rem 0.7rem;color:var(--red,#e05252);">✕</button>` : ''}
     </div>`).join('');
@@ -6054,6 +6068,14 @@ function renderCommandePieceRows(){
         recalculerPrixPiece();
       });
     });
+    rowEl.querySelectorAll('.cp-row-statut-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        row.statutClient = btn.dataset.statut;
+        renderCommandePieceRows();
+        recalculerPrixPiece();
+      });
+    });
+    rowEl.querySelector('.cp-row-motif')?.addEventListener('input', e => { row.motifRefus = e.target.value; recalculerPrixPiece(); });
     rowEl.querySelector('.cp-row-remove')?.addEventListener('click', () => {
       commandePieceRows = commandePieceRows.filter(r => r.id !== id);
       renderCommandePieceRows();
@@ -6074,9 +6096,12 @@ function recalculerPrixPiece(){
   const idxLivraison = parseInt(document.getElementById('f-livraison').value, 10);
   const livraison = tarifs[idxLivraison] ? (parseFloat(tarifs[idxLivraison].prix) || 0) : (tarifs[0] ? tarifs[0].prix : 10);
   const validRows = commandePieceRows.filter(r => r.nom.trim() || coutReelLigne(r) > 0 || parseFloat(r.prixConseille) > 0);
+  // Les pièces refusées par le client restent dans le CR (traçabilité) mais ne sont
+  // comptées ni dans le coût réel (CA), ni dans le montant facturé.
+  const rowsFacturables = validRows.filter(r => r.statutClient !== 'refusee');
 
-  const totalFournisseur = validRows.reduce((s,r) => s + coutReelLigne(r), 0);
-  const totalFacture = validRows.reduce((s,r) => {
+  const totalFournisseur = rowsFacturables.reduce((s,r) => s + coutReelLigne(r), 0);
+  const totalFacture = rowsFacturables.reduce((s,r) => {
     const base = baseMargeLigne(r);
     return s + (base > 0 ? calculerPrixVente(base, 0) : 0);
   }, 0) + (totalFournisseur > 0 ? livraison : 0);
@@ -6085,12 +6110,17 @@ function recalculerPrixPiece(){
   document.getElementById('f-piece-cout').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
   document.getElementById('f-cout-pieces').value = totalFacture > 0 ? totalFacture.toFixed(2) : '';
   document.getElementById('f-piece-desc').value = validRows
-    .map(r => r.nom.trim() ? (cleanNom(r.nom) + (r.ref && r.ref.trim() ? ` (Réf. ${cleanRef(r.ref)})` : '')) : '')
+    .map(r => r.nom.trim() ? (cleanNom(r.nom) + (r.ref && r.ref.trim() ? ` (Réf. ${cleanRef(r.ref)})` : '') + (r.statutClient === 'refusee' ? ' [refusée par le client]' : '')) : '')
     .filter(Boolean).join(', ');
   document.getElementById('f-pieces-commandees-json').value = JSON.stringify(
     validRows.filter(r => r.nom.trim()).map(r => {
       const base = baseMargeLigne(r);
-      return { nom: cleanNom(r.nom), ref: cleanRef(r.ref), prixVente: base > 0 ? calculerPrixVente(base, 0) : 0 };
+      return {
+        nom: cleanNom(r.nom), ref: cleanRef(r.ref),
+        prixVente: (r.statutClient !== 'refusee' && base > 0) ? calculerPrixVente(base, 0) : 0,
+        statutClient: r.statutClient || 'acceptee',
+        motifRefus: r.motifRefus || ''
+      };
     })
   );
   recalcTotal();
@@ -7330,9 +7360,13 @@ function renderDetailContent(r, container){
     } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
       r.piecesCommandees.forEach(p => {
         const refClean = cleanRef(p.ref);
-        html += dRow(cleanNom(p.nom) || 'Pièce', (refClean ? `Réf. ${escapeHtml(refClean)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—'));
+        const estRefusee = p.statutClient === 'refusee';
+        const valeur = estRefusee
+          ? `<span style="color:#e05252;">❌ Refusée par le client${p.motifRefus ? ' — ' + escapeHtml(p.motifRefus) : ''}</span>`
+          : (refClean ? `Réf. ${escapeHtml(refClean)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—');
+        html += dRow(cleanNom(p.nom) || 'Pièce', valeur);
       });
-      if(r['piece-cout']) html += dRow('Total pièces + livraison', parseFloat(r['piece-cout']).toFixed(2) + ' €');
+      if(r['piece-cout']) html += dRow('Total pièces + livraison (facturées)', parseFloat(r['piece-cout']).toFixed(2) + ' €');
     } else {
       html += dRow('Désignation', escapeHtml(r['piece-desc']), true);
       html += dRow('Prix facturé', r['piece-cout'] ? parseFloat(r['piece-cout']).toFixed(2) + ' €' : '—');
