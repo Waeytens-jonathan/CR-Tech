@@ -525,12 +525,15 @@
       <div id="stock-atelier-categories-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.7rem;margin-bottom:0.9rem;"></div>
 
       <div id="stock-atelier-nouvelle-categorie-form" style="display:none;margin-bottom:0.9rem;">
-        <div style="display:flex;gap:0.5rem;">
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
           <input type="text" id="stock-atelier-nouvelle-categorie-nom" placeholder="Nom de la catégorie (ex : Cafetières, Composants audio…)" style="flex:1;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
           <button class="btn btn-primary" id="stock-atelier-nouvelle-categorie-valider" style="padding:0.5rem 0.9rem;">Créer</button>
         </div>
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Logo <span style="font-weight:400;">(facultatif)</span></label>
+        <input type="file" id="stock-atelier-nouvelle-categorie-logo" accept="image/*" style="font-size:0.85rem;">
       </div>
       <button class="btn btn-outline" id="stock-atelier-nouvelle-categorie-btn" style="width:100%;">+ Nouvelle catégorie</button>
+      <input type="file" id="stock-atelier-changer-logo-input" accept="image/*" style="display:none;">
     </div>
   </div>
 
