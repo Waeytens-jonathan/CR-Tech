@@ -543,7 +543,11 @@
         <button class="btn btn-outline" id="stock-atelier-categorie-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour aux catégories</button>
         <button class="btn btn-primary" id="stock-atelier-categorie-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Ajouter une pièce</button>
       </div>
-      <h2 id="stock-atelier-categorie-titre" style="margin:0 0 0.9rem;"></h2>
+      <div style="display:flex;align-items:center;gap:0.7rem;margin-bottom:0.9rem;">
+        <img id="stock-atelier-categorie-logo-img" src="" style="width:44px;height:44px;object-fit:contain;border-radius:8px;display:none;">
+        <h2 id="stock-atelier-categorie-titre" style="margin:0;flex:1;"></h2>
+        <button class="btn btn-outline" id="stock-atelier-categorie-logo-btn" style="font-size:0.78rem;padding:0.4rem 0.7rem;display:none;">🖼️ Logo</button>
+      </div>
       <input type="text" id="stock-atelier-search" placeholder="🔍 Rechercher une pièce (nom ou précision)…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:1rem;font-size:0.9rem;">
       <div id="stock-atelier-list"></div>
       <div class="empty" id="stock-atelier-empty-msg" style="display:none;">Aucune pièce dans cette catégorie pour le moment.</div>

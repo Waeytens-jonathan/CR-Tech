@@ -1379,14 +1379,13 @@ function renderStockAtelierCategoriesGrid(){
   const renderBoite = (id, nom, nb, nbAlerte, logo) => `
     <div class="stock-atelier-boite" data-cat-id="${id === null ? '' : escapeHtml(id)}" style="position:relative;border:1px solid var(--border);border-radius:12px;padding:1rem 0.8rem;text-align:center;cursor:pointer;background:rgba(255,255,255,0.02);${nbAlerte ? 'border-color:#e05252;' : ''}">
       ${id !== null ? `<span class="stock-atelier-boite-delete" data-cat-id="${escapeHtml(id)}" data-cat-nom="${escapeHtml(nom)}" style="position:absolute;top:0.3rem;right:0.4rem;color:var(--text-muted);font-size:0.9rem;cursor:pointer;padding:0.1rem 0.3rem;">✕</span>` : ''}
-      ${id !== null ? `<span class="stock-atelier-boite-logo-btn" data-cat-id="${escapeHtml(id)}" style="position:absolute;top:0.3rem;left:0.4rem;color:var(--text-muted);font-size:0.85rem;cursor:pointer;padding:0.1rem 0.3rem;">🖼️</span>` : ''}
       ${logo ? `<img src="${logo}" style="width:40px;height:40px;object-fit:contain;margin-bottom:0.3rem;border-radius:6px;">` : `<div style="font-size:1.6rem;margin-bottom:0.3rem;">📦</div>`}
       <div style="font-weight:600;font-size:0.88rem;margin-bottom:0.2rem;">${escapeHtml(nom)}</div>
       <div style="font-size:0.78rem;color:var(--text-muted);">${nb} pièce${nb>1?'s':''}${nbAlerte ? ' · ⚠️ '+nbAlerte : ''}</div>
     </div>`;
 
   grid.innerHTML = boites.map(b => renderBoite(b.id, b.nom, b.nb, b.nbAlerte, b.logo)).join('')
-    + renderBoite(null, 'Sans catégorie', sansCategorie.length, nbAlerteSansCategorie, null);
+    + (sansCategorie.length ? renderBoite(null, 'Sans catégorie', sansCategorie.length, nbAlerteSansCategorie, null) : '');
 
   grid.querySelectorAll('.stock-atelier-boite').forEach(el => {
     el.addEventListener('click', () => {
@@ -1397,15 +1396,6 @@ function renderStockAtelierCategoriesGrid(){
     el.addEventListener('click', async (e) => {
       e.stopPropagation();
       await supprimerCategorieAtelier(el.dataset.catId, el.dataset.catNom);
-    });
-  });
-  grid.querySelectorAll('.stock-atelier-boite-logo-btn').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const logoInput = document.getElementById('stock-atelier-changer-logo-input');
-      logoInput.dataset.catId = el.dataset.catId;
-      logoInput.value = '';
-      logoInput.click();
     });
   });
 }
@@ -1426,7 +1416,9 @@ document.getElementById('stock-atelier-changer-logo-input').addEventListener('ch
     if(error) throw error;
     const cat = stockAtelierCategories.find(c => c.app_id === catId);
     if(cat) cat.logo_base64 = logoCompresse;
-    renderStockAtelierCategoriesGrid();
+    const logoImg = document.getElementById('stock-atelier-categorie-logo-img');
+    logoImg.src = logoCompresse;
+    logoImg.style.display = 'block';
     showToast('Logo mis à jour ✓');
   }catch(err){
     console.error('Erreur changement logo catégorie :', err);
@@ -1455,12 +1447,37 @@ async function supprimerCategorieAtelier(categorieId, nom){
 function openStockAtelierCategorie(categorieId){
   currentStockAtelierCategorieId = categorieId;
   const cat = categorieId ? stockAtelierCategories.find(c => c.app_id === categorieId) : null;
-  document.getElementById('stock-atelier-categorie-titre').textContent = cat ? '📦 ' + cat.nom : '📦 Sans catégorie';
+  document.getElementById('stock-atelier-categorie-titre').textContent = cat ? cat.nom : 'Sans catégorie';
+
+  const logoImg = document.getElementById('stock-atelier-categorie-logo-img');
+  const logoBtn = document.getElementById('stock-atelier-categorie-logo-btn');
+  if(cat){
+    logoBtn.style.display = 'inline-block';
+    logoBtn.dataset.catId = cat.app_id;
+    if(cat.logo_base64){
+      logoImg.src = cat.logo_base64;
+      logoImg.style.display = 'block';
+    } else {
+      logoImg.style.display = 'none';
+    }
+  } else {
+    // "Sans catégorie" n'a pas de logo (ce n'est pas une vraie catégorie)
+    logoBtn.style.display = 'none';
+    logoImg.style.display = 'none';
+  }
+
   document.getElementById('stock-atelier-search').value = '';
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-stock-atelier-categorie').classList.add('active');
   renderStockAtelierList();
 }
+
+document.getElementById('stock-atelier-categorie-logo-btn').addEventListener('click', () => {
+  const logoInput = document.getElementById('stock-atelier-changer-logo-input');
+  logoInput.dataset.catId = document.getElementById('stock-atelier-categorie-logo-btn').dataset.catId;
+  logoInput.value = '';
+  logoInput.click();
+});
 
 document.getElementById('stock-atelier-categorie-back').addEventListener('click', () => {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
