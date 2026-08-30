@@ -1350,6 +1350,97 @@ async function loadStockPieces(){
 }
 
 let stockAtelier = [];
+let stockAtelierCategories = [];
+let currentStockAtelierCategorieId = null; // null = "Sans catégorie", sinon app_id de la catégorie
+
+async function loadStockAtelierCategories(){
+  try{
+    const { data, error } = await sb.from('stock_atelier_categories').select('*').order('nom', { ascending: true });
+    if(error) throw error;
+    return data || [];
+  }catch(e){
+    console.error('Erreur chargement catégories stock atelier :', e);
+    return [];
+  }
+}
+
+function renderStockAtelierCategoriesGrid(){
+  const grid = document.getElementById('stock-atelier-categories-grid');
+  if(!grid) return;
+
+  const boites = stockAtelierCategories.map(cat => {
+    const pieces = stockAtelier.filter(p => p.categorie_id === cat.app_id);
+    const nbAlerte = pieces.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
+    return { id: cat.app_id, nom: cat.nom, nb: pieces.length, nbAlerte };
+  });
+  const sansCategorie = stockAtelier.filter(p => !p.categorie_id);
+  const nbAlerteSansCategorie = sansCategorie.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
+
+  const renderBoite = (id, nom, nb, nbAlerte) => `
+    <div class="stock-atelier-boite" data-cat-id="${id === null ? '' : escapeHtml(id)}" style="border:1px solid var(--border);border-radius:12px;padding:1rem 0.8rem;text-align:center;cursor:pointer;background:rgba(255,255,255,0.02);${nbAlerte ? 'border-color:#e05252;' : ''}">
+      <div style="font-size:1.6rem;margin-bottom:0.3rem;">📦</div>
+      <div style="font-weight:600;font-size:0.88rem;margin-bottom:0.2rem;">${escapeHtml(nom)}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">${nb} pièce${nb>1?'s':''}${nbAlerte ? ' · ⚠️ '+nbAlerte : ''}</div>
+    </div>`;
+
+  grid.innerHTML = boites.map(b => renderBoite(b.id, b.nom, b.nb, b.nbAlerte)).join('')
+    + renderBoite(null, 'Sans catégorie', sansCategorie.length, nbAlerteSansCategorie);
+
+  grid.querySelectorAll('.stock-atelier-boite').forEach(el => {
+    el.addEventListener('click', () => {
+      openStockAtelierCategorie(el.dataset.catId || null);
+    });
+  });
+}
+
+function openStockAtelierCategorie(categorieId){
+  currentStockAtelierCategorieId = categorieId;
+  const cat = categorieId ? stockAtelierCategories.find(c => c.app_id === categorieId) : null;
+  document.getElementById('stock-atelier-categorie-titre').textContent = cat ? '📦 ' + cat.nom : '📦 Sans catégorie';
+  document.getElementById('stock-atelier-search').value = '';
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-stock-atelier-categorie').classList.add('active');
+  renderStockAtelierList();
+}
+
+document.getElementById('stock-atelier-categorie-back').addEventListener('click', () => {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-stock-atelier').classList.add('active');
+  renderStockAtelierCategoriesGrid();
+});
+
+document.getElementById('stock-atelier-nouvelle-categorie-btn').addEventListener('click', () => {
+  const form = document.getElementById('stock-atelier-nouvelle-categorie-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  if(form.style.display === 'block') document.getElementById('stock-atelier-nouvelle-categorie-nom').focus();
+});
+
+document.getElementById('stock-atelier-nouvelle-categorie-valider').addEventListener('click', async () => {
+  const nom = document.getElementById('stock-atelier-nouvelle-categorie-nom').value.trim();
+  if(!nom){ showToast('Merci de saisir un nom', true); return; }
+  try{
+    const app_id = 'stac_' + Date.now();
+    const { error } = await sb.from('stock_atelier_categories').insert({ app_id, nom });
+    if(error) throw error;
+    stockAtelierCategories.push({ app_id, nom });
+    document.getElementById('stock-atelier-nouvelle-categorie-nom').value = '';
+    document.getElementById('stock-atelier-nouvelle-categorie-form').style.display = 'none';
+    renderStockAtelierCategoriesGrid();
+    peuplerSelectCategorieAtelier();
+    showToast('Catégorie créée ✓');
+  }catch(e){
+    console.error('Erreur création catégorie :', e);
+    showToast('Échec de la création', true);
+  }
+});
+
+function peuplerSelectCategorieAtelier(){
+  const sel = document.getElementById('sae-categorie-boite');
+  if(!sel) return;
+  const valeurActuelle = sel.value;
+  sel.innerHTML = '<option value="">Aucune catégorie</option>' + stockAtelierCategories.map(c => `<option value="${escapeHtml(c.app_id)}">${escapeHtml(c.nom)}</option>`).join('');
+  if([...sel.options].some(o => o.value === valeurActuelle)) sel.value = valeurActuelle;
+}
 
 async function loadStockAtelier(){
   try{
@@ -1375,12 +1466,13 @@ function renderStockAtelierList(){
   const emptyEl = document.getElementById('stock-atelier-empty-msg');
   const q = (document.getElementById('stock-atelier-search').value || '').trim().toLowerCase();
 
-  const filtres = stockAtelier.filter(p => {
+  const piecesCategorie = stockAtelier.filter(p => (p.categorie_id || null) === currentStockAtelierCategorieId);
+  const filtres = piecesCategorie.filter(p => {
     if(!q) return true;
     return (p.nom||'').toLowerCase().includes(q) || (p.precision||'').toLowerCase().includes(q);
   });
 
-  if(!stockAtelier.length){
+  if(!piecesCategorie.length){
     container.innerHTML = '';
     emptyEl.style.display = 'block';
     return;
@@ -1417,6 +1509,7 @@ function renderStockAtelierList(){
   container.querySelectorAll('.list-item').forEach(el => {
     el.addEventListener('click', (e) => {
       if(e.target.closest('.stock-atelier-qte-controls')) return;
+      stockAtelierEditReturnView = 'view-stock-atelier-categorie';
       openStockAtelierEdit(el.dataset.appId);
     });
   });
@@ -1449,14 +1542,15 @@ document.getElementById('stock-atelier-search').addEventListener('input', render
 
 // --- Édition d'une pièce du stock atelier ---
 let editingStockAtelierAppId = null;
+let stockAtelierEditReturnView = 'view-stock-atelier';
 
-document.getElementById('sae-categorie').addEventListener('change', (e) => {
+document.getElementById('sae-nature').addEventListener('change', (e) => {
   const estComposant = e.target.value === 'composant';
   document.getElementById('sae-piece-fields').style.display = estComposant ? 'none' : 'block';
   document.getElementById('sae-composant-fields').style.display = estComposant ? 'block' : 'none';
 });
 
-function openStockAtelierEdit(appId){
+function openStockAtelierEdit(appId, categorieIdPreremplie){
   editingStockAtelierAppId = appId;
   const item = appId ? stockAtelier.find(p => p.app_id === appId) : null;
 
@@ -1465,8 +1559,11 @@ function openStockAtelierEdit(appId){
   document.getElementById('sae-quantite').value = item ? (item.quantite ?? 1) : 1;
   document.getElementById('sae-seuil').value = item ? (item.seuil_alerte ?? 2) : 2;
 
+  peuplerSelectCategorieAtelier();
+  document.getElementById('sae-categorie-boite').value = item ? (item.categorie_id || '') : (categorieIdPreremplie || '');
+
   const estComposant = item ? item.type === 'composant' : false;
-  document.getElementById('sae-categorie').value = estComposant ? 'composant' : 'piece';
+  document.getElementById('sae-nature').value = estComposant ? 'composant' : 'piece';
   document.getElementById('sae-piece-fields').style.display = estComposant ? 'none' : 'block';
   document.getElementById('sae-composant-fields').style.display = estComposant ? 'block' : 'none';
 
@@ -1490,18 +1587,25 @@ function openStockAtelierEdit(appId){
   document.getElementById('view-stock-atelier-edit').classList.add('active');
 }
 
-document.getElementById('stock-atelier-new-btn').addEventListener('click', () => openStockAtelierEdit(null));
+document.getElementById('stock-atelier-new-btn').addEventListener('click', () => {
+  stockAtelierEditReturnView = 'view-stock-atelier';
+  openStockAtelierEdit(null, null);
+});
+document.getElementById('stock-atelier-categorie-new-btn').addEventListener('click', () => {
+  stockAtelierEditReturnView = 'view-stock-atelier-categorie';
+  openStockAtelierEdit(null, currentStockAtelierCategorieId);
+});
 
 document.getElementById('stock-atelier-edit-back').addEventListener('click', () => {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-stock-atelier').classList.add('active');
+  document.getElementById(stockAtelierEditReturnView).classList.add('active');
 });
 
 document.getElementById('stock-atelier-save-btn').addEventListener('click', async () => {
   const nom = document.getElementById('sae-nom').value.trim();
   if(!nom){ showToast('Merci de renseigner un nom', true); return; }
 
-  const estComposant = document.getElementById('sae-categorie').value === 'composant';
+  const estComposant = document.getElementById('sae-nature').value === 'composant';
   const type = estComposant ? 'composant' : document.getElementById('sae-type').value;
   const precision = estComposant
     ? [document.getElementById('sae-valeur').value.trim(), document.getElementById('sae-tension').value.trim()].filter(Boolean).join(' / ')
@@ -1511,6 +1615,7 @@ document.getElementById('stock-atelier-save-btn').addEventListener('click', asyn
     nom,
     precision: precision || null,
     type,
+    categorie_id: document.getElementById('sae-categorie-boite').value || null,
     quantite: parseInt(document.getElementById('sae-quantite').value, 10) || 0,
     seuil_alerte: parseInt(document.getElementById('sae-seuil').value, 10) || 0
   };
@@ -1529,10 +1634,16 @@ document.getElementById('stock-atelier-save-btn').addEventListener('click', asyn
       if(error) throw error;
     }
     showToast('Enregistré ✓');
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById('view-stock-atelier').classList.add('active');
     stockAtelier = await loadStockAtelier();
-    renderStockAtelierList();
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    if(stockAtelierEditReturnView === 'view-stock-atelier-categorie'){
+      currentStockAtelierCategorieId = row.categorie_id || null;
+      document.getElementById('view-stock-atelier-categorie').classList.add('active');
+      renderStockAtelierList();
+    } else {
+      document.getElementById('view-stock-atelier').classList.add('active');
+      renderStockAtelierCategoriesGrid();
+    }
   }catch(e){
     console.error('Erreur enregistrement stock atelier :', e);
     showToast('Échec de l\'enregistrement', true);
@@ -1548,9 +1659,9 @@ document.getElementById('stock-atelier-delete-btn').addEventListener('click', as
     const { error } = await sb.from('stock_atelier').delete().eq('app_id', editingStockAtelierAppId);
     if(error) throw error;
     showToast('Pièce supprimée');
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById('view-stock-atelier').classList.add('active');
     stockAtelier = await loadStockAtelier();
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-stock-atelier-categorie').classList.add('active');
     renderStockAtelierList();
   }catch(e){
     console.error('Erreur suppression stock atelier :', e);
@@ -1581,9 +1692,10 @@ async function renderStock(){
     atelierBtn.style.display = 'none';
   } else {
     atelierBtn.style.display = 'flex';
-    document.getElementById('stock-atelier-list').innerHTML = '<div class="empty">Chargement…</div>';
-    stockAtelier = await loadStockAtelier();
-    renderStockAtelierList();
+    document.getElementById('stock-atelier-categories-grid').innerHTML = '<div class="empty">Chargement…</div>';
+    [stockAtelier, stockAtelierCategories] = await Promise.all([loadStockAtelier(), loadStockAtelierCategories()]);
+    renderStockAtelierCategoriesGrid();
+    peuplerSelectCategorieAtelier();
     const nbAlerte = stockAtelier.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
     document.getElementById('stock-menu-atelier-count').textContent = stockAtelier.length + ' pièce' + (stockAtelier.length > 1 ? 's' : '') + (nbAlerte ? ` · ⚠️ ${nbAlerte}` : '');
   }

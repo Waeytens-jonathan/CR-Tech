@@ -518,12 +518,32 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
         <button class="btn btn-outline" id="stock-atelier-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour</button>
-        <button class="btn btn-primary" id="stock-atelier-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Ajouter</button>
+        <button class="btn btn-primary" id="stock-atelier-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Ajouter une pièce</button>
       </div>
       <h2 style="margin:0 0 0.9rem;">🏭 Stock atelier</h2>
+
+      <div id="stock-atelier-categories-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.7rem;margin-bottom:0.9rem;"></div>
+
+      <div id="stock-atelier-nouvelle-categorie-form" style="display:none;margin-bottom:0.9rem;">
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="stock-atelier-nouvelle-categorie-nom" placeholder="Nom de la catégorie (ex : Cafetières, Composants audio…)" style="flex:1;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          <button class="btn btn-primary" id="stock-atelier-nouvelle-categorie-valider" style="padding:0.5rem 0.9rem;">Créer</button>
+        </div>
+      </div>
+      <button class="btn btn-outline" id="stock-atelier-nouvelle-categorie-btn" style="width:100%;">+ Nouvelle catégorie</button>
+    </div>
+  </div>
+
+  <div class="view" id="view-stock-atelier-categorie">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
+        <button class="btn btn-outline" id="stock-atelier-categorie-back" style="padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour aux catégories</button>
+        <button class="btn btn-primary" id="stock-atelier-categorie-new-btn" style="padding:0.5rem 1rem;font-size:0.88rem;">➕ Ajouter une pièce</button>
+      </div>
+      <h2 id="stock-atelier-categorie-titre" style="margin:0 0 0.9rem;"></h2>
       <input type="text" id="stock-atelier-search" placeholder="🔍 Rechercher une pièce (nom ou précision)…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:1rem;font-size:0.9rem;">
       <div id="stock-atelier-list"></div>
-      <div class="empty" id="stock-atelier-empty-msg" style="display:none;">Aucune pièce dans le stock atelier pour le moment.</div>
+      <div class="empty" id="stock-atelier-empty-msg" style="display:none;">Aucune pièce dans cette catégorie pour le moment.</div>
     </div>
   </div>
 
@@ -537,8 +557,14 @@
         <input type="text" id="sae-nom" placeholder="ex : Joystick, Courroie, Filtre à eau…">
       </div>
       <div class="field" style="margin-bottom:0.8rem;">
-        <label>Catégorie</label>
-        <select id="sae-categorie">
+        <label>Catégorie <span style="font-weight:400;color:var(--text-muted);">(facultatif)</span></label>
+        <select id="sae-categorie-boite">
+          <option value="">Aucune catégorie</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0.8rem;">
+        <label>Nature</label>
+        <select id="sae-nature">
           <option value="piece">Pièce</option>
           <option value="composant">Composant électronique</option>
         </select>
