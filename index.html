@@ -549,7 +549,14 @@
       <div style="display:flex;align-items:center;gap:0.7rem;margin-bottom:0.9rem;">
         <img id="stock-atelier-categorie-logo-img" src="" style="width:44px;height:44px;object-fit:contain;border-radius:8px;display:none;">
         <h2 id="stock-atelier-categorie-titre" style="margin:0;flex:1;"></h2>
+        <button class="btn btn-outline" id="stock-atelier-categorie-renommer-btn" style="font-size:0.78rem;padding:0.4rem 0.7rem;display:none;">✏️ Renommer</button>
         <button class="btn btn-outline" id="stock-atelier-categorie-logo-btn" style="font-size:0.78rem;padding:0.4rem 0.7rem;display:none;">🖼️ Logo</button>
+      </div>
+      <div id="stock-atelier-categorie-renommer-form" style="display:none;margin-bottom:0.9rem;">
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="stock-atelier-categorie-renommer-nom" style="flex:1;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+          <button class="btn btn-primary" id="stock-atelier-categorie-renommer-valider" style="padding:0.5rem 0.9rem;">Valider</button>
+        </div>
       </div>
       <input type="text" id="stock-atelier-search" placeholder="🔍 Rechercher une pièce (nom ou précision)…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:1rem;font-size:0.9rem;">
       <div id="stock-atelier-list"></div>

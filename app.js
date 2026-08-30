@@ -1451,9 +1451,13 @@ function openStockAtelierCategorie(categorieId){
 
   const logoImg = document.getElementById('stock-atelier-categorie-logo-img');
   const logoBtn = document.getElementById('stock-atelier-categorie-logo-btn');
+  const renommerBtn = document.getElementById('stock-atelier-categorie-renommer-btn');
+  document.getElementById('stock-atelier-categorie-renommer-form').style.display = 'none';
   if(cat){
     logoBtn.style.display = 'inline-block';
     logoBtn.dataset.catId = cat.app_id;
+    renommerBtn.style.display = 'inline-block';
+    renommerBtn.dataset.catId = cat.app_id;
     if(cat.logo_base64){
       logoImg.src = cat.logo_base64;
       logoImg.style.display = 'block';
@@ -1461,8 +1465,9 @@ function openStockAtelierCategorie(categorieId){
       logoImg.style.display = 'none';
     }
   } else {
-    // "Sans catégorie" n'a pas de logo (ce n'est pas une vraie catégorie)
+    // "Sans catégorie" ne peut pas être renommée ni avoir de logo (ce n'est pas une vraie catégorie)
     logoBtn.style.display = 'none';
+    renommerBtn.style.display = 'none';
     logoImg.style.display = 'none';
   }
 
@@ -1471,6 +1476,35 @@ function openStockAtelierCategorie(categorieId){
   document.getElementById('view-stock-atelier-categorie').classList.add('active');
   renderStockAtelierList();
 }
+
+document.getElementById('stock-atelier-categorie-renommer-btn').addEventListener('click', () => {
+  const form = document.getElementById('stock-atelier-categorie-renommer-form');
+  const ouvert = form.style.display === 'block';
+  form.style.display = ouvert ? 'none' : 'block';
+  if(!ouvert){
+    document.getElementById('stock-atelier-categorie-renommer-nom').value = document.getElementById('stock-atelier-categorie-titre').textContent;
+    document.getElementById('stock-atelier-categorie-renommer-nom').focus();
+  }
+});
+
+document.getElementById('stock-atelier-categorie-renommer-valider').addEventListener('click', async () => {
+  const catId = document.getElementById('stock-atelier-categorie-renommer-btn').dataset.catId;
+  const nouveauNom = document.getElementById('stock-atelier-categorie-renommer-nom').value.trim();
+  if(!nouveauNom){ showToast('Merci de saisir un nom', true); return; }
+  try{
+    const { error } = await sb.from('stock_atelier_categories').update({ nom: nouveauNom }).eq('app_id', catId);
+    if(error) throw error;
+    const cat = stockAtelierCategories.find(c => c.app_id === catId);
+    if(cat) cat.nom = nouveauNom;
+    document.getElementById('stock-atelier-categorie-titre').textContent = nouveauNom;
+    document.getElementById('stock-atelier-categorie-renommer-form').style.display = 'none';
+    peuplerSelectCategorieAtelier();
+    showToast('Catégorie renommée ✓');
+  }catch(e){
+    console.error('Erreur renommage catégorie :', e);
+    showToast('Échec du renommage', true);
+  }
+});
 
 document.getElementById('p-logo-waze-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
