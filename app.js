@@ -2510,7 +2510,7 @@ let devisLight = [];
 
 async function loadDevisLight(){
   try{
-    const { data, error } = await sb.from('devis').select('app_id,numero,rapport_app_id,annee,sequence,statut_client,motif_refus,date_reponse_client').order('sequence', { ascending: false });
+    const { data, error } = await sb.from('devis').select('app_id,numero,rapport_app_id,annee,sequence,statut,statut_client,motif_refus,date_reponse_client').order('sequence', { ascending: false });
     if(error) throw error;
     devisLight = data || [];
   }catch(e){
@@ -7201,6 +7201,16 @@ function buildDossierItem(rapports){
     ? `<span class="badge red" style="font-size:0.7rem;">Reste ${totalReste.toFixed(2)} €</span>`
     : '';
 
+  // Devis lié (le plus récent des devis liés à un des appareils de ce dossier)
+  const devisLies = rapports.map(r => devisLight.find(d => d.rapport_app_id === r.id)).filter(Boolean);
+  const devisRecent = devisLies.sort((a,b) => (b.sequence||0) - (a.sequence||0))[0];
+  const devisBadge = devisRecent ? (
+    devisRecent.statut_client === 'accepte' ? '<span class="badge" style="font-size:0.7rem;background:rgba(63,191,111,0.12);color:var(--green,#3fbf6f);border:1px solid var(--green,#3fbf6f);">✅ Devis accepté</span>'
+    : devisRecent.statut_client === 'refuse' ? '<span class="badge" style="font-size:0.7rem;background:rgba(224,82,82,0.12);color:#e05252;border:1px solid #e05252;">❌ Devis refusé</span>'
+    : devisRecent.statut === 'envoye' ? '<span class="badge" style="font-size:0.7rem;background:rgba(26,115,200,0.12);color:#1a73c8;border:1px solid #1a73c8;">📤 Devis envoyé</span>'
+    : '<span class="badge" style="font-size:0.7rem;background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);">📝 Devis généré</span>'
+  ) : '';
+
   item.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;width:100%;">
       <div style="flex:1;min-width:0;">
@@ -7214,6 +7224,7 @@ function buildDossierItem(rapports){
         <div style="font-weight:700;color:var(--orange);font-size:1rem;">${totalFmt}</div>
         <div style="margin-top:0.3rem;">${factureBadge}</div>
         ${resteBadge ? '<div style="margin-top:0.25rem;">'+resteBadge+'</div>' : ''}
+        ${devisBadge ? '<div style="margin-top:0.25rem;">'+devisBadge+'</div>' : ''}
       </div>
     </div>
   `;
@@ -7513,6 +7524,14 @@ function renderDetailContent(r, container){
   html += dRow('Moyen de paiement', escapeHtml(r['paiement-moyen']));
   const reste = parseFloat(r['reste-encaisser']) || 0;
   html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Reste à encaisser</span><span class="dvalue" style="font-weight:700;color:${reste > 0 ? 'var(--orange)' : 'var(--green,#3fbf6f)'};">${reste.toFixed(2)} €</span></div>`;
+  const devisLie = devisLight.find(d => d.rapport_app_id === r.id);
+  if(devisLie){
+    const infoDevis = devisLie.statut_client === 'accepte' ? { label: '✅ Devis accepté', couleur: 'var(--green,#3fbf6f)' }
+      : devisLie.statut_client === 'refuse' ? { label: '❌ Devis refusé' + (devisLie.motif_refus ? ' — ' + escapeHtml(devisLie.motif_refus) : ''), couleur: '#e05252' }
+      : devisLie.statut === 'envoye' ? { label: '📤 Devis envoyé', couleur: '#1a73c8' }
+      : { label: '📝 Devis généré', couleur: 'var(--text-muted)' };
+    html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Devis</span><span class="dvalue" style="font-weight:600;color:${infoDevis.couleur};">${infoDevis.label}</span></div>`;
+  }
   html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Facture créée</span><span class="dvalue" style="font-weight:600;color:${r['facture-creee'] ? 'var(--green,#3fbf6f)' : 'var(--orange)'};">${r['facture-creee'] ? 'Oui' : 'Non'}</span></div>`;
   html += '</div>';
 
