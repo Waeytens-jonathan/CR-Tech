@@ -9064,6 +9064,57 @@ document.getElementById('p-avis-add-btn').addEventListener('click', () => {
 // ==================== PARAMÈTRES AGENDA (Supabase) ====================
 
 // Accordéon des sections de Paramètres
+const PARAMS_SECTIONS = [
+  { slug: 'agenda', titre: 'Agenda', icone: '📅' },
+  { slug: 'banniere', titre: 'Bannière de fermeture', icone: '📢' },
+  { slug: 'avis-clients', titre: 'Avis clients', icone: '⭐' },
+  { slug: 'message-avis', titre: "Message d'avis", icone: '⭐' },
+  { slug: 'charges', titre: 'Charges', icone: '💼' },
+  { slug: 'archivage', titre: 'Archivage auto', icone: '📦' },
+  { slug: 'logo-waze', titre: 'Logo Waze', icone: '🗺️' },
+  { slug: 'livraison', titre: 'Tarifs livraison', icone: '🚚' },
+  { slug: 'export-cr', titre: 'Export CR archivés', icone: '📥' },
+  { slug: 'numerotation', titre: 'Numérotation', icone: '🔢' },
+  { slug: 'rib', titre: 'RIB', icone: '🏦' },
+  { slug: 'tarifs-em', titre: 'Tarifs électroménager', icone: '🔧' },
+  { slug: 'tarifs-gaming', titre: 'Tarifs gaming', icone: '🎮' },
+  { slug: 'tarifs-info', titre: 'Tarifs informatique', icone: '💻' }
+];
+
+function renderParamsGrid(){
+  const grid = document.getElementById('params-grid');
+  grid.innerHTML = PARAMS_SECTIONS.map(s => `
+    <div class="params-tile" data-slug="${s.slug}" style="border:1px solid var(--border);border-radius:12px;padding:1rem 0.6rem;text-align:center;cursor:pointer;background:rgba(255,255,255,0.02);">
+      <div style="font-size:1.6rem;margin-bottom:0.3rem;">${s.icone}</div>
+      <div style="font-weight:600;font-size:0.82rem;">${s.titre}</div>
+    </div>`).join('');
+  grid.querySelectorAll('.params-tile').forEach(el => {
+    el.addEventListener('click', () => showParamsPanel(el.dataset.slug));
+  });
+}
+
+function showParamsPanel(slug){
+  document.getElementById('params-grid').style.display = 'none';
+  document.getElementById('params-back-btn').style.display = 'inline-block';
+  document.querySelectorAll('.settings-section').forEach(el => {
+    if(el.id === 'params-panel-' + slug){
+      el.style.display = 'block';
+      el.classList.add('open');
+    } else {
+      el.style.display = 'none';
+    }
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function showParamsGridView(){
+  document.getElementById('params-grid').style.display = 'grid';
+  document.getElementById('params-back-btn').style.display = 'none';
+  document.querySelectorAll('.settings-section').forEach(el => { el.style.display = 'none'; });
+}
+
+document.getElementById('params-back-btn').addEventListener('click', showParamsGridView);
+
 document.querySelectorAll('.settings-section-header').forEach(header => {
   header.addEventListener('click', () => {
     header.closest('.settings-section').classList.toggle('open');
@@ -9072,6 +9123,8 @@ document.querySelectorAll('.settings-section-header').forEach(header => {
 
 // Chargement de l'onglet Paramètres
 document.getElementById('tab-parametres') && document.getElementById('tab-parametres').addEventListener('click', async () => {
+  renderParamsGrid();
+  showParamsGridView();
   const params = await getAgendaParams();
   // Agenda
   document.getElementById('p-matin-debut').value     = params.matinDebut || '08:00';

@@ -1315,8 +1315,12 @@
     <div class="card">
       <h2 style="margin:0 0 1.2rem;">⚙️ Paramètres</h2>
 
+      <button class="btn btn-outline" id="params-back-btn" style="display:none;margin-bottom:1rem;padding:0.45rem 0.9rem;font-size:0.88rem;">← Retour aux réglages</button>
+
+      <div id="params-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.7rem;margin-bottom:1.2rem;"></div>
+
       <!-- AGENDA -->
-      <div class="settings-section open" data-section="agenda">
+      <div class="settings-section open" data-section="agenda" id="params-panel-agenda">
         <div class="settings-section-header"><h3>📅 Agenda</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
@@ -1340,7 +1344,7 @@
       </div>
 
       <!-- BANNIERE FERMETURE -->
-      <div class="settings-section" data-section="banniere">
+      <div class="settings-section" data-section="banniere" id="params-panel-banniere">
         <div class="settings-section-header"><h3>📢 Bannière de fermeture</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem;">
@@ -1360,7 +1364,7 @@
       </div>
 
       <!-- AVIS CLIENTS -->
-      <div class="settings-section" data-section="avis">
+      <div class="settings-section" data-section="avis" id="params-panel-avis-clients">
         <div class="settings-section-header"><h3>⭐ Avis clients (site public)</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div style="margin-bottom:0.8rem;">
@@ -1384,7 +1388,7 @@
 
       <!-- CHARGES -->
       <!-- MESSAGE AVIS -->
-      <div class="settings-section" data-section="avis">
+      <div class="settings-section" data-section="avis" id="params-panel-message-avis">
         <div class="settings-section-header"><h3>⭐ Message de demande d'avis</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Texte envoyé par SMS quand tu cliques sur "⭐ Avis"</label>
@@ -1393,7 +1397,7 @@
         </div>
       </div>
 
-      <div class="settings-section" data-section="charges">
+      <div class="settings-section" data-section="charges" id="params-panel-charges">
         <div class="settings-section-header"><h3>💼 Charges (statistiques)</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Taux URSSAF (%)</label>
@@ -1403,7 +1407,7 @@
       </div>
 
       <!-- ARCHIVAGE -->
-      <div class="settings-section" data-section="archivage">
+      <div class="settings-section" data-section="archivage" id="params-panel-archivage">
         <div class="settings-section-header"><h3>📦 Archivage automatique</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Délai avant archivage automatique (heures)</label>
@@ -1413,7 +1417,7 @@
       </div>
 
       <!-- LOGO WAZE -->
-      <div class="settings-section" data-section="logo-waze">
+      <div class="settings-section" data-section="logo-waze" id="params-panel-logo-waze">
         <div class="settings-section-header"><h3>🗺️ Logo Waze</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.7rem;">
@@ -1425,7 +1429,7 @@
       </div>
 
       <!-- TARIFS LIVRAISON -->
-      <div class="settings-section" data-section="livraison">
+      <div class="settings-section" data-section="livraison" id="params-panel-livraison">
         <div class="settings-section-header"><h3>🚚 Tarifs de livraison des pièces</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div id="p-livraison-rows" style="margin-bottom:0.6rem;"></div>
@@ -1435,7 +1439,7 @@
       </div>
 
       <!-- EXPORT CR ARCHIVÉS -->
-      <div class="settings-section" data-section="export-cr">
+      <div class="settings-section" data-section="export-cr" id="params-panel-export-cr">
         <div class="settings-section-header"><h3>📥 Export des comptes-rendus archivés</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.8rem;">Régénère et télécharge en un ZIP tous les comptes-rendus des dossiers archivés, directement sur cet appareil — indépendamment du récap hebdomadaire automatique par email.</p>
@@ -1445,7 +1449,7 @@
       </div>
 
       <!-- NUMÉROTATION -->
-      <div class="settings-section" data-section="numerotation">
+      <div class="settings-section" data-section="numerotation" id="params-panel-numerotation">
         <div class="settings-section-header"><h3>🔢 Numérotation factures & devis</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div id="p-numero-preview" style="background:var(--bg-soft,#1a2a3d);border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:1rem;font-size:0.85rem;">
@@ -1461,7 +1465,7 @@
       </div>
 
       <!-- RIB -->
-      <div class="settings-section" data-section="rib">
+      <div class="settings-section" data-section="rib" id="params-panel-rib">
         <div class="settings-section-header"><h3>🏦 Coordonnées bancaires (RIB)</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <p style="font-size:0.75rem;color:var(--text-muted);margin:0 0 0.8rem;">Affichées en bas de vos factures pour les règlements par virement. Laissez vide pour ne rien afficher.</p>
@@ -1475,7 +1479,7 @@
       </div>
 
       <!-- TARIFS ÉLECTROMÉNAGER -->
-      <div class="settings-section" data-section="tarifs-em">
+      <div class="settings-section" data-section="tarifs-em" id="params-panel-tarifs-em">
         <div class="settings-section-header"><h3>🔧 Tarifs électroménager</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
@@ -1490,7 +1494,7 @@
       </div>
 
       <!-- TARIFS GAMING -->
-      <div class="settings-section" data-section="tarifs-gaming">
+      <div class="settings-section" data-section="tarifs-gaming" id="params-panel-tarifs-gaming">
         <div class="settings-section-header"><h3>🎮 Tarifs gaming</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
@@ -1503,7 +1507,7 @@
       </div>
 
       <!-- TARIFS INFORMATIQUE -->
-      <div class="settings-section" data-section="tarifs-info">
+      <div class="settings-section" data-section="tarifs-info" id="params-panel-tarifs-info">
         <div class="settings-section-header"><h3>💻 Tarifs informatique</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
