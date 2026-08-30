@@ -612,7 +612,7 @@
           </div>
         </div>
       </div>
-      <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:1.2rem;">
+      <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">
         <div class="field">
           <label>Quantité</label>
           <input type="number" id="sae-quantite" min="0" step="1" value="1">
@@ -621,6 +621,10 @@
           <label>Seuil d'alerte</label>
           <input type="number" id="sae-seuil" min="0" step="1" value="2">
         </div>
+      </div>
+      <div class="field" style="margin-bottom:1.2rem;">
+        <label>Prix <span style="font-weight:400;color:var(--text-muted);">(facultatif)</span></label>
+        <input type="number" id="sae-prix" min="0" step="0.01" placeholder="ex : 12.50">
       </div>
 
       <button class="btn btn-primary" id="stock-atelier-save-btn" style="width:100%;margin-bottom:0.6rem;">Enregistrer</button>

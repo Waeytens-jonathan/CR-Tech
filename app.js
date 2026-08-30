@@ -1617,7 +1617,7 @@ function renderPieceRow(p, avecCategorie){
     <div class="list-item" style="cursor:pointer;${enAlerte ? 'border-color:#e05252;' : ''}" data-app-id="${escapeHtml(p.app_id)}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
         <div style="min-width:0;flex:1;">
-          <strong>${escapeHtml(p.nom||'')}</strong>${p.precision ? ' <span style="color:var(--text-muted);font-size:0.85rem;">— ' + escapeHtml(p.precision) + '</span>' : ''}
+          <strong>${escapeHtml(p.nom||'')}</strong>${p.precision ? ' <span style="color:var(--text-muted);font-size:0.85rem;">— ' + escapeHtml(p.precision) + '</span>' : ''}${p.prix != null ? ' <span style="color:var(--orange);font-size:0.85rem;font-weight:600;">' + parseFloat(p.prix).toFixed(2) + ' €</span>' : ''}
           <div style="margin-top:0.3rem;">
             <span class="badge" style="background:${typeInfo.couleur}22;color:${typeInfo.couleur};border:1px solid ${typeInfo.couleur};font-size:0.7rem;">${typeInfo.label}</span>
             ${cat ? '<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);font-size:0.7rem;margin-left:4px;">📦 ' + escapeHtml(cat.nom) + '</span>' : ''}
@@ -1738,6 +1738,7 @@ function openStockAtelierEdit(appId, categorieIdPreremplie){
   document.getElementById('sae-nom').value = item ? (item.nom || '') : '';
   document.getElementById('sae-quantite').value = item ? (item.quantite ?? 1) : 1;
   document.getElementById('sae-seuil').value = item ? (item.seuil_alerte ?? 2) : 2;
+  document.getElementById('sae-prix').value = item && item.prix != null ? item.prix : '';
 
   peuplerSelectCategorieAtelier();
   document.getElementById('sae-categorie-boite').value = item ? (item.categorie_id || '') : (categorieIdPreremplie || '');
@@ -1797,7 +1798,8 @@ document.getElementById('stock-atelier-save-btn').addEventListener('click', asyn
     type,
     categorie_id: document.getElementById('sae-categorie-boite').value || null,
     quantite: parseInt(document.getElementById('sae-quantite').value, 10) || 0,
-    seuil_alerte: parseInt(document.getElementById('sae-seuil').value, 10) || 0
+    seuil_alerte: parseInt(document.getElementById('sae-seuil').value, 10) || 0,
+    prix: document.getElementById('sae-prix').value !== '' ? parseFloat(document.getElementById('sae-prix').value) : null
   };
 
   const btn = document.getElementById('stock-atelier-save-btn');
