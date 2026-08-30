@@ -7420,6 +7420,7 @@ function getScheduledPosePieceRdv(r){
 }
 
 const PIECE_SUIVI_LABELS = {
+  en_attente: { label: '⏳ En attente', color: '#888' },
   en_commande: { label: '📦 En commande', color: '#f5a623' },
   en_livraison: { label: '🚚 En livraison', color: '#1a73c8' },
   recu: { label: '✅ Pièce reçue', color: '#3fbf6f' },
