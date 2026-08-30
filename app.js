@@ -6010,24 +6010,15 @@ document.getElementById('f-commande-piece').addEventListener('change', e => {
   }
 });
 
-// ---------- Bascule Stock / Commande (étape Pièces) ----------
-function setPieceMode(mode){
-  const stockBtn = document.getElementById('piece-mode-stock-btn');
-  const commandeBtn = document.getElementById('piece-mode-commande-btn');
-  const stockSection = document.getElementById('piece-mode-stock-section');
-  const commandeSection = document.getElementById('piece-mode-commande-section');
-
-  stockBtn.classList.toggle('btn-secondary', mode === 'stock');
-  stockBtn.classList.toggle('btn-outline', mode !== 'stock');
-  commandeBtn.classList.toggle('btn-secondary', mode === 'commande');
-  commandeBtn.classList.toggle('btn-outline', mode !== 'commande');
-
-  stockSection.style.display = mode === 'stock' ? 'block' : 'none';
-  commandeSection.style.display = mode === 'commande' ? 'block' : 'none';
-}
-
-document.getElementById('piece-mode-stock-btn').addEventListener('click', () => setPieceMode('stock'));
-document.getElementById('piece-mode-commande-btn').addEventListener('click', () => setPieceMode('commande'));
+// ---------- Bouton "Commander une pièce" : révèle directement le formulaire, sans étape intermédiaire ----------
+document.getElementById('toggle-commande-piece-btn').addEventListener('click', () => {
+  const checkbox = document.getElementById('f-commande-piece');
+  checkbox.checked = !checkbox.checked;
+  checkbox.dispatchEvent(new Event('change'));
+  const btn = document.getElementById('toggle-commande-piece-btn');
+  btn.classList.toggle('btn-secondary', checkbox.checked);
+  btn.classList.toggle('btn-outline', !checkbox.checked);
+});
 
 // ---------- Effet de la garantie : client ne paie rien ----------
 document.getElementById('f-garantie').addEventListener('change', e => {
@@ -6878,10 +6869,11 @@ function resetForm(){
   document.getElementById('f-date').value = todayISO();
   document.getElementById('f-heure').value = new Date().toTimeString().slice(0,5);
   document.getElementById('f-technicien').value = 'Jonathan';
-  document.getElementById('f-statut').value = 'Terminée';
+  document.getElementById('f-statut').value = 'Attente_piece';
+  document.getElementById('f-duree').value = '60';
   populerSelectLivraison();
   document.getElementById('f-livraison').value = '0';
-  document.getElementById('f-paiement-statut').value = 'Paye_total';
+  document.getElementById('f-paiement-statut').value = 'Non_paye';
   document.getElementById('f-paiement-statut').disabled = false;
   document.getElementById('f-reste-encaisser').value = '0.00';
   document.getElementById('f-remise-valeur').value = '';
@@ -6889,7 +6881,9 @@ function resetForm(){
   document.getElementById('commande-piece-fields').style.display = 'none';
   document.getElementById('acompte-field').style.display = 'none';
   document.getElementById('paiement-mixte-fields').style.display = 'none';
-  setPieceMode('stock');
+  const toggleCommandeBtn = document.getElementById('toggle-commande-piece-btn');
+  toggleCommandeBtn.classList.remove('btn-secondary');
+  toggleCommandeBtn.classList.add('btn-outline');
   // delete-btn supprimé
   signatureData = null;
   updateSigPreview();
@@ -6953,7 +6947,11 @@ async function loadIntoForm(report){
     selectedStockPieces = [];
   }
   renderStockPiecesSelectedList();
-  setPieceMode((report['commande-piece'] || selectedStockPieces.length) ? (report['commande-piece'] ? 'commande' : 'stock') : 'stock');
+  const commandeActive = !!report['commande-piece'];
+  document.getElementById('f-commande-piece').checked = commandeActive;
+  document.getElementById('commande-piece-fields').style.display = commandeActive ? 'block' : 'none';
+  document.getElementById('toggle-commande-piece-btn').classList.toggle('btn-secondary', commandeActive);
+  document.getElementById('toggle-commande-piece-btn').classList.toggle('btn-outline', !commandeActive);
   document.getElementById('f-paiement-statut').disabled = !!report.garantie;
   updateEmailBtnVisibility();
 }

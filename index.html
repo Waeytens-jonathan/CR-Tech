@@ -1074,22 +1074,14 @@
       </div>
 
       <div style="display:flex;gap:0.6rem;margin:1rem 0;">
-        <button type="button" class="btn btn-secondary piece-mode-btn active" data-mode="stock" id="piece-mode-stock-btn" style="flex:1;">📦 Pièce en stock</button>
-        <button type="button" class="btn btn-outline piece-mode-btn" data-mode="commande" id="piece-mode-commande-btn" style="flex:1;">🛒 Commander une pièce</button>
+        <button type="button" class="btn btn-secondary" id="open-stock-picker-btn" style="flex:1;">📦 Utiliser une pièce du stock</button>
+        <button type="button" class="btn btn-outline" id="toggle-commande-piece-btn" style="flex:1;">🛒 Commander une pièce</button>
       </div>
 
-      <!-- Mode STOCK -->
-      <div id="piece-mode-stock-section">
-        <button type="button" class="btn btn-secondary" id="open-stock-picker-btn" style="margin-bottom:0.8rem;">📦 Ajouter une pièce du stock</button>
-        <div id="stock-pieces-selected-list"></div>
-      </div>
+      <div id="stock-pieces-selected-list"></div>
 
-      <!-- Mode COMMANDE -->
-      <div id="piece-mode-commande-section" style="display:none;">
-        <div class="checkbox-row">
-          <input type="checkbox" id="f-commande-piece">
-          <label for="f-commande-piece">Une commande de pièce est nécessaire</label>
-        </div>
+      <div id="piece-mode-commande-section">
+        <input type="checkbox" id="f-commande-piece" style="display:none;">
         <div id="commande-piece-fields" style="margin-top:0.8rem; display:none;">
           <input type="hidden" id="f-piece-desc">
           <input type="hidden" id="f-pieces-commandees-json">
