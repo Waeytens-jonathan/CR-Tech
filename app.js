@@ -1472,6 +1472,29 @@ function openStockAtelierCategorie(categorieId){
   renderStockAtelierList();
 }
 
+document.getElementById('p-logo-waze-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const logoCompresse = await recompressDataUrl(dataUrl, 120, 0.85);
+    const { error } = await sb.from('agenda_config').update({ logo_waze: logoCompresse }).eq('id', 1);
+    if(error) throw error;
+    if(_agendaConfigCache) _agendaConfigCache.logoWaze = logoCompresse;
+    document.getElementById('p-logo-waze-apercu').src = logoCompresse;
+    document.getElementById('p-logo-waze-apercu').style.display = 'block';
+    showToast('Logo Waze mis à jour ✓');
+  }catch(err){
+    console.error('Erreur changement logo Waze :', err);
+    showToast('Échec de l\'import du logo', true);
+  }
+});
+
 document.getElementById('stock-atelier-categorie-logo-btn').addEventListener('click', () => {
   const logoInput = document.getElementById('stock-atelier-changer-logo-input');
   logoInput.dataset.catId = document.getElementById('stock-atelier-categorie-logo-btn').dataset.catId;
@@ -4291,7 +4314,8 @@ async function showAgendaDetail(appId){
   const addrCopie = `${r.adresse||''}${r.adresse2 ? ', ' + r.adresse2 : ''} ${r.cp||''} ${r.ville||''}`.trim();
   if(addrFull){
     html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.4rem;">';
-    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull).replace(/'/g,'%27')}'))">🗺️ Waze</button>`;
+    const logoWazeHtml = (_agendaConfigCache && _agendaConfigCache.logoWaze) ? `<img src="${_agendaConfigCache.logoWaze}" style="width:16px;height:16px;object-fit:contain;vertical-align:-3px;margin-right:0.3rem;">` : '🗺️ ';
+    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull).replace(/'/g,'%27')}'))">${logoWazeHtml}Waze</button>`;
     html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie).replace(/'/g,'%27')}'))">📋 Copier adresse</button>`;
     html += '</div>';
   }
@@ -7631,7 +7655,8 @@ function renderDetailContent(r, container){
   const addrCopie = `${r.adresse||''}${r.adresse2 ? ', ' + r.adresse2 : ''} ${r.cp||''} ${r.ville||''}`.trim();
   if(addrFull){
     html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">';
-    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull).replace(/'/g,'%27')}'))">🗺️ Waze</button>`;
+    const logoWazeHtml = (_agendaConfigCache && _agendaConfigCache.logoWaze) ? `<img src="${_agendaConfigCache.logoWaze}" style="width:16px;height:16px;object-fit:contain;vertical-align:-3px;margin-right:0.3rem;">` : '🗺️ ';
+    html += `<button class="btn btn-secondary" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="openWaze(decodeURIComponent('${encodeURIComponent(addrFull).replace(/'/g,'%27')}'))">${logoWazeHtml}Waze</button>`;
     html += `<button class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.8rem;" onclick="copyAddr(decodeURIComponent('${encodeURIComponent(addrCopie).replace(/'/g,'%27')}'))">📋 Copier adresse</button>`;
 
     html += '</div>';
@@ -9078,6 +9103,12 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   renderTarifsLivraisonRows();
   document.getElementById('p-numero-facture-override').value = params.numeroFactureOverride ?? '';
   document.getElementById('p-numero-devis-override').value = params.numeroDevisOverride ?? '';
+  if(params.logoWaze){
+    document.getElementById('p-logo-waze-apercu').src = params.logoWaze;
+    document.getElementById('p-logo-waze-apercu').style.display = 'block';
+  } else {
+    document.getElementById('p-logo-waze-apercu').style.display = 'none';
+  }
   document.getElementById('p-rib-titulaire').value = params.ribTitulaire ?? '';
   document.getElementById('p-rib-iban').value = params.ribIban ?? '';
   document.getElementById('p-rib-bic').value = params.ribBic ?? '';
@@ -9249,6 +9280,7 @@ async function getAgendaParams(){
       messageAvis: data.message_avis || null,
       tarifsLivraison: data.tarifs_livraison || null,
       numeroFactureOverride: data.numero_facture_override ?? null,
+      logoWaze: data.logo_waze ?? null,
       numeroDevisOverride: data.numero_devis_override ?? null,
       ribTitulaire: data.rib_titulaire ?? '',
       ribIban: data.rib_iban ?? '',
