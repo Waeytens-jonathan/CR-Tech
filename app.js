@@ -1575,6 +1575,73 @@ const STOCK_ATELIER_TYPE_LABELS = {
   composant: { label: 'Composant', couleur: '#f5a623' }
 };
 
+function renderPieceRow(p, avecCategorie){
+  const typeInfo = STOCK_ATELIER_TYPE_LABELS[p.type] || STOCK_ATELIER_TYPE_LABELS.achetee;
+  const enAlerte = (p.quantite ?? 0) <= (p.seuil_alerte ?? 0);
+  const cat = avecCategorie && p.categorie_id ? stockAtelierCategories.find(c => c.app_id === p.categorie_id) : null;
+  return `
+    <div class="list-item" style="cursor:pointer;${enAlerte ? 'border-color:#e05252;' : ''}" data-app-id="${escapeHtml(p.app_id)}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+        <div style="min-width:0;flex:1;">
+          <strong>${escapeHtml(p.nom||'')}</strong>${p.precision ? ' <span style="color:var(--text-muted);font-size:0.85rem;">— ' + escapeHtml(p.precision) + '</span>' : ''}
+          <div style="margin-top:0.3rem;">
+            <span class="badge" style="background:${typeInfo.couleur}22;color:${typeInfo.couleur};border:1px solid ${typeInfo.couleur};font-size:0.7rem;">${typeInfo.label}</span>
+            ${cat ? '<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);font-size:0.7rem;margin-left:4px;">📦 ' + escapeHtml(cat.nom) + '</span>' : ''}
+            ${avecCategorie && !p.categorie_id ? '<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);font-size:0.7rem;margin-left:4px;">Sans catégorie</span>' : ''}
+            ${enAlerte ? '<span class="badge" style="background:rgba(224,82,82,0.2);color:#e05252;border:1px solid #e05252;font-size:0.7rem;margin-left:4px;">⚠️ Stock faible</span>' : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;" class="stock-atelier-qte-controls" data-app-id="${escapeHtml(p.app_id)}">
+          <button type="button" class="sa-qte-btn" data-delta="-1" data-app-id="${escapeHtml(p.app_id)}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1.1rem;cursor:pointer;">−</button>
+          <span style="min-width:24px;text-align:center;font-weight:700;${enAlerte?'color:#e05252;':''}">${p.quantite ?? 0}</span>
+          <button type="button" class="sa-qte-btn" data-delta="1" data-app-id="${escapeHtml(p.app_id)}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1.1rem;cursor:pointer;">+</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function attacherListenersPieces(container, retourVue){
+  container.querySelectorAll('.list-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if(e.target.closest('.stock-atelier-qte-controls')) return;
+      stockAtelierEditReturnView = retourVue;
+      openStockAtelierEdit(el.dataset.appId);
+    });
+  });
+  container.querySelectorAll('.sa-qte-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const appId = btn.dataset.appId;
+      const delta = parseInt(btn.dataset.delta, 10);
+      await ajusterQuantiteAtelier(appId, delta);
+    });
+  });
+}
+
+function renderStockAtelierRechercheGlobale(){
+  const q = document.getElementById('stock-atelier-recherche-globale').value.trim().toLowerCase();
+  const grid = document.getElementById('stock-atelier-categories-grid');
+  const resultatsEl = document.getElementById('stock-atelier-resultats-globaux');
+
+  if(!q){
+    resultatsEl.style.display = 'none';
+    grid.style.display = 'grid';
+    return;
+  }
+  grid.style.display = 'none';
+  resultatsEl.style.display = 'block';
+
+  const matches = stockAtelier.filter(p => (p.nom||'').toLowerCase().includes(q) || (p.precision||'').toLowerCase().includes(q));
+  if(!matches.length){
+    resultatsEl.innerHTML = '<div class="empty">Aucune pièce ne correspond à cette recherche.</div>';
+    return;
+  }
+  resultatsEl.innerHTML = matches.map(p => renderPieceRow(p, true)).join('');
+  attacherListenersPieces(resultatsEl, 'view-stock-atelier');
+}
+
+document.getElementById('stock-atelier-recherche-globale').addEventListener('input', renderStockAtelierRechercheGlobale);
+
 function renderStockAtelierList(){
   const container = document.getElementById('stock-atelier-list');
   const emptyEl = document.getElementById('stock-atelier-empty-msg');
@@ -1598,43 +1665,8 @@ function renderStockAtelierList(){
     return;
   }
 
-  container.innerHTML = filtres.map(p => {
-    const typeInfo = STOCK_ATELIER_TYPE_LABELS[p.type] || STOCK_ATELIER_TYPE_LABELS.achetee;
-    const enAlerte = (p.quantite ?? 0) <= (p.seuil_alerte ?? 0);
-    return `
-      <div class="list-item" style="cursor:pointer;${enAlerte ? 'border-color:#e05252;' : ''}" data-app-id="${escapeHtml(p.app_id)}">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
-          <div style="min-width:0;flex:1;">
-            <strong>${escapeHtml(p.nom||'')}</strong>${p.precision ? ' <span style="color:var(--text-muted);font-size:0.85rem;">— ' + escapeHtml(p.precision) + '</span>' : ''}
-            <div style="margin-top:0.3rem;">
-              <span class="badge" style="background:${typeInfo.couleur}22;color:${typeInfo.couleur};border:1px solid ${typeInfo.couleur};font-size:0.7rem;">${typeInfo.label}</span>
-              ${enAlerte ? '<span class="badge" style="background:rgba(224,82,82,0.2);color:#e05252;border:1px solid #e05252;font-size:0.7rem;margin-left:4px;">⚠️ Stock faible</span>' : ''}
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;" class="stock-atelier-qte-controls" data-app-id="${escapeHtml(p.app_id)}">
-            <button type="button" class="sa-qte-btn" data-delta="-1" data-app-id="${escapeHtml(p.app_id)}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1.1rem;cursor:pointer;">−</button>
-            <span style="min-width:24px;text-align:center;font-weight:700;${enAlerte?'color:#e05252;':''}">${p.quantite ?? 0}</span>
-            <button type="button" class="sa-qte-btn" data-delta="1" data-app-id="${escapeHtml(p.app_id)}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1.1rem;cursor:pointer;">+</button>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-
-  container.querySelectorAll('.list-item').forEach(el => {
-    el.addEventListener('click', (e) => {
-      if(e.target.closest('.stock-atelier-qte-controls')) return;
-      stockAtelierEditReturnView = 'view-stock-atelier-categorie';
-      openStockAtelierEdit(el.dataset.appId);
-    });
-  });
-  container.querySelectorAll('.sa-qte-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const appId = btn.dataset.appId;
-      const delta = parseInt(btn.dataset.delta, 10);
-      await ajusterQuantiteAtelier(appId, delta);
-    });
-  });
+  container.innerHTML = filtres.map(p => renderPieceRow(p, false)).join('');
+  attacherListenersPieces(container, 'view-stock-atelier-categorie');
 }
 
 async function ajusterQuantiteAtelier(appId, delta){

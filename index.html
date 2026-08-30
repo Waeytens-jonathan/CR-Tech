@@ -522,6 +522,9 @@
       </div>
       <h2 style="margin:0 0 0.9rem;">🏭 Stock atelier</h2>
 
+      <input type="text" id="stock-atelier-recherche-globale" placeholder="🔍 Rechercher une pièce dans tout le stock atelier…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:1rem;font-size:0.9rem;">
+      <div id="stock-atelier-resultats-globaux" style="display:none;margin-bottom:1rem;"></div>
+
       <div id="stock-atelier-categories-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.7rem;margin-bottom:0.9rem;"></div>
 
       <div id="stock-atelier-nouvelle-categorie-form" style="display:none;margin-bottom:0.9rem;">
@@ -1311,7 +1314,7 @@
 </div>
 
 <!-- ===================== VUE PARAMÈTRES ===================== -->
-  <div class="view" id="view-parametres">
+  <div class="view" id="view-parametres" style="max-width:900px;margin:0 auto;">
     <div class="card">
       <h2 style="margin:0 0 1.2rem;">⚙️ Paramètres</h2>
 
