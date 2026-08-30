@@ -1371,21 +1371,22 @@ function renderStockAtelierCategoriesGrid(){
   const boites = stockAtelierCategories.map(cat => {
     const pieces = stockAtelier.filter(p => p.categorie_id === cat.app_id);
     const nbAlerte = pieces.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
-    return { id: cat.app_id, nom: cat.nom, nb: pieces.length, nbAlerte };
+    return { id: cat.app_id, nom: cat.nom, nb: pieces.length, nbAlerte, logo: cat.logo_base64 || null };
   });
   const sansCategorie = stockAtelier.filter(p => !p.categorie_id);
   const nbAlerteSansCategorie = sansCategorie.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
 
-  const renderBoite = (id, nom, nb, nbAlerte) => `
+  const renderBoite = (id, nom, nb, nbAlerte, logo) => `
     <div class="stock-atelier-boite" data-cat-id="${id === null ? '' : escapeHtml(id)}" style="position:relative;border:1px solid var(--border);border-radius:12px;padding:1rem 0.8rem;text-align:center;cursor:pointer;background:rgba(255,255,255,0.02);${nbAlerte ? 'border-color:#e05252;' : ''}">
       ${id !== null ? `<span class="stock-atelier-boite-delete" data-cat-id="${escapeHtml(id)}" data-cat-nom="${escapeHtml(nom)}" style="position:absolute;top:0.3rem;right:0.4rem;color:var(--text-muted);font-size:0.9rem;cursor:pointer;padding:0.1rem 0.3rem;">✕</span>` : ''}
-      <div style="font-size:1.6rem;margin-bottom:0.3rem;">📦</div>
+      ${id !== null ? `<span class="stock-atelier-boite-logo-btn" data-cat-id="${escapeHtml(id)}" style="position:absolute;top:0.3rem;left:0.4rem;color:var(--text-muted);font-size:0.85rem;cursor:pointer;padding:0.1rem 0.3rem;">🖼️</span>` : ''}
+      ${logo ? `<img src="${logo}" style="width:40px;height:40px;object-fit:contain;margin-bottom:0.3rem;border-radius:6px;">` : `<div style="font-size:1.6rem;margin-bottom:0.3rem;">📦</div>`}
       <div style="font-weight:600;font-size:0.88rem;margin-bottom:0.2rem;">${escapeHtml(nom)}</div>
       <div style="font-size:0.78rem;color:var(--text-muted);">${nb} pièce${nb>1?'s':''}${nbAlerte ? ' · ⚠️ '+nbAlerte : ''}</div>
     </div>`;
 
-  grid.innerHTML = boites.map(b => renderBoite(b.id, b.nom, b.nb, b.nbAlerte)).join('')
-    + renderBoite(null, 'Sans catégorie', sansCategorie.length, nbAlerteSansCategorie);
+  grid.innerHTML = boites.map(b => renderBoite(b.id, b.nom, b.nb, b.nbAlerte, b.logo)).join('')
+    + renderBoite(null, 'Sans catégorie', sansCategorie.length, nbAlerteSansCategorie, null);
 
   grid.querySelectorAll('.stock-atelier-boite').forEach(el => {
     el.addEventListener('click', () => {
@@ -1398,7 +1399,40 @@ function renderStockAtelierCategoriesGrid(){
       await supprimerCategorieAtelier(el.dataset.catId, el.dataset.catNom);
     });
   });
+  grid.querySelectorAll('.stock-atelier-boite-logo-btn').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const logoInput = document.getElementById('stock-atelier-changer-logo-input');
+      logoInput.dataset.catId = el.dataset.catId;
+      logoInput.value = '';
+      logoInput.click();
+    });
+  });
 }
+
+document.getElementById('stock-atelier-changer-logo-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const catId = e.target.dataset.catId;
+  if(!file || !catId) return;
+  try{
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const logoCompresse = await recompressDataUrl(dataUrl, 200, 0.85);
+    const { error } = await sb.from('stock_atelier_categories').update({ logo_base64: logoCompresse }).eq('app_id', catId);
+    if(error) throw error;
+    const cat = stockAtelierCategories.find(c => c.app_id === catId);
+    if(cat) cat.logo_base64 = logoCompresse;
+    renderStockAtelierCategoriesGrid();
+    showToast('Logo mis à jour ✓');
+  }catch(err){
+    console.error('Erreur changement logo catégorie :', err);
+    showToast('Échec de l\'import du logo', true);
+  }
+});
 
 async function supprimerCategorieAtelier(categorieId, nom){
   if(!confirm(`Supprimer la catégorie "${nom}" ? Les pièces qu'elle contient ne seront pas supprimées, elles basculeront dans "Sans catégorie".`)) return;
@@ -1443,12 +1477,26 @@ document.getElementById('stock-atelier-nouvelle-categorie-btn').addEventListener
 document.getElementById('stock-atelier-nouvelle-categorie-valider').addEventListener('click', async () => {
   const nom = document.getElementById('stock-atelier-nouvelle-categorie-nom').value.trim();
   if(!nom){ showToast('Merci de saisir un nom', true); return; }
+  const btn = document.getElementById('stock-atelier-nouvelle-categorie-valider');
+  btn.disabled = true;
   try{
+    const logoFile = document.getElementById('stock-atelier-nouvelle-categorie-logo').files[0];
+    let logoCompresse = null;
+    if(logoFile){
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(logoFile);
+      });
+      logoCompresse = await recompressDataUrl(dataUrl, 200, 0.85);
+    }
     const app_id = 'stac_' + Date.now();
-    const { error } = await sb.from('stock_atelier_categories').insert({ app_id, nom });
+    const { error } = await sb.from('stock_atelier_categories').insert({ app_id, nom, logo_base64: logoCompresse });
     if(error) throw error;
-    stockAtelierCategories.push({ app_id, nom });
+    stockAtelierCategories.push({ app_id, nom, logo_base64: logoCompresse });
     document.getElementById('stock-atelier-nouvelle-categorie-nom').value = '';
+    document.getElementById('stock-atelier-nouvelle-categorie-logo').value = '';
     document.getElementById('stock-atelier-nouvelle-categorie-form').style.display = 'none';
     renderStockAtelierCategoriesGrid();
     peuplerSelectCategorieAtelier();
@@ -1457,6 +1505,7 @@ document.getElementById('stock-atelier-nouvelle-categorie-valider').addEventList
     console.error('Erreur création catégorie :', e);
     showToast('Échec de la création', true);
   }
+  btn.disabled = false;
 });
 
 function peuplerSelectCategorieAtelier(){
