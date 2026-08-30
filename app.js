@@ -5862,7 +5862,7 @@ function clearDraft(){
 
 function hasDraftContent(data){
   // Considère qu'il y a un brouillon utile si au moins un champ texte/coché est rempli
-  const skip = ['date','heure','technicien','statut','paiement-statut','reste-encaisser','livraison','cout-total','ref','id','_draftStep','photos','plaquePhoto','signature','remise-type'];
+  const skip = ['date','heure','technicien','statut','paiement-statut','reste-encaisser','livraison','cout-total','ref','id','_draftStep','photos','plaquePhoto','signature','remise-type','duree'];
   for(const key in data){
     if(skip.includes(key)) continue;
     const val = data[key];
