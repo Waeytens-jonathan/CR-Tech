@@ -5848,6 +5848,10 @@ function saveDraft(){
     const data = collectFormData();
     data.id = currentId;
     data._draftStep = currentStep;
+    if(!hasDraftContent(data)){
+      clearDraft();
+      return;
+    }
     localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
   }catch(e){}
 }
