@@ -1377,7 +1377,8 @@ function renderStockAtelierCategoriesGrid(){
   const nbAlerteSansCategorie = sansCategorie.filter(p => (p.quantite ?? 0) <= (p.seuil_alerte ?? 0)).length;
 
   const renderBoite = (id, nom, nb, nbAlerte) => `
-    <div class="stock-atelier-boite" data-cat-id="${id === null ? '' : escapeHtml(id)}" style="border:1px solid var(--border);border-radius:12px;padding:1rem 0.8rem;text-align:center;cursor:pointer;background:rgba(255,255,255,0.02);${nbAlerte ? 'border-color:#e05252;' : ''}">
+    <div class="stock-atelier-boite" data-cat-id="${id === null ? '' : escapeHtml(id)}" style="position:relative;border:1px solid var(--border);border-radius:12px;padding:1rem 0.8rem;text-align:center;cursor:pointer;background:rgba(255,255,255,0.02);${nbAlerte ? 'border-color:#e05252;' : ''}">
+      ${id !== null ? `<span class="stock-atelier-boite-delete" data-cat-id="${escapeHtml(id)}" data-cat-nom="${escapeHtml(nom)}" style="position:absolute;top:0.3rem;right:0.4rem;color:var(--text-muted);font-size:0.9rem;cursor:pointer;padding:0.1rem 0.3rem;">✕</span>` : ''}
       <div style="font-size:1.6rem;margin-bottom:0.3rem;">📦</div>
       <div style="font-weight:600;font-size:0.88rem;margin-bottom:0.2rem;">${escapeHtml(nom)}</div>
       <div style="font-size:0.78rem;color:var(--text-muted);">${nb} pièce${nb>1?'s':''}${nbAlerte ? ' · ⚠️ '+nbAlerte : ''}</div>
@@ -1391,6 +1392,30 @@ function renderStockAtelierCategoriesGrid(){
       openStockAtelierCategorie(el.dataset.catId || null);
     });
   });
+  grid.querySelectorAll('.stock-atelier-boite-delete').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await supprimerCategorieAtelier(el.dataset.catId, el.dataset.catNom);
+    });
+  });
+}
+
+async function supprimerCategorieAtelier(categorieId, nom){
+  if(!confirm(`Supprimer la catégorie "${nom}" ? Les pièces qu'elle contient ne seront pas supprimées, elles basculeront dans "Sans catégorie".`)) return;
+  try{
+    const { error: errUpdate } = await sb.from('stock_atelier').update({ categorie_id: null }).eq('categorie_id', categorieId);
+    if(errUpdate) throw errUpdate;
+    const { error: errDelete } = await sb.from('stock_atelier_categories').delete().eq('app_id', categorieId);
+    if(errDelete) throw errDelete;
+    stockAtelier.forEach(p => { if(p.categorie_id === categorieId) p.categorie_id = null; });
+    stockAtelierCategories = stockAtelierCategories.filter(c => c.app_id !== categorieId);
+    renderStockAtelierCategoriesGrid();
+    peuplerSelectCategorieAtelier();
+    showToast('Catégorie supprimée');
+  }catch(e){
+    console.error('Erreur suppression catégorie :', e);
+    showToast('Échec de la suppression', true);
+  }
 }
 
 function openStockAtelierCategorie(categorieId){
