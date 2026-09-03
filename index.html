@@ -367,12 +367,18 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.9rem;gap:0.6rem;flex-wrap:wrap;">
         <h2 style="margin:0;">Statistiques</h2>
-        <select id="stats-period" style="max-width:200px;">
-          <option value="month">Ce mois-ci</option>
-          <option value="last_month">Mois dernier</option>
-          <option value="year">Cette année</option>
-          <option value="all">Tout l'historique</option>
-        </select>
+        <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+          <div style="background:var(--bg-soft,#1a2a3d);border-radius:10px;padding:0.5rem 0.9rem;text-align:center;">
+            <div style="font-size:0.68rem;color:#778;text-transform:uppercase;letter-spacing:0.04em;">Aujourd'hui</div>
+            <div style="font-size:1.05rem;font-weight:700;" id="stat-ca-aujourdhui">0,00 €</div>
+          </div>
+          <select id="stats-period" style="max-width:200px;">
+            <option value="month">Ce mois-ci</option>
+            <option value="last_month">Mois dernier</option>
+            <option value="year">Cette année</option>
+            <option value="all">Tout l'historique</option>
+          </select>
+        </div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;margin-bottom:0.7rem;">
@@ -1371,18 +1377,8 @@
 
       <!-- AVIS CLIENTS -->
       <div class="settings-section" data-section="avis" id="params-panel-avis-clients">
-        <div class="settings-section-header"><h3>⭐ Avis clients (site public)</h3><span class="settings-section-chevron">▼</span></div>
+        <div class="settings-section-header"><h3>⭐ Alerte faux avis (site public)</h3><span class="settings-section-chevron">▼</span></div>
         <div class="settings-section-body">
-          <div style="margin-bottom:0.8rem;">
-            <label style="font-size:0.8rem;display:block;margin-bottom:0.3rem;">Note globale affichée (ex : 4.9)</label>
-            <input type="number" id="p-avis-note" min="1" max="5" step="0.1" style="width:120px;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
-          </div>
-          <label style="font-size:0.8rem;display:block;margin-bottom:0.4rem;">Vignettes avis (8 maximum)</label>
-          <div id="p-avis-rows" style="margin-bottom:0.6rem;"></div>
-          <button class="btn btn-outline" id="p-avis-add-btn" type="button" style="width:100%;">+ Ajouter un avis</button>
-
-          <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
-
           <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.6rem;">
             <input type="checkbox" id="p-alerte-avis-active" style="width:1.1rem;height:1.1rem;">
             <label for="p-alerte-avis-active" style="font-size:0.85rem;">Afficher une alerte "faux avis" au-dessus du bouton Google</label>

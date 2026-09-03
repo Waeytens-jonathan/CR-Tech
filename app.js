@@ -1066,6 +1066,12 @@ async function renderStats(){
     ? candidats.filter(r => r.date >= prevRange.start && r.date <= prevRange.end)
     : null;
 
+  // CA encaissé du jour même — toujours affiché, peu importe la période choisie dans le filtre
+  const todayISOStats = todayISO();
+  const caAujourdhui = candidats.filter(r => r.date === todayISOStats).reduce((s,r) => s + caEncaisseRapport(r), 0);
+  const elCaAujourdhui = document.getElementById('stat-ca-aujourdhui');
+  if(elCaAujourdhui) elCaAujourdhui.textContent = caAujourdhui.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+
   let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0, nbNonReparable = 0, nbPiecesPosees = 0;
   const caParJour = {};
   const marqueCount = {};
@@ -9006,131 +9012,6 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
 });
 
 // ==================== AVIS CLIENTS — LIGNES MULTIPLES ====================
-let avisRows = [];
-
-function pluralUnite(n, unite){
-  if(unite === 'mois') return 'mois'; // invariable en français
-  if(unite === 'an') return n > 1 ? 'ans' : 'an';
-  if(unite === 'semaine') return n > 1 ? 'semaines' : 'semaine';
-  return n > 1 ? 'jours' : 'jour'; // jour par défaut
-}
-
-function formatAvisDate(nombre, unite){
-  const n = parseInt(nombre) || 1;
-  return `Il y a ${n} ${pluralUnite(n, unite)}`;
-}
-
-// Convertit un nombre + une unité (ex: "5 jours") en vraie date calendaire (aujourd'hui - X)
-function computeDateReference(nombre, unite){
-  const n = parseInt(nombre) || 1;
-  const joursParUnite = { jour: 1, semaine: 7, mois: 30, an: 365 };
-  const joursTotal = n * (joursParUnite[unite] || 1);
-  const d = new Date();
-  d.setDate(d.getDate() - joursTotal);
-  return d.toISOString().slice(0, 10);
-}
-
-// Reconstruit un nombre + une unité approximatifs à partir d'une date de référence,
-// pour réafficher quelque chose de cohérent dans l'éditeur au moment de rouvrir un avis existant
-function dateReferenceVersNombreUnite(dateReference){
-  const d = new Date(dateReference + 'T00:00:00');
-  const joursEcoules = Math.max(1, Math.round((new Date() - d) / 86400000));
-  if(joursEcoules < 7) return { nombre: joursEcoules, unite: 'jour' };
-  if(joursEcoules < 30) return { nombre: Math.round(joursEcoules / 7), unite: 'semaine' };
-  if(joursEcoules < 365) return { nombre: Math.round(joursEcoules / 30), unite: 'mois' };
-  return { nombre: Math.round(joursEcoules / 365), unite: 'an' };
-}
-
-// Retrouve nombre/unité à partir d'une ancienne valeur texte libre (rétrocompatibilité)
-function parseAvisDate(str){
-  if(!str) return { nombre: 1, unite: 'jour' };
-  const m = String(str).match(/(\d+)\s*(jour|semaine|mois|an)/i);
-  if(m) return { nombre: parseInt(m[1]), unite: m[2].toLowerCase() };
-  return { nombre: 1, unite: 'jour' };
-}
-
-function newAvisRow(prefill){
-  const base = { id: 'a' + Date.now() + Math.random().toString(36).slice(2,7), nom: '', note: 5, dateNombre: 1, dateUnite: 'jour', texte: '' };
-  const p = prefill || {};
-  if(p.dateReference && p.dateNombre === undefined){
-    const reconstruit = dateReferenceVersNombreUnite(p.dateReference);
-    p.dateNombre = reconstruit.nombre;
-    p.dateUnite = reconstruit.unite;
-  } else if(p.date && p.dateNombre === undefined){
-    const parsed = parseAvisDate(p.date);
-    p.dateNombre = parsed.nombre;
-    p.dateUnite = parsed.unite;
-  }
-  return Object.assign(base, p);
-}
-
-function renderAvisRows(){
-  const container = document.getElementById('p-avis-rows');
-  if(!container) return;
-  container.innerHTML = avisRows.map(row => `
-    <div class="avis-row" data-row-id="${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:0.7rem;margin-bottom:0.6rem;">
-      <div style="display:grid;grid-template-columns:2fr 1fr 0.7fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
-        <input type="text" class="avis-row-nom" placeholder="Nom (ex : Florence N.)" value="${escapeHtml(row.nom)}"
-          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
-        <select class="avis-row-note" style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
-          ${[5,4,3,2,1].map(n => `<option value="${n}" ${row.note==n?'selected':''}>${'★'.repeat(n)}</option>`).join('')}
-        </select>
-        <input type="number" class="avis-row-date-nombre" min="1" step="1" value="${row.dateNombre}"
-          style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
-        <select class="avis-row-date-unite" style="padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;">
-          <option value="jour" ${row.dateUnite==='jour'?'selected':''}>jour(s)</option>
-          <option value="semaine" ${row.dateUnite==='semaine'?'selected':''}>semaine(s)</option>
-          <option value="mois" ${row.dateUnite==='mois'?'selected':''}>mois</option>
-          <option value="an" ${row.dateUnite==='an'?'selected':''}>an(s)</option>
-        </select>
-      </div>
-      <p style="font-size:0.75rem;color:var(--text-muted);margin:0 0 0.5rem;">Affiché sur le site : « ${formatAvisDate(row.dateNombre, row.dateUnite)} »</p>
-      <textarea class="avis-row-texte" placeholder="Texte de l'avis" rows="2"
-        style="width:100%;padding:0.5rem 0.6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.85rem;box-sizing:border-box;resize:vertical;">${escapeHtml(row.texte)}</textarea>
-      <button type="button" class="avis-row-remove btn btn-outline" style="margin-top:0.5rem;padding:0.35rem 0.7rem;font-size:0.8rem;color:var(--red,#e05252);">✕ Supprimer cet avis</button>
-    </div>`).join('');
-
-  container.querySelectorAll('.avis-row').forEach(rowEl => {
-    const id = rowEl.dataset.rowId;
-    const row = avisRows.find(r => r.id === id);
-    const dateApercu = rowEl.querySelector('p');
-    rowEl.querySelector('.avis-row-nom').addEventListener('input', e => { row.nom = e.target.value; });
-    rowEl.querySelector('.avis-row-note').addEventListener('change', e => { row.note = parseInt(e.target.value); });
-    rowEl.querySelector('.avis-row-date-nombre').addEventListener('input', e => {
-      row.dateNombre = parseInt(e.target.value) || 1;
-      dateApercu.textContent = `Affiché sur le site : « ${formatAvisDate(row.dateNombre, row.dateUnite)} »`;
-    });
-    rowEl.querySelector('.avis-row-date-unite').addEventListener('change', e => {
-      row.dateUnite = e.target.value;
-      dateApercu.textContent = `Affiché sur le site : « ${formatAvisDate(row.dateNombre, row.dateUnite)} »`;
-    });
-    rowEl.querySelector('.avis-row-texte').addEventListener('input', e => { row.texte = e.target.value; });
-    rowEl.querySelector('.avis-row-remove').addEventListener('click', () => {
-      avisRows = avisRows.filter(r => r.id !== id);
-      renderAvisRows();
-      updateAvisAddBtnState();
-    });
-  });
-}
-
-function updateAvisAddBtnState(){
-  const btn = document.getElementById('p-avis-add-btn');
-  if(!btn) return;
-  if(avisRows.length >= 8){
-    btn.disabled = true;
-    btn.textContent = 'Maximum 8 avis atteint';
-  } else {
-    btn.disabled = false;
-    btn.textContent = '+ Ajouter un avis';
-  }
-}
-
-document.getElementById('p-avis-add-btn').addEventListener('click', () => {
-  if(avisRows.length >= 8) return;
-  avisRows.push(newAvisRow());
-  renderAvisRows();
-  updateAvisAddBtnState();
-});
 
 // ==================== PARAMÈTRES AGENDA (Supabase) ====================
 
@@ -9212,12 +9093,6 @@ document.getElementById('tab-parametres') && document.getElementById('tab-parame
   document.getElementById('p-banniere-date-debut').value  = params.banniereDateDebut || '';
   document.getElementById('p-banniere-date-fin').value    = params.banniereDateFin || '';
   // Avis clients
-  document.getElementById('p-avis-note').value = params.avisNoteGlobale ?? 5.0;
-  avisRows = (Array.isArray(params.avisListe) && params.avisListe.length)
-    ? params.avisListe.map(a => newAvisRow(a))
-    : [newAvisRow()];
-  renderAvisRows();
-  updateAvisAddBtnState();
   document.getElementById('p-alerte-avis-active').checked = params.alerteFauxAvisActive || false;
   document.getElementById('p-alerte-avis-texte').value    = params.alerteFauxAvisTexte || '';
   document.getElementById('p-urssaf-taux').value = params.urssafTaux ?? 20;
@@ -9338,8 +9213,6 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     banniereMessage:    document.getElementById('p-banniere-message').value.trim(),
     banniereDateDebut:  document.getElementById('p-banniere-date-debut').value || null,
     banniereDateFin:    document.getElementById('p-banniere-date-fin').value   || null,
-    avisNoteGlobale:    parseFloat(document.getElementById('p-avis-note').value) || 5.0,
-    avisListe:          avisRows.filter(r => r.nom.trim() || r.texte.trim()).slice(0,8).map(r => ({ nom: r.nom.trim(), note: r.note, dateReference: computeDateReference(r.dateNombre, r.dateUnite), texte: r.texte.trim() })),
     alerteFauxAvisActive: document.getElementById('p-alerte-avis-active').checked,
     alerteFauxAvisTexte:  document.getElementById('p-alerte-avis-texte').value.trim(),
     urssafTaux: parseFloat(document.getElementById('p-urssaf-taux').value) || 20,
@@ -9395,8 +9268,6 @@ async function getAgendaParams(){
       banniereMessage:    data.banniere_message    ?? '',
       banniereDateDebut:  data.banniere_date_debut ?? '',
       banniereDateFin:    data.banniere_date_fin   ?? '',
-      avisNoteGlobale:    data.avis_note_globale ?? 5.0,
-      avisListe:          (() => { try{ return data.avis_liste ? JSON.parse(data.avis_liste) : []; }catch(e){ return []; } })(),
       alerteFauxAvisActive: data.alerte_faux_avis_active ?? false,
       alerteFauxAvisTexte:  data.alerte_faux_avis_texte  ?? '',
       urssafTaux: data.urssaf_taux ?? 20,
@@ -9452,8 +9323,6 @@ async function saveAgendaParams(params){
     banniere_message:     params.banniereMessage    || null,
     banniere_date_debut:  params.banniereDateDebut  || null,
     banniere_date_fin:    params.banniereDateFin    || null,
-    avis_note_globale:    params.avisNoteGlobale ?? 5.0,
-    avis_liste:           (Array.isArray(params.avisListe) && params.avisListe.length) ? JSON.stringify(params.avisListe) : null,
     alerte_faux_avis_active: params.alerteFauxAvisActive ?? false,
     alerte_faux_avis_texte:  params.alerteFauxAvisTexte  || null,
     urssaf_taux: params.urssafTaux ?? 20,
