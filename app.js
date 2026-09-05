@@ -5055,12 +5055,15 @@ document.getElementById('agenda-carte-btn').addEventListener('click', async () =
     if((r.lat_rdv == null || r.lon_rdv == null) && r.cp && r.ville){
       try{
         const q = [r.adresse, r.cp, r.ville].filter(Boolean).join(' ');
-        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1`);
+        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1&terr=METROPOLE`);
         const data = await res.json();
         const point = data.results && data.results[0];
-        if(point && point.x && point.y){
-          r.lat_rdv = parseFloat(point.y);
-          r.lon_rdv = parseFloat(point.x);
+        const latC = point ? parseFloat(point.y) : null;
+        const lonC = point ? parseFloat(point.x) : null;
+        const dansMetropole = latC != null && lonC != null && latC >= 41 && latC <= 51.5 && lonC >= -5.5 && lonC <= 9.7;
+        if(dansMetropole){
+          r.lat_rdv = latC;
+          r.lon_rdv = lonC;
           await sb.from(RDV_TABLE).update({ lat_rdv: r.lat_rdv, lon_rdv: r.lon_rdv }).eq('app_id', r.app_id);
         }
       }catch(e){}
@@ -5191,12 +5194,15 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
     if((r.lat_rdv == null || r.lon_rdv == null) && r.cp && r.ville){
       try{
         const q = [r.adresse, r.cp, r.ville].filter(Boolean).join(' ');
-        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1`);
+        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1&terr=METROPOLE`);
         const data = await res.json();
         const point = data.results && data.results[0];
-        if(point && point.x && point.y){
-          r.lat_rdv = parseFloat(point.y);
-          r.lon_rdv = parseFloat(point.x);
+        const latC = point ? parseFloat(point.y) : null;
+        const lonC = point ? parseFloat(point.x) : null;
+        const dansMetropole = latC != null && lonC != null && latC >= 41 && latC <= 51.5 && lonC >= -5.5 && lonC <= 9.7;
+        if(dansMetropole){
+          r.lat_rdv = latC;
+          r.lon_rdv = lonC;
           await sb.from(RDV_TABLE).update({ lat_rdv: r.lat_rdv, lon_rdv: r.lon_rdv }).eq('app_id', r.app_id);
         }
       }catch(e){}
@@ -5702,11 +5708,16 @@ async function geocoderEtCalculerDistanceRDV(adresse, cp, ville, latConnu, lonCo
   if(!adresse && !cp && !ville) return;
   try{
     const q = [adresse, cp, ville].filter(Boolean).join(' ');
-    const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1`);
+    const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(q)}&maximumResponses=1&terr=METROPOLE`);
     const data = await res.json();
     const point = data.results && data.results[0];
-    if(point && point.x && point.y){
-      await fetchDistanceRDV(parseFloat(point.y), parseFloat(point.x));
+    const lat = point ? parseFloat(point.y) : null;
+    const lon = point ? parseFloat(point.x) : null;
+    // Filet de sécurité : rejeter tout résultat hors de la France métropolitaine
+    // (évite qu'une adresse ambiguë ne pointe vers un endroit totalement différent)
+    const dansMetropole = lat != null && lon != null && lat >= 41 && lat <= 51.5 && lon >= -5.5 && lon <= 9.7;
+    if(dansMetropole){
+      await fetchDistanceRDV(lat, lon);
     }
   }catch(e){}
 }
@@ -5750,10 +5761,12 @@ async function fetchDistanceRDV(lat, lon){
       const ville = document.getElementById('newrdv-ville').value;
       if(cp && ville){
         try{
-          const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&maximumResponses=1`);
+          const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&maximumResponses=1&terr=METROPOLE`);
           const data = await res.json();
           const r = data.results && data.results[0];
-          if(r && r.x && r.y) fetchDistanceRDV(parseFloat(r.y), parseFloat(r.x));
+          const latR = r ? parseFloat(r.y) : null;
+          const lonR = r ? parseFloat(r.x) : null;
+          if(latR != null && lonR != null && latR >= 41 && latR <= 51.5 && lonR >= -5.5 && lonR <= 9.7) fetchDistanceRDV(latR, lonR);
         }catch(e){}
       }
     }, 100);
@@ -5764,10 +5777,12 @@ async function fetchDistanceRDV(lat, lon){
     const ville = document.getElementById('newrdv-ville').value;
     if(cp.length === 5 && ville){
       try{
-        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&maximumResponses=1`);
+        const res = await fetch(`https://data.geopf.fr/geocodage/completion/?text=${encodeURIComponent(cp + ' ' + ville)}&maximumResponses=1&terr=METROPOLE`);
         const data = await res.json();
         const r = data.results && data.results[0];
-        if(r && r.x && r.y) fetchDistanceRDV(parseFloat(r.y), parseFloat(r.x));
+        const latR = r ? parseFloat(r.y) : null;
+        const lonR = r ? parseFloat(r.x) : null;
+        if(latR != null && lonR != null && latR >= 41 && latR <= 51.5 && lonR >= -5.5 && lonR <= 9.7) fetchDistanceRDV(latR, lonR);
       }catch(e){}
     } else {
       const infoEl = document.getElementById('newrdv-distance-info');
