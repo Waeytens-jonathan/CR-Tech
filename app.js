@@ -7856,6 +7856,10 @@ function renderDetailContent(r, container){
       : devisLie.statut === 'envoye' ? { label: '📤 Devis envoyé', couleur: '#1a73c8' }
       : { label: '📝 Devis généré', couleur: 'var(--text-muted)' };
     html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Devis</span><span class="dvalue" style="font-weight:600;color:${infoDevis.couleur};">${infoDevis.label}</span></div>`;
+    const piecesNonRefusees = Array.isArray(r.piecesCommandees) ? r.piecesCommandees.filter(p => p.statutClient !== 'refusee') : [];
+    if(devisLie.statut_client === 'refuse' && piecesNonRefusees.length){
+      html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="exclure-pieces-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">🚫 Exclure la/les pièce(s) du CR (devis refusé)</button></div>`;
+    }
   }
   html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Facture créée</span><span class="dvalue" style="font-weight:600;color:${r['facture-creee'] ? 'var(--green,#3fbf6f)' : 'var(--orange)'};">${r['facture-creee'] ? 'Oui' : 'Non'}</span></div>`;
   html += '</div>';
@@ -7890,6 +7894,38 @@ function renderDetailContent(r, container){
   }
 
   c.innerHTML = html;
+
+  c.querySelector('#exclure-pieces-devis-refuse-btn')?.addEventListener('click', async () => {
+    if(!confirm('Marquer la/les pièce(s) commandée(s) comme refusées par le client ? Elle(s) resteront visibles dans le CR mais ne compteront plus dans le montant facturé — ce qui a déjà été encaissé est conservé.')) return;
+    const devisLie = devisLight.find(d => d.rapport_app_id === r.id);
+    const motif = (devisLie && devisLie.motif_refus) ? devisLie.motif_refus : 'Devis refusé par le client';
+
+    r.piecesCommandees = (r.piecesCommandees || []).map(p => ({ ...p, statutClient: 'refusee', motifRefus: p.motifRefus || motif }));
+    r['piece-desc'] = r.piecesCommandees.map(p => {
+      const base = (p.nom || '') + (p.ref ? ` (Réf. ${p.ref})` : '');
+      return base ? base + ' [refusée par le client]' : '';
+    }).filter(Boolean).join(', ');
+
+    // Recalcule les totaux en excluant les pièces désormais refusées (aucune, puisque toutes le sont)
+    const totalFacture = 0;
+    r['prix-fournisseur'] = '';
+    r['piece-cout'] = totalFacture ? totalFacture.toFixed(2) : '';
+    r['cout-pieces'] = r['piece-cout'];
+    const mo = parseFloat(r['cout-mo']) || 0;
+    const depl = parseFloat(r['cout-deplacement']) || 0;
+    r['cout-total'] = (mo + depl).toFixed(2);
+    const dejaVerse = r['paiement-statut'] === 'Acompte' ? (parseFloat(r['acompte-montant']) || 0) : 0;
+    r['reste-encaisser'] = Math.max(0, (mo + depl) - dejaVerse).toFixed(2);
+
+    try{
+      await saveReportToSupabase(r);
+      showToast('Pièce(s) exclue(s) du montant facturé ✓');
+      showDetail(r);
+    }catch(e){
+      console.error('Erreur exclusion pièce devis refusé :', e);
+      showToast('Échec de la mise à jour', true);
+    }
+  });
 
   c.querySelector('#quick-type-client')?.addEventListener('change', (e) => {
     c.querySelector('#quick-entreprise-fields').style.display = e.target.value === 'professionnel' ? 'block' : 'none';
