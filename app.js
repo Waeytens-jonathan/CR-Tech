@@ -1068,7 +1068,7 @@ async function renderStats(){
 
   // CA encaissé du jour même — toujours affiché, peu importe la période choisie dans le filtre
   const todayISOStats = todayISO();
-  const caAujourdhui = candidats.filter(r => r.date === todayISOStats).reduce((s,r) => s + caEncaisseRapport(r), 0);
+  const caAujourdhui = candidats.filter(r => r.date === todayISOStats).reduce((s,r) => s + caEncaisseRapport(r).total, 0);
   const elCaAujourdhui = document.getElementById('stat-ca-aujourdhui');
   if(elCaAujourdhui) elCaAujourdhui.textContent = caAujourdhui.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
 
