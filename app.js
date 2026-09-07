@@ -1107,7 +1107,12 @@ async function renderStats(){
     const prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
     totalFournisseur += prixFournisseur;
     if(prixFournisseur > 0){
-      totalLivraison += (r['livraison'] === '24h') ? 12 : 10;
+      const tarifsStats = (_agendaConfigCache && _agendaConfigCache.tarifsLivraison && _agendaConfigCache.tarifsLivraison.length)
+        ? _agendaConfigCache.tarifsLivraison
+        : defaultTarifsLivraison();
+      const idxLivraisonStats = parseInt(r['livraison'], 10);
+      const tarifLivraisonStats = tarifsStats[idxLivraisonStats] ? (parseFloat(tarifsStats[idxLivraisonStats].prix) || 0) : (tarifsStats[0] ? tarifsStats[0].prix : 10);
+      totalLivraison += tarifLivraisonStats;
     }
     if(r.statut === 'Non_reparable') nbNonReparable++;
     const marque = (r.marque || '').trim();
