@@ -1183,13 +1183,23 @@ async function renderStats(){
   const nbAnnules = rdvPeriode.filter(r => r.statut === 'annule').length;
   const tauxAnnulation = rdvPeriode.length ? Math.round((nbAnnules / rdvPeriode.length) * 100) : 0;
 
-  // Moyenne d'interventions par jour sur la période
+  // Moyenne d'interventions par jour travaillé sur la période (dimanches exclus, jour non travaillé)
+  function compterJoursTravailles(dateDebut, dateFin){
+    let compte = 0;
+    const d = new Date(dateDebut);
+    const fin = new Date(dateFin);
+    while(d <= fin){
+      if(d.getDay() !== 0) compte++; // 0 = dimanche
+      d.setDate(d.getDate() + 1);
+    }
+    return compte;
+  }
   let nbJoursPeriode;
   if(range){
-    nbJoursPeriode = Math.round((new Date(range.end) - new Date(range.start)) / 86400000) + 1;
+    nbJoursPeriode = compterJoursTravailles(range.start, range.end);
   } else if(filtered.length){
     const dates = filtered.map(r => r.date).sort();
-    nbJoursPeriode = Math.round((new Date(dates[dates.length-1]) - new Date(dates[0])) / 86400000) + 1;
+    nbJoursPeriode = compterJoursTravailles(dates[0], dates[dates.length-1]);
   } else {
     nbJoursPeriode = 1;
   }
