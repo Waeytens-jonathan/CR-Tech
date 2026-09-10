@@ -1132,11 +1132,11 @@ async function renderStats(){
     if(r.statut === 'Non_reparable') nbNonReparable++;
     const marque = (r.marque || '').trim();
     if(marque) marqueCount[marque] = (marqueCount[marque] || 0) + 1;
-    if(Array.isArray(r.piecesPosees) && r.piecesPosees.length){
-      nbPiecesPosees += r.piecesPosees.length;
-    } else if(r['piece-posee'] || r.pieceDeposeNom){
-      nbPiecesPosees += 1;
-    }
+    // Compte les pièces réellement posées, en réutilisant exactement la même détection
+    // que la facturation (buildFactureLignes) — garantit que ce chiffre correspond
+    // toujours à ce qui est vraiment facturé, peu importe comment la pièce a été saisie
+    // (pose-pièce, stock, commande directe...).
+    nbPiecesPosees += buildFactureLignes(r).filter(l => l.designation === 'Pièce').length;
   });
 
   const ca = totalMo + totalPieces + totalDepl;
