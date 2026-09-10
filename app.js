@@ -313,6 +313,17 @@ function reportToRow(r){
     r.date_termine = null;
   }
 
+  // Repère la date du dernier encaissement réel (ex : encaissement du reste lors d'une pose de
+  // pièce, bien après la date de l'intervention) — comparé au montant restant avant cette sauvegarde,
+  // pour que les stats "Aujourd'hui" reflètent quand l'argent est vraiment rentré, pas la date du CR.
+  const ancienReport = reports.find(rep => rep.id === r.id);
+  const totalActuelPourEncaissement = (parseFloat(r['cout-mo'])||0) + (parseFloat(r['cout-pieces'])||0) + (parseFloat(r['cout-deplacement'])||0);
+  const ancienReste = ancienReport ? (parseFloat(ancienReport['reste-encaisser']) || 0) : totalActuelPourEncaissement;
+  const nouveauReste = parseFloat(r['reste-encaisser']) || 0;
+  if(nouveauReste < ancienReste - 0.01){
+    r.date_dernier_encaissement = todayISO();
+  }
+
   const row = {
     app_id: r.id,
     ref: r.ref || '',
@@ -387,6 +398,7 @@ function reportToRow(r){
     parent_app_id: r.parent_app_id || null,
     sav_raison: r.sav_raison || null,
     date_termine: r.date_termine || null,
+    date_dernier_encaissement: r.date_dernier_encaissement || null,
     _is_draft: false
   };
   // Champs sans colonne dédiée -> regroupés dans "notes" pour ne rien perdre
@@ -498,6 +510,7 @@ function rowToReport(row){
     rdv_app_id: row.rdv_app_id || null,
     depot_app_id: row.depot_app_id || null,
     date_termine: row.date_termine || null,
+    date_dernier_encaissement: row.date_dernier_encaissement || null,
     date_archivage: row.date_archivage || null,
     is_sav: !!row.is_sav,
     parent_app_id: row.parent_app_id || null,
@@ -517,7 +530,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,exclu_impaye,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,exclu_impaye,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_dernier_encaissement,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -1066,9 +1079,11 @@ async function renderStats(){
     ? candidats.filter(r => r.date >= prevRange.start && r.date <= prevRange.end)
     : null;
 
-  // CA encaissé du jour même — toujours affiché, peu importe la période choisie dans le filtre
+  // CA encaissé du jour même — inclut les interventions du jour ET les dossiers plus anciens
+  // dont le solde a été encaissé aujourd'hui (ex : lors d'une pose de pièce ultérieure)
   const todayISOStats = todayISO();
-  const caAujourdhui = candidats.filter(r => r.date === todayISOStats).reduce((s,r) => s + caEncaisseRapport(r).total, 0);
+  const rapportsAujourdhui = candidats.filter(r => r.date === todayISOStats || r.date_dernier_encaissement === todayISOStats);
+  const caAujourdhui = rapportsAujourdhui.reduce((s,r) => s + caEncaisseRapport(r).total, 0);
   const elCaAujourdhui = document.getElementById('stat-ca-aujourdhui');
   if(elCaAujourdhui) elCaAujourdhui.textContent = caAujourdhui.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
 
