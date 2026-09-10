@@ -1105,14 +1105,14 @@ async function renderStats(){
       caParJour[r.date] = (caParJour[r.date] || 0) + moEncaisse + piecesEncaisse + deplEncaisse;
     }
     const prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
-    totalFournisseur += prixFournisseur;
+    totalFournisseur += prixFournisseur * ratioEncaisse;
     if(prixFournisseur > 0){
       const tarifsStats = (_agendaConfigCache && _agendaConfigCache.tarifsLivraison && _agendaConfigCache.tarifsLivraison.length)
         ? _agendaConfigCache.tarifsLivraison
         : defaultTarifsLivraison();
       const idxLivraisonStats = parseInt(r['livraison'], 10);
       const tarifLivraisonStats = tarifsStats[idxLivraisonStats] ? (parseFloat(tarifsStats[idxLivraisonStats].prix) || 0) : (tarifsStats[0] ? tarifsStats[0].prix : 10);
-      totalLivraison += tarifLivraisonStats;
+      totalLivraison += tarifLivraisonStats * ratioEncaisse;
     }
     if(r.statut === 'Non_reparable') nbNonReparable++;
     const marque = (r.marque || '').trim();
