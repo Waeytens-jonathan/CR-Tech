@@ -355,6 +355,9 @@ function reportToRow(r){
     panne: r.panne || '',
     diagnostic: r.diagnostic || '',
     travaux: r.travaux || '',
+    evenement_exterieur: !!r['evenement-exterieur'],
+    evenement_type: r['evenement-type'] || null,
+    evenement_details: r['evenement-details'] || '',
     statue: r.statut || '',
     duree: r.duree || '',
     notes: r.notes || '',
@@ -460,6 +463,9 @@ function rowToReport(row){
     panne: row.panne,
     diagnostic: row.diagnostic || '',
     travaux: row.travaux,
+    'evenement-exterieur': !!row.evenement_exterieur,
+    'evenement-type': row.evenement_type || '',
+    'evenement-details': row.evenement_details || '',
     statut: row.statue,
     duree: row.duree,
     notes: notes,
@@ -530,7 +536,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,exclu_impaye,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_dernier_encaissement,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,evenement_exterieur,evenement_type,evenement_details,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,exclu_impaye,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_dernier_encaissement,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -6057,6 +6063,11 @@ document.getElementById('newrdv-appareil')?.addEventListener('change', (e) => {
   else { autreEl.style.display = 'none'; autreEl.value = ''; }
 });
 
+document.getElementById('f-evenement-exterieur').addEventListener('change', e => {
+  document.getElementById('evenement-type-field').style.display = e.target.checked ? 'block' : 'none';
+  document.getElementById('evenement-details-field').style.display = e.target.checked ? 'block' : 'none';
+});
+
 document.getElementById('f-commande-piece').addEventListener('change', e => {
   document.getElementById('commande-piece-fields').style.display = e.target.checked ? 'block' : 'none';
   if(e.target.checked && !commandePieceRows.length){
@@ -6901,13 +6912,13 @@ document.getElementById('plaque-analyze-btn').addEventListener('click', async ()
 const fieldIds = [
   'f-date','f-heure','f-technicien','f-nom','f-prenom','f-adresse','f-adresse2','f-cp','f-ville','f-tel','f-email','f-type-client','f-entreprise-nom','f-entreprise-siret',
   'f-appareil','f-marque','f-modele','f-serie','f-age',
-  'f-panne','f-diagnostic','f-travaux','f-statut','f-duree',
+  'f-panne','f-diagnostic','f-travaux','f-statut','f-duree','f-evenement-type','f-evenement-details',
   'f-piece-desc','f-pieces-commandees-json','f-prix-fournisseur','f-livraison','f-piece-cout',
   'f-cout-mo','f-cout-pieces','f-cout-deplacement','f-remise-valeur','f-remise-type','f-cout-total','f-reste-encaisser',
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen','f-paiement-especes','f-paiement-carte',
   'f-notes'
 ];
-const checkboxIds = ['f-besoin-piece','f-commande-piece','f-garantie','f-conseils-entretien'];
+const checkboxIds = ['f-besoin-piece','f-commande-piece','f-garantie','f-conseils-entretien','f-evenement-exterieur'];
 
 function updateEmailBtnVisibility(){
   const statut = document.getElementById('f-statut').value;
@@ -6919,6 +6930,8 @@ document.getElementById('f-statut').addEventListener('change', updateEmailBtnVis
 function resetForm(){
   fieldIds.forEach(id => document.getElementById(id).value = '');
   checkboxIds.forEach(id => document.getElementById(id).checked = false);
+  document.getElementById('evenement-type-field').style.display = 'none';
+  document.getElementById('evenement-details-field').style.display = 'none';
   document.getElementById('f-appareil-autre').value = '';
   document.getElementById('f-appareil-autre').style.display = 'none';
   document.getElementById('f-date').value = todayISO();
@@ -6970,6 +6983,8 @@ async function loadIntoForm(report){
     const key = id.replace('f-','');
     document.getElementById(id).checked = !!report[key];
   });
+  document.getElementById('evenement-type-field').style.display = report['evenement-exterieur'] ? 'block' : 'none';
+  document.getElementById('evenement-details-field').style.display = report['evenement-exterieur'] ? 'block' : 'none';
   setAppareilValue(document.getElementById('f-appareil'), document.getElementById('f-appareil-autre'), report.appareil);
   autoFillMainOeuvre(document.getElementById('f-appareil').value);
   // Rétrocompatibilité : anciens dossiers avec pièce déjà commandée/en stock mais sans la case "besoin-piece"
@@ -7805,6 +7820,10 @@ function renderDetailContent(r, container){
   html += dRow('Panne signalée', escapeHtml(r.panne), true);
   html += dRow('Diagnostic', escapeHtml(r.diagnostic), true);
   html += dRow('Travaux effectués', escapeHtml(r.travaux), true);
+  if(r['evenement-exterieur']){
+    const labelsEvenementDetail = { climatique: '🌩️ Climatique', electrique: '⚡ Électrique', autre: 'Autre' };
+    html += dRow('Événement extérieur', escapeHtml(labelsEvenementDetail[r['evenement-type']] || 'Oui') + (r['evenement-details'] ? ' — ' + escapeHtml(r['evenement-details']) : ''), true);
+  }
   html += dRow('Statut', escapeHtml(STATUT_LABELS[r.statut] || r.statut || ''));
   html += dRow('Durée', formatDuree(r.duree));
   html += '</div>';
@@ -8533,6 +8552,11 @@ async function generatePdfFor(data, mode){
   line('Panne signalée', data.panne);
   line('Diagnostic', data.diagnostic);
   line('Travaux effectués', data.travaux);
+  if(data['evenement-exterieur']){
+    const labelsEvenement = { climatique: 'Climatique (orage, foudre, inondation...)', electrique: 'Électrique (coupure, surtension répétée du réseau...)', autre: 'Autre' };
+    line('Dommage lié à un événement extérieur', labelsEvenement[data['evenement-type']] || 'Oui');
+    if(data['evenement-details']) line('Détails de l\'événement', data['evenement-details']);
+  }
   line('Statut', STATUT_LABELS[data.statut] || data.statut);
   line('Durée', formatDuree(data.duree));
   y += 2;

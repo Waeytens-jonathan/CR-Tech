@@ -1052,6 +1052,22 @@
           <label>Travaux effectués</label>
           <textarea id="f-travaux" placeholder="Détail des opérations réalisées"></textarea>
         </div>
+        <div class="checkbox-row full">
+          <input type="checkbox" id="f-evenement-exterieur">
+          <label for="f-evenement-exterieur">Dommage causé par un événement extérieur (orage, coupure électrique répétée...)</label>
+        </div>
+        <div class="field" id="evenement-type-field" style="display:none;">
+          <label>Type d'événement</label>
+          <select id="f-evenement-type">
+            <option value="climatique">Climatique (orage, foudre, inondation...)</option>
+            <option value="electrique">Électrique (coupure, surtension répétée du réseau...)</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+        <div class="field full" id="evenement-details-field" style="display:none;">
+          <label>Détails de l'événement</label>
+          <textarea id="f-evenement-details" placeholder="ex : coupures électriques répétées signalées par le client depuis plusieurs semaines, orage la nuit précédente..."></textarea>
+        </div>
         <div class="field">
           <label>Statut de l'intervention</label>
           <select id="f-statut">
@@ -1827,6 +1843,7 @@
   </div>
 </div>
 
+<script>
 <script src="app.js"></script>
 
 <!-- ===================== MODALE SMS ARRIVÉE ===================== -->
