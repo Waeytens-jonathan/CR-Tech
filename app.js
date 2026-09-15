@@ -7097,6 +7097,13 @@ async function saveCurrentReport(){
     if(data.parent_app_id === undefined) data.parent_app_id = ancien.parent_app_id || null;
     if(data.sav_raison === undefined) data.sav_raison = ancien.sav_raison || '';
     if(data.sav_probleme === undefined) data.sav_probleme = ancien.sav_probleme || '';
+    // Idem pour tout champ que seul "Suivi du dossier" renseigne (pas dans le formulaire principal) —
+    // un enregistrement classique du CR ne doit jamais effacer ce qui a été réglé de ce côté-là.
+    if(data['facture-creee'] === undefined) data['facture-creee'] = ancien['facture-creee'] || false;
+    if(data['exclu-impaye'] === undefined) data['exclu-impaye'] = ancien['exclu-impaye'] || false;
+    if(data['tel-interlocuteur'] === undefined) data['tel-interlocuteur'] = ancien['tel-interlocuteur'] || '';
+    if(data['piece-suivi-statut'] === undefined) data['piece-suivi-statut'] = ancien['piece-suivi-statut'] || null;
+    if(data.documents_envoyes === undefined) data.documents_envoyes = ancien.documents_envoyes || false;
     reports[idx] = data;
     if(currentDetailReport && currentDetailReport.id === data.id){
       currentDetailReport = data;
