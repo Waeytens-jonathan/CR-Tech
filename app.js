@@ -8056,6 +8056,7 @@ function renderDetailContent(r, container){
       const factureEl = document.getElementById('quick-facture');
       const telInterlocuteurEl = document.getElementById('quick-tel-interlocuteur');
       const typeClientEl = document.getElementById('quick-type-client');
+      const resteAvantModifQuick = parseFloat(reports[idx]['reste-encaisser']) || 0;
 
       reports[idx].statut = statutEl.value;
       reports[idx]['paiement-statut'] = paiementEl.value;
@@ -8099,6 +8100,9 @@ function renderDetailContent(r, container){
       }
       if(reste < 0) reste = 0;
       reports[idx]['reste-encaisser'] = reste.toFixed(2);
+      if(reste < resteAvantModifQuick - 0.01){
+        reports[idx].date_dernier_encaissement = todayISO();
+      }
 
       quickBtn.disabled = true;
       const texteOriginal = quickBtn.textContent;
@@ -9049,6 +9053,7 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
 
   const idx = reports.findIndex(rep => rep.id === currentDetailReport.id);
   if(idx === -1){ showToast('Compte-rendu introuvable', true); return; }
+  const resteAvantModif = parseFloat(reports[idx]['reste-encaisser']) || 0;
 
   const btn = document.getElementById('pose-piece-save-btn');
   btn.disabled = true;
@@ -9070,6 +9075,10 @@ document.getElementById('pose-piece-save-btn').addEventListener('click', async (
   reports[idx]['paiement-especes'] = document.getElementById('pose-piece-paiement-especes').value;
   reports[idx]['paiement-carte'] = document.getElementById('pose-piece-paiement-carte').value;
   reports[idx]['reste-encaisser'] = document.getElementById('pose-piece-reste-encaisser').value;
+  const resteApresModif = parseFloat(reports[idx]['reste-encaisser']) || 0;
+  if(resteApresModif < resteAvantModif - 0.01){
+    reports[idx].date_dernier_encaissement = todayISO();
+  }
 
   // localStorage désactivé — données dans Supabase
   await saveReportToSupabase(reports[idx]);
