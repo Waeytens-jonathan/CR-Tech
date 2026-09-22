@@ -9774,6 +9774,7 @@ async function renderDossierAppareilContent(r){
     <button class="btn btn-outline doss-email-btn" style="flex:1;min-width:160px;">✅ Envoyer CR+Facture</button>
     <button class="btn btn-secondary doss-sms-btn">💬 J'arrive</button>
     <button class="btn btn-secondary doss-avis-btn">⭐ Avis</button>
+    ${r.statut === 'Non_reparable' ? '<button class="btn btn-outline doss-attestation-btn" style="flex:1;min-width:160px;border-color:#e0584f;color:#e0584f;">📋 Attestation</button>' : ''}
     ${isTermine ? '<button class="btn btn-outline doss-archiver-btn" style="font-size:0.82rem;">📦 Archiver</button>' : ''}
     ${r.statut === 'archivé' ? '<button class="btn btn-outline doss-sav-btn" style="border-color:#e0584f;color:#e0584f;">🛠️ Rouvrir SAV</button>' : ''}
     <button class="btn btn-danger doss-delete-btn" style="width:100%;">🗑️ Supprimer cet appareil</button>
@@ -9798,6 +9799,11 @@ async function renderDossierAppareilContent(r){
     clearDraft();
     loadIntoForm(r);
     goToStep(1);
+  });
+  actionsDiv.querySelector('.doss-attestation-btn')?.addEventListener('click', () => {
+    currentDetailReport = r;
+    document.getElementById('attestation-modal').style.display = 'flex';
+    initSignatureCanvas();
   });
   actionsDiv.querySelector('.doss-delete-btn')?.addEventListener('click', () => {
     const name = `${r.prenom||''} ${r.nom||''}`.trim() || 'ce dossier';
