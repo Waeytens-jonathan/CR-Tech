@@ -194,6 +194,7 @@ function joursDepuisIntervention(r){
 }
 function estEnRetardPaiement(r){
   if(r['exclu-impaye']) return false;
+  if(r['dossier-assurance']) return false;
   if(!r.date) return false;
   if(r['paiement-statut'] === 'Gratuit') return false;
   const reste = parseFloat(r['reste-encaisser']) || 0;
@@ -380,6 +381,7 @@ function reportToRow(r){
     garantie: !!r.garantie,
     facture_creee: !!r['facture-creee'],
     exclu_impaye: !!r['exclu-impaye'],
+    dossier_assurance: !!r['dossier-assurance'],
     documents_envoyes: !!r.documents_envoyes,
     conseil_entretien: !!r['conseils-entretien'],
     photos: JSON.stringify(r.photos || []),
@@ -495,6 +497,7 @@ function rowToReport(row){
     garantie: !!row.garantie,
     'facture-creee': !!row.facture_creee,
     'exclu-impaye': !!row.exclu_impaye,
+    'dossier-assurance': !!row.dossier_assurance,
     'conseils-entretien': !!row.conseil_entretien,
     photos: photos,
     plaquePhoto: plaquePhotoArr[0] || null,
@@ -536,7 +539,7 @@ let currentDossierRapports = [];
 let activeDossierTabIdx = 0;
 
 // Colonnes légères : tout sauf les photos/signatures (chargées à la demande, voir ensureFullReportLoaded)
-const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,evenement_exterieur,evenement_type,evenement_details,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,exclu_impaye,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_dernier_encaissement,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
+const LIGHT_REPORT_COLUMNS = 'app_id,ref,date,heure,technicien,nom,prenom,adresse,cp,ville,tel,tel_interlocuteur,email,type_client,entreprise_nom,entreprise_siret,remboursement_motif,remboursement_montant,remboursement_categorie,remise_type,remise_valeur,remise_montant,appareil,marque,modele,serie,age,panne,diagnostic,travaux,evenement_exterieur,evenement_type,evenement_details,statue,duree,notes,commande_piece,piece_recue,piece_suivi_statut,piece_posee,piece_desc,piece_prix,prix_fournisseur,cout_piece,cout_main_oeuvre,cout_deplacement,cout_total,paiement_statue,reste_encaisser,mode_paiement,paiement_especes,paiement_carte,garantie,facture_creee,exclu_impaye,dossier_assurance,documents_envoyes,conseil_entretien,stock_piece,piece_depose_nom,piece_depose_ref,pieces_posees,pieces_commandees,client_id,dossier_id,rdv_app_id,depot_app_id,date_termine,date_dernier_encaissement,date_archivage,is_sav,parent_app_id,sav_raison,created_at,_is_draft';
 
 async function loadReportsFromSupabase(){
   try{
@@ -2310,8 +2313,8 @@ function renderDepotList(){
   }
   emptyEl.style.display = 'none';
 
-  const depotsActifs = depots.filter(d => d.statut !== 'recupere');
-  const depotsRecuperes = depots.filter(d => d.statut === 'recupere');
+  const depotsActifs = depots.filter(d => d.statut !== 'recupere' && d.statut !== 'abandonne');
+  const depotsRecuperes = depots.filter(d => d.statut === 'recupere' || d.statut === 'abandonne');
 
   if(!depotsActifs.length){
     listEl.innerHTML = '<div class="empty">Aucun dépôt en cours.</div>';
@@ -2344,7 +2347,7 @@ function renderDepotList(){
     wrap.id = 'depot-recuperes-wrap';
     wrap.style.marginTop = '0.8rem';
     wrap.innerHTML = `
-      <label style="font-size:0.82rem;color:var(--text-muted);display:block;margin-bottom:0.4rem;">📦 Appareils récupérés</label>
+      <label style="font-size:0.82rem;color:var(--text-muted);display:block;margin-bottom:0.4rem;">📦 Appareils récupérés / abandonnés</label>
       <select id="depot-recuperes-select" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></select>
     `;
     listEl.parentElement.appendChild(wrap);
@@ -2359,8 +2362,8 @@ function renderDepotList(){
     wrap.style.display = 'none';
   } else {
     wrap.style.display = 'block';
-    select.innerHTML = `<option value="">${depotsRecuperes.length} appareil${depotsRecuperes.length>1?'s':''} récupéré${depotsRecuperes.length>1?'s':''} — sélectionner…</option>` +
-      depotsRecuperes.map(d => `<option value="${escapeHtml(d.app_id)}">${escapeHtml(d.prenom||'')} ${escapeHtml(d.nom||'')} — ${escapeHtml(d.appareil||'')}</option>`).join('');
+    select.innerHTML = `<option value="">${depotsRecuperes.length} appareil${depotsRecuperes.length>1?'s':''} — sélectionner…</option>` +
+      depotsRecuperes.map(d => `<option value="${escapeHtml(d.app_id)}">${escapeHtml(d.prenom||'')} ${escapeHtml(d.nom||'')} — ${escapeHtml(d.appareil||'')}${d.statut === 'abandonne' ? ' (abandonné)' : ' (récupéré)'}</option>`).join('');
   }
 }
 
@@ -7101,6 +7104,7 @@ async function saveCurrentReport(){
     // un enregistrement classique du CR ne doit jamais effacer ce qui a été réglé de ce côté-là.
     if(data['facture-creee'] === undefined) data['facture-creee'] = ancien['facture-creee'] || false;
     if(data['exclu-impaye'] === undefined) data['exclu-impaye'] = ancien['exclu-impaye'] || false;
+    if(data['dossier-assurance'] === undefined) data['dossier-assurance'] = ancien['dossier-assurance'] || false;
     if(data['tel-interlocuteur'] === undefined) data['tel-interlocuteur'] = ancien['tel-interlocuteur'] || '';
     if(data['piece-suivi-statut'] === undefined) data['piece-suivi-statut'] = ancien['piece-suivi-statut'] || null;
     if(data.documents_envoyes === undefined) data.documents_envoyes = ancien.documents_envoyes || false;
@@ -7533,6 +7537,7 @@ function buildDossierItem(rapports){
   }
   if(hasSAV) statutBadge += '<span class="badge red" style="font-size:0.7rem;margin-left:4px;">🛠️ SAV</span>';
   if(rapports.some(r => estEnRetardPaiement(r))) statutBadge += '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;font-size:0.7rem;margin-left:4px;">⚠️ Impayé</span>';
+  if(rapports.some(r => r['dossier-assurance'])) statutBadge += '<span class="badge" style="background:rgba(26,115,200,0.15);color:#1a73c8;border:1px solid #1a73c8;font-size:0.7rem;margin-left:4px;">🛡️ Assurance</span>';
 
   // RDV de pose-pièce déjà programmé
   const rdvPosePiece = rapports.some(r => r.statut === 'Attente_piece') ? getScheduledPosePieceRdv(first) : null;
@@ -7750,6 +7755,11 @@ function renderDetailContent(r, container){
   html += '<div class="checkbox-row" style="margin-top:0.8rem;">';
   html += `<input type="checkbox" id="quick-exclu-impaye" ${r['exclu-impaye'] ? 'checked' : ''}>`;
   html += '<label for="quick-exclu-impaye">Ne pas compter comme impayé <span style="font-weight:400;color:var(--text-muted);">(ex : en attente d\'une pièce, reste à encaisser normal)</span></label>';
+  html += '</div>';
+
+  html += '<div class="checkbox-row" style="margin-top:0.4rem;">';
+  html += `<input type="checkbox" id="quick-dossier-assurance" ${r['dossier-assurance'] ? 'checked' : ''}>`;
+  html += '<label for="quick-dossier-assurance">🛡️ Dossier assurance <span style="font-weight:400;color:var(--text-muted);">(exclu automatiquement de l\'impayé à 15 jours)</span></label>';
   html += '</div>';
 
   html += '<div class="field" style="margin-top:0.6rem;"><label>Téléphone interlocuteur <span style="font-weight:400;color:var(--text-muted);">(si différent — personne qui recevra le technicien)</span></label>';
@@ -8062,6 +8072,7 @@ function renderDetailContent(r, container){
       reports[idx]['paiement-statut'] = paiementEl.value;
       reports[idx]['facture-creee'] = factureEl.checked;
       reports[idx]['exclu-impaye'] = document.getElementById('quick-exclu-impaye').checked;
+      reports[idx]['dossier-assurance'] = document.getElementById('quick-dossier-assurance').checked;
       reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
       const pieceSuiviEl = document.getElementById('quick-piece-suivi');
       if(reports[idx]['commande-piece']){
