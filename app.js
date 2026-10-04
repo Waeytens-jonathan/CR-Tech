@@ -7652,6 +7652,35 @@ function dRow(label, value, leftAlign){
   return `<div class="detail-row"><span class="dlabel">${escapeHtml(label)}</span><span class="dvalue${leftAlign ? ' left' : ''}">${value}</span></div>`;
 }
 
+// Petit bouton pour copier une référence de pièce en un clic (presse-papier)
+function refCopyBtn(ref){
+  const clean = (ref || '').toString().trim();
+  if(!clean) return '';
+  return ` <button class="copy-ref-btn" data-ref="${escapeHtml(clean)}" title="Copier la référence" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.95rem;padding:0 0.15rem;vertical-align:middle;">📋</button>`;
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-ref-btn');
+  if(!btn) return;
+  const ref = btn.dataset.ref || '';
+  if(!ref) return;
+  const fallbackCopy = () => {
+    const ta = document.createElement('textarea');
+    ta.value = ref;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); showToast('Référence copiée ✓'); }
+    catch(e){ showToast('Impossible de copier', true); }
+    document.body.removeChild(ta);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ref).then(() => showToast('Référence copiée ✓')).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+});
+
 function renderDetailContent(r, container){
   const c = container || document.getElementById('detail-content');
   const dateFmt = r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '—';
@@ -7878,7 +7907,7 @@ function renderDetailContent(r, container){
       html += dRow('Garantie', 'Intervention sous garantie — client non facturé');
     } else if(stockPiecesArr.length){
       stockPiecesArr.forEach(p => {
-        html += dRow('Pièce (stock)', escapeHtml(p.nom || '') + (p.ref ? ' — ' + escapeHtml(p.ref) : ''));
+        html += dRow('Pièce (stock)', escapeHtml(p.nom || '') + (p.ref ? ' — ' + escapeHtml(p.ref) + refCopyBtn(p.ref) : ''));
       });
     } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
       r.piecesCommandees.forEach(p => {
@@ -7886,7 +7915,7 @@ function renderDetailContent(r, container){
         const estRefusee = p.statutClient === 'refusee';
         const valeur = estRefusee
           ? `<span style="color:#e05252;">❌ Refusée par le client${p.motifRefus ? ' — ' + escapeHtml(p.motifRefus) : ''}</span>`
-          : (refClean ? `Réf. ${escapeHtml(refClean)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—');
+          : (refClean ? `Réf. ${escapeHtml(refClean)}${refCopyBtn(refClean)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—');
         html += dRow(cleanNom(p.nom) || 'Pièce', valeur);
       });
       if(r['piece-cout']) html += dRow('Total pièces + livraison (facturées)', parseFloat(r['piece-cout']).toFixed(2) + ' €');
@@ -7905,7 +7934,7 @@ function renderDetailContent(r, container){
     piecesAffichees.forEach((p, i) => {
       if(piecesAffichees.length > 1) html += `<p style="margin:0.3rem 0 0.1rem;font-weight:600;color:var(--text-muted);font-size:0.8rem;">Pièce ${i+1}</p>`;
       html += dRow('Nom', escapeHtml(p.nom || ''));
-      html += dRow('Référence', escapeHtml(p.ref || ''));
+      html += dRow('Référence', p.ref ? escapeHtml(p.ref) + refCopyBtn(p.ref) : '');
     });
     if(Array.isArray(r.pieceDeposePhotos) && r.pieceDeposePhotos.length){
       html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.4rem;">';
