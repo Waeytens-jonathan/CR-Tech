@@ -2849,7 +2849,7 @@ let devisLight = [];
 
 async function loadDevisLight(){
   try{
-    const { data, error } = await sb.from('devis').select('app_id,numero,rapport_app_id,annee,sequence,statut,statut_client,motif_refus,date_reponse_client').order('sequence', { ascending: false });
+    const { data, error } = await sb.from('devis').select('app_id,numero,rapport_app_id,annee,sequence,statut,statut_client,motif_refus,date_reponse_client,date_emission').order('sequence', { ascending: false });
     if(error) throw error;
     devisLight = data || [];
   }catch(e){
@@ -7503,8 +7503,31 @@ const PIECE_SUIVI_LABELS = {
   en_commande: { label: '📦 En commande', color: '#f5a623' },
   en_livraison: { label: '🚚 En livraison', color: '#1a73c8' },
   recu: { label: '✅ Pièce reçue', color: '#3fbf6f' },
-  posee: { label: '🔧 Pièce posée', color: '#3fbf6f' }
+  posee: { label: '🔧 Pièce posée', color: '#3fbf6f' },
+  annulee: { label: '🚫 Annulée (devis refusé/expiré)', color: '#8a97a8' }
 };
+
+// Exclut toutes les pièces commandées du montant facturé (devis refusé par le client,
+// ou expiré sans réponse) : conserve ce qui a déjà été encaissé, recalcule le total
+// et le reste à encaisser sans la/les pièce(s). Mutateur pur, n'enregistre pas en DB.
+function exclurePiecesCommandeesDuDevis(r, motif){
+  r.piecesCommandees = (r.piecesCommandees || []).map(p => ({ ...p, statutClient: 'refusee', motifRefus: p.motifRefus || motif }));
+  r['piece-desc'] = r.piecesCommandees.map(p => {
+    const base = (p.nom || '') + (p.ref ? ` (Réf. ${p.ref})` : '');
+    return base ? base + ' [refusée par le client]' : '';
+  }).filter(Boolean).join(', ');
+
+  r['prix-fournisseur'] = '';
+  r['piece-cout'] = '';
+  r['cout-pieces'] = '';
+  const mo = parseFloat(r['cout-mo']) || 0;
+  const depl = parseFloat(r['cout-deplacement']) || 0;
+  r['cout-total'] = (mo + depl).toFixed(2);
+  const dejaVerse = r['paiement-statut'] === 'Acompte' ? (parseFloat(r['acompte-montant']) || 0) : 0;
+  r['reste-encaisser'] = Math.max(0, (mo + depl) - dejaVerse).toFixed(2);
+  if(r['commande-piece']) r['piece-suivi-statut'] = 'annulee';
+  return r;
+}
 
 function buildDossierItem(rapports){
   const first = rapports[0];
@@ -7583,6 +7606,7 @@ function buildDossierItem(rapports){
   const devisBadge = devisRecent ? (
     devisRecent.statut_client === 'accepte' ? '<span class="badge" style="font-size:0.7rem;background:rgba(63,191,111,0.12);color:var(--green,#3fbf6f);border:1px solid var(--green,#3fbf6f);">✅ Devis accepté</span>'
     : devisRecent.statut_client === 'refuse' ? '<span class="badge" style="font-size:0.7rem;background:rgba(224,82,82,0.12);color:#e05252;border:1px solid #e05252;">❌ Devis refusé</span>'
+    : devisRecent.statut_client === 'expire' ? '<span class="badge" style="font-size:0.7rem;background:rgba(138,151,168,0.15);color:#8a97a8;border:1px solid #8a97a8;">⏰ Devis expiré</span>'
     : devisRecent.statut === 'envoye' ? '<span class="badge" style="font-size:0.7rem;background:rgba(26,115,200,0.12);color:#1a73c8;border:1px solid #1a73c8;">📤 Devis envoyé</span>'
     : '<span class="badge" style="font-size:0.7rem;background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid var(--border);">📝 Devis généré</span>'
   ) : '';
@@ -7914,12 +7938,13 @@ function renderDetailContent(r, container){
   if(devisLie){
     const infoDevis = devisLie.statut_client === 'accepte' ? { label: '✅ Devis accepté', couleur: 'var(--green,#3fbf6f)' }
       : devisLie.statut_client === 'refuse' ? { label: '❌ Devis refusé' + (devisLie.motif_refus ? ' — ' + escapeHtml(devisLie.motif_refus) : ''), couleur: '#e05252' }
+      : devisLie.statut_client === 'expire' ? { label: '⏰ Devis expiré (non répondu après 30 jours)', couleur: '#8a97a8' }
       : devisLie.statut === 'envoye' ? { label: '📤 Devis envoyé', couleur: '#1a73c8' }
       : { label: '📝 Devis généré', couleur: 'var(--text-muted)' };
     html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Devis</span><span class="dvalue" style="font-weight:600;color:${infoDevis.couleur};">${infoDevis.label}</span></div>`;
     const piecesNonRefusees = Array.isArray(r.piecesCommandees) ? r.piecesCommandees.filter(p => p.statutClient !== 'refusee') : [];
-    if(devisLie.statut_client === 'refuse' && piecesNonRefusees.length){
-      html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="exclure-pieces-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">🚫 Exclure la/les pièce(s) du CR (devis refusé)</button></div>`;
+    if((devisLie.statut_client === 'refuse' || devisLie.statut_client === 'expire') && piecesNonRefusees.length){
+      html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="exclure-pieces-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">🚫 Exclure la/les pièce(s) du CR (devis refusé/expiré)</button></div>`;
     }
   }
   html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Facture créée</span><span class="dvalue" style="font-weight:600;color:${r['facture-creee'] ? 'var(--green,#3fbf6f)' : 'var(--orange)'};">${r['facture-creee'] ? 'Oui' : 'Non'}</span></div>`;
@@ -7961,22 +7986,7 @@ function renderDetailContent(r, container){
     const devisLie = devisLight.find(d => d.rapport_app_id === r.id);
     const motif = (devisLie && devisLie.motif_refus) ? devisLie.motif_refus : 'Devis refusé par le client';
 
-    r.piecesCommandees = (r.piecesCommandees || []).map(p => ({ ...p, statutClient: 'refusee', motifRefus: p.motifRefus || motif }));
-    r['piece-desc'] = r.piecesCommandees.map(p => {
-      const base = (p.nom || '') + (p.ref ? ` (Réf. ${p.ref})` : '');
-      return base ? base + ' [refusée par le client]' : '';
-    }).filter(Boolean).join(', ');
-
-    // Recalcule les totaux en excluant les pièces désormais refusées (aucune, puisque toutes le sont)
-    const totalFacture = 0;
-    r['prix-fournisseur'] = '';
-    r['piece-cout'] = totalFacture ? totalFacture.toFixed(2) : '';
-    r['cout-pieces'] = r['piece-cout'];
-    const mo = parseFloat(r['cout-mo']) || 0;
-    const depl = parseFloat(r['cout-deplacement']) || 0;
-    r['cout-total'] = (mo + depl).toFixed(2);
-    const dejaVerse = r['paiement-statut'] === 'Acompte' ? (parseFloat(r['acompte-montant']) || 0) : 0;
-    r['reste-encaisser'] = Math.max(0, (mo + depl) - dejaVerse).toFixed(2);
+    exclurePiecesCommandeesDuDevis(r, motif);
 
     try{
       await saveReportToSupabase(r);
@@ -8823,6 +8833,7 @@ function afterReportsLoaded(){
   const listView = document.getElementById('view-list');
   if(listView && listView.classList.contains('active')) renderList();
   autoArchiveOldReports();
+  autoClasserDevisExpires();
 }
 initAuth();
 // Pré-charger la config agenda dès le démarrage
@@ -10115,6 +10126,63 @@ async function autoArchiveOldReports(){
   if(toArchive.length) renderList();
 }
 
+// Devis sans réponse du client depuis plus de 30 jours : on classe le dossier tout seul
+// plutôt que de le laisser traîner indéfiniment en "attente paiement"/impayé.
+async function autoClasserDevisExpires(){
+  let devisEnAttente;
+  try{
+    const { data, error } = await sb.from('devis')
+      .select('app_id,rapport_app_id,statut_client,date_emission')
+      .eq('statut_client', 'en_attente');
+    if(error) throw error;
+    devisEnAttente = data || [];
+  }catch(e){ console.error('Erreur vérification devis expirés :', e); return; }
+
+  const maintenant = Date.now();
+  const expires = devisEnAttente.filter(d => {
+    if(!d.date_emission) return false;
+    return (maintenant - new Date(d.date_emission).getTime()) / 86400000 > 30;
+  });
+  if(!expires.length) return;
+
+  const motif = 'Devis non répondu par le client après 30 jours — classé automatiquement';
+  const dateJour = new Date().toISOString().slice(0,10);
+  let uneModif = false;
+
+  for(const d of expires){
+    try{
+      const { error } = await sb.from('devis').update({
+        statut_client: 'expire',
+        motif_refus: motif,
+        date_reponse_client: dateJour
+      }).eq('app_id', d.app_id);
+      if(error) throw error;
+
+      const dv = devisLight.find(x => x.app_id === d.app_id);
+      if(dv){ dv.statut_client = 'expire'; dv.motif_refus = motif; dv.date_reponse_client = dateJour; }
+
+      const r = reports.find(x => !x._isDraft && (x.id === d.rapport_app_id || x.app_id === d.rapport_app_id));
+      if(r){
+        exclurePiecesCommandeesDuDevis(r, motif);
+        // Le solde ne dépend plus que de ce qui était déjà dû hors pièce : s'il est
+        // couvert, le dossier n'a plus de raison de rester "en attente de paiement".
+        if((parseFloat(r['reste-encaisser']) || 0) <= 0 && r['paiement-statut'] !== 'Gratuit'){
+          r['paiement-statut'] = 'Paye_total';
+        }
+        // Un dossier qui n'attendait plus que la réponse du client peut être classé terminé
+        if(r.statut === 'Attente_piece'){
+          r.statut = 'Terminée';
+          if(!r.date_termine) r.date_termine = dateJour;
+        }
+        await saveReportToSupabase(r);
+      }
+      uneModif = true;
+    }catch(e){ console.error('Erreur classement auto devis expiré :', e); }
+  }
+
+  if(uneModif) renderList();
+}
+
 // ==================== BOUTON RDV POSE PIÈCE ====================
 document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
@@ -10175,6 +10243,38 @@ let editingClientId = null; // app_id en cours d'édition
 
 // --- Helpers ---
 function clientDisplayName(c){ return `${c.prenom||''} ${c.nom||''}`.trim() || '—'; }
+
+// --- Motif de la pastille rouge (client "banni") ---
+function openClientMotifModal(client, appId){
+  const modal = document.getElementById('client-motif-modal');
+  if(!modal) return;
+  document.getElementById('client-motif-text').value = client.motif_couleur || '';
+  modal.dataset.clientAppId = appId;
+  modal.style.display = 'flex';
+}
+document.getElementById('client-motif-cancel-btn')?.addEventListener('click', () => {
+  document.getElementById('client-motif-modal').style.display = 'none';
+});
+document.getElementById('client-motif-confirm-btn')?.addEventListener('click', async () => {
+  const modal = document.getElementById('client-motif-modal');
+  const appId = modal.dataset.clientAppId;
+  const motif = document.getElementById('client-motif-text').value.trim();
+  if(!motif){ showToast('Merci d\'indiquer un motif', true); return; }
+  const c = allClients.find(x => x.app_id === appId);
+  if(!c) return;
+  try{
+    const { error } = await sb.from(CLIENTS_TABLE).update({ couleur: 'rouge', motif_couleur: motif }).eq('app_id', appId);
+    if(error) throw error;
+    c.couleur = 'rouge';
+    c.motif_couleur = motif;
+    modal.style.display = 'none';
+    showToast('Motif enregistré');
+    showClientDetail(appId);
+  }catch(e){
+    console.error('Erreur enregistrement motif client :', e);
+    showToast('Erreur lors de l\'enregistrement', true);
+  }
+});
 
 // --- Chargement ---
 async function loadClients(){
@@ -10237,6 +10337,7 @@ async function showClientDetail(appId){
       <button class="client-couleur-btn" data-couleur="orange" style="flex:1;padding:0.5rem;border-radius:8px;border:2px solid ${c.couleur==='orange'?'#f5a623':'transparent'};background:rgba(245,166,35,0.15);color:#f5a623;font-size:0.82rem;cursor:pointer;">🟠</button>
       <button class="client-couleur-btn" data-couleur="rouge" style="flex:1;padding:0.5rem;border-radius:8px;border:2px solid ${c.couleur==='rouge'?'#e05252':'transparent'};background:rgba(224,82,82,0.15);color:#e05252;font-size:0.82rem;cursor:pointer;">🔴</button>
     </div>
+    ${c.couleur === 'rouge' ? `<button class="btn btn-outline" id="client-voir-motif-btn" style="width:100%;margin-bottom:1rem;font-size:0.82rem;">📄 Voir le motif</button>` : ''}
     <div class="detail-rows">
       ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(c.tel)}</a> <a href="tel:${escapeHtml(c.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(c.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a></span></div>` : ''}
       ${c.email  ? `<div class="detail-row"><span>Email</span><span><a href="mailto:${escapeHtml(c.email)}" style="color:var(--blue);">${escapeHtml(c.email)}</a></span></div>` : ''}
@@ -10252,14 +10353,37 @@ async function showClientDetail(appId){
       <div id="client-devis-list"></div>
     </div>`;
 
+  document.getElementById('client-voir-motif-btn')?.addEventListener('click', () => openClientMotifModal(c, appId));
+
   content.querySelectorAll('.client-couleur-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const nouvelleCouleur = c.couleur === btn.dataset.couleur ? null : btn.dataset.couleur;
+      const couleurClic = btn.dataset.couleur;
+      // On retire la couleur si on reclique sur celle déjà active
+      if(c.couleur === couleurClic){
+        try{
+          const { error } = await sb.from(CLIENTS_TABLE).update({ couleur: null, motif_couleur: null }).eq('app_id', c.app_id);
+          if(error) throw error;
+          c.couleur = null;
+          c.motif_couleur = null;
+          showToast('Couleur retirée');
+          showClientDetail(appId);
+        }catch(e){
+          console.error('Erreur mise à jour couleur client :', e);
+          showToast('Erreur lors de la mise à jour', true);
+        }
+        return;
+      }
+      // Passer en rouge demande systématiquement un motif
+      if(couleurClic === 'rouge'){
+        openClientMotifModal(c, appId);
+        return;
+      }
       try{
-        const { error } = await sb.from(CLIENTS_TABLE).update({ couleur: nouvelleCouleur }).eq('app_id', c.app_id);
+        const { error } = await sb.from(CLIENTS_TABLE).update({ couleur: couleurClic, motif_couleur: null }).eq('app_id', c.app_id);
         if(error) throw error;
-        c.couleur = nouvelleCouleur;
-        showToast(nouvelleCouleur ? 'Couleur mise à jour' : 'Couleur retirée');
+        c.couleur = couleurClic;
+        c.motif_couleur = null;
+        showToast('Couleur mise à jour');
         showClientDetail(appId);
       }catch(e){
         console.error('Erreur mise à jour couleur client :', e);
@@ -10330,7 +10454,8 @@ async function showClientDetail(appId){
 const DEVIS_STATUT_INFO = {
   en_attente: { label: '⏳ En attente', couleur: '#f5a623' },
   accepte:    { label: '✅ Accepté', couleur: '#3fbf6f' },
-  refuse:     { label: '❌ Refusé', couleur: '#e05252' }
+  refuse:     { label: '❌ Refusé', couleur: '#e05252' },
+  expire:     { label: '⏰ Expiré (non répondu)', couleur: '#8a97a8' }
 };
 
 async function renderClientDevisList(c){
@@ -10352,7 +10477,7 @@ async function renderClientDevisList(c){
           <div>
             <strong>Devis ${escapeHtml(d.numero||'')}</strong>
             <div style="font-size:0.82rem;color:var(--text-muted);">${d.montant_total ? parseFloat(d.montant_total).toFixed(2)+' €' : ''} · ${d.date_emission ? dateFrLong(d.date_emission) : ''}</div>
-            ${d.statut_client === 'refuse' && d.motif_refus ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">Motif : ${escapeHtml(d.motif_refus)}</div>` : ''}
+            ${(d.statut_client === 'refuse' || d.statut_client === 'expire') && d.motif_refus ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">Motif : ${escapeHtml(d.motif_refus)}</div>` : ''}
           </div>
           <span class="badge" style="background:${info.couleur}22;color:${info.couleur};border:1px solid ${info.couleur};font-size:0.75rem;white-space:nowrap;">${info.label}</span>
         </div>

@@ -1718,6 +1718,18 @@
   </div>
 </div>
 
+<div id="client-motif-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <h3 style="margin:0 0 0.8rem;color:#e05252;">🔴 Motif</h3>
+    <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1rem;">Indique la raison de ce signalement (ex : impayé, comportement, litige…).</p>
+    <textarea id="client-motif-text" rows="3" placeholder="Motif…" style="width:100%;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:1rem;resize:vertical;"></textarea>
+    <div style="display:flex;gap:0.6rem;">
+      <button class="btn btn-outline" id="client-motif-cancel-btn" style="flex:1;">Annuler</button>
+      <button class="btn btn-danger" id="client-motif-confirm-btn" style="flex:1;">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div id="sav-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;padding:1.2rem;">
   <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
