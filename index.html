@@ -789,6 +789,17 @@
       </div>
       <input type="text" id="client-search" placeholder="🔍 Rechercher un client (nom, tél, email)…"
         style="width:100%;padding:0.7rem 0.9rem;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:1rem;">
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+        <button class="btn btn-primary" id="clients-mode-clients" style="flex:1;font-size:0.85rem;padding:0.5rem;">👤 Clients</button>
+        <button class="btn btn-outline" id="clients-mode-devis" style="flex:1;font-size:0.85rem;padding:0.5rem;">📝 Devis créés</button>
+      </div>
+      <select id="devis-filtre-statut" style="display:none;width:100%;padding:0.6rem 0.8rem;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;margin-bottom:1rem;">
+        <option value="">Tous les statuts</option>
+        <option value="en_attente">⏳ En attente</option>
+        <option value="accepte">✅ Accepté</option>
+        <option value="refuse">❌ Refusé</option>
+        <option value="expire">⏰ Expiré</option>
+      </select>
       <div id="clients-list"><div class="empty">Chargement…</div></div>
     </div>
   </div>

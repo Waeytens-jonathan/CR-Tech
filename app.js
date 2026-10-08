@@ -4082,7 +4082,7 @@ document.getElementById('rendre-appareil-confirm')?.addEventListener('click', as
         const dateFmt = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR') : '';
         const clientName = `${currentDepot.prenom||''} ${currentDepot.nom||''}`.trim() || 'Client';
         const smsMessage = `Bonjour ${clientName}, nous confirmons la récupération de votre appareil "${currentDepot.appareil||''}" le ${dateFmt} à ${heureVal}. Merci de votre confiance ! Jonathan - Technik-Home - 07 59 70 54 97`;
-        window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(smsMessage);
+        ouvrirSms(tel, smsMessage);
       }
     }
 
@@ -4101,7 +4101,7 @@ document.getElementById('depot-detail-sms-btn').addEventListener('click', () => 
   const dateLabel = dateFrLongFromISO(currentDepot.date_depot);
   const heureLabel = currentDepot.heure_depot || '';
   const message = `Bonjour ${currentDepot.prenom||''}, je vous confirme le dépôt de votre appareil (${currentDepot.appareil||''}) le ${dateLabel} à ${heureLabel}. Je vous recontacte dès le diagnostic effectué. Jonathan – Technik-Home.`;
-  window.location.href = `sms:${tel}?body=${encodeURIComponent(message)}`;
+  ouvrirSms(tel, message);
 });
 
 // Extrait le texte "Problème signalé par le client" du champ description/panne combiné
@@ -4700,7 +4700,7 @@ document.getElementById('agenda-detail-sms-avis').addEventListener('click', () =
   const tel = (currentAgendaRdv.tel || '').replace(/[^\d+]/g, '');
   if(!tel){ showToast('Numéro manquant', true); return; }
   const message = (_agendaConfigCache && _agendaConfigCache.messageAvis) || "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
-  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
+  ouvrirSms(tel, message);
 });
 
 document.getElementById('agenda-detail-cancel-btn').addEventListener('click', () => {
@@ -7652,6 +7652,20 @@ function dRow(label, value, leftAlign){
   return `<div class="detail-row"><span class="dlabel">${escapeHtml(label)}</span><span class="dvalue${leftAlign ? ' left' : ''}">${value}</span></div>`;
 }
 
+// Ouvre l'appli SMS sur mobile ; sur ordinateur (aucun gestionnaire sms:), copie le message
+// dans le presse-papier pour pouvoir le coller où on veut.
+function ouvrirSms(tel, message){
+  const estMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  if(estMobile){
+    window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
+    return;
+  }
+  const fin = (ok) => showToast(ok ? 'SMS indisponible sur ordinateur — message copié, colle-le dans ton application de messagerie' : 'SMS indisponible sur ordinateur', !ok);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(message).then(() => fin(true)).catch(() => fin(false));
+  } else fin(false);
+}
+
 // Petit bouton pour copier une référence de pièce en un clic (presse-papier)
 function refCopyBtn(ref){
   const clean = (ref || '').toString().trim();
@@ -8319,7 +8333,7 @@ document.getElementById('detail-avis-btn').addEventListener('click', () => {
   const tel = (currentDetailReport.tel || '').replace(/[^\d+]/g, '');
   if(!tel){ showToast('Numéro manquant', true); return; }
   const message = (_agendaConfigCache && _agendaConfigCache.messageAvis) || "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
-  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
+  ouvrirSms(tel, message);
 });
 
 async function envoyerCrEtFacture(r, btn){
@@ -8393,7 +8407,7 @@ function sendSmsArrival(){
   const tel = (rawTel || '').replace(/[^\d+]/g, '');
   if(!tel){ showToast('Numéro de téléphone manquant', true); return; }
   const msg = `Bonjour, c'est Jonathan Technik-home. Vous êtes mon prochain client(e) j'arrive chez vous dans ${minutes} minutes. Merci à tout de suite.`;
-  window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(msg);
+  ouvrirSms(tel, msg);
 }
 
 async function deleteDetailPhoto(idx){
@@ -9895,7 +9909,7 @@ async function renderDossierAppareilContent(r){
     const tel = (r.tel || '').replace(/[^\d+]/g, '');
     if(!tel){ showToast('Numéro manquant', true); return; }
     const message = (_agendaConfigCache && _agendaConfigCache.messageAvis) || "Bonjour, j'espère que votre appareil fonctionne parfaitement suite à mon intervention. Si vous êtes satisfait(e), un avis Google me ferait vraiment plaisir, cela ne prend que 30 secondes et me booste pour avoir des interventions toujours plus qualitatives. Bonne journée, Jonathan – Technik-Home https://g.page/r/CZNr2KMTWf7qEBM/review";
-    window.location.href = 'sms:' + tel + '?body=' + encodeURIComponent(message);
+    ouvrirSms(tel, message);
   });
   el.querySelector('.doss-pose-btn')?.addEventListener('click', () => {
     currentDetailReport = r;
@@ -10742,18 +10756,103 @@ async function deleteClient(appId){
 // --- Navigation onglet Clients ---
 document.getElementById('tab-clients') && document.getElementById('tab-clients').addEventListener('click', async () => {
   await loadClients();
+  clientsModeDevis = false;
+  majClientsMode();
   renderClientsList('');
 });
 
 document.getElementById('client-new-btn') && document.getElementById('client-new-btn').addEventListener('click', () => openClientForm(null));
-document.getElementById('client-detail-back') && document.getElementById('client-detail-back').addEventListener('click', () => { showView('clients'); renderClientsList(document.getElementById('client-search').value); });
+document.getElementById('client-detail-back') && document.getElementById('client-detail-back').addEventListener('click', () => { showView('clients'); if(clientsModeDevis) renderTousLesDevis(); else renderClientsList(document.getElementById('client-search').value); });
 document.getElementById('client-form-back') && document.getElementById('client-form-back').addEventListener('click', () => {
   if(editingClientId) showClientDetail(editingClientId);
   else { showView('clients'); renderClientsList(''); }
 });
 
+// --- Mode "Devis créés" dans l'onglet Clients ---
+let clientsModeDevis = false;
+let tousLesDevis = [];
+
+function majClientsMode(){
+  const bc = document.getElementById('clients-mode-clients');
+  const bd = document.getElementById('clients-mode-devis');
+  if(!bc || !bd) return;
+  bc.className = 'btn ' + (clientsModeDevis ? 'btn-outline' : 'btn-primary');
+  bd.className = 'btn ' + (clientsModeDevis ? 'btn-primary' : 'btn-outline');
+  document.getElementById('devis-filtre-statut').style.display = clientsModeDevis ? 'block' : 'none';
+  document.getElementById('client-search').placeholder = clientsModeDevis ? '🔍 Rechercher un devis (n°, nom du client)…' : '🔍 Rechercher un client (nom, tél, email)…';
+}
+
+async function renderTousLesDevis(){
+  const el = document.getElementById('clients-list');
+  el.innerHTML = '<div class="empty">Chargement…</div>';
+  try{
+    const { data, error } = await sb.from('devis')
+      .select('app_id,numero,client_id,rapport_app_id,client_nom,client_prenom,montant_total,date_emission,statut,statut_client,created_at')
+      .order('created_at', { ascending: false });
+    if(error) throw error;
+    tousLesDevis = data || [];
+  }catch(e){
+    console.error('Erreur chargement devis :', e);
+    el.innerHTML = '<div class="empty">Erreur de chargement des devis</div>';
+    return;
+  }
+  const countEl = document.getElementById('clients-total-count');
+  if(countEl) countEl.textContent = `(${tousLesDevis.length} devis)`;
+  filtrerAfficherDevis();
+}
+
+function filtrerAfficherDevis(){
+  const el = document.getElementById('clients-list');
+  const q = (document.getElementById('client-search').value || '').trim().toLowerCase();
+  const st = document.getElementById('devis-filtre-statut').value;
+  const liste = tousLesDevis.filter(d => {
+    if(st && (d.statut_client || 'en_attente') !== st) return false;
+    if(!q) return true;
+    return (d.numero||'').toLowerCase().includes(q) || `${d.client_prenom||''} ${d.client_nom||''}`.toLowerCase().includes(q);
+  });
+  if(!liste.length){ el.innerHTML = '<div class="empty">Aucun devis trouvé</div>'; return; }
+  el.innerHTML = liste.map(d => {
+    const info = DEVIS_STATUT_INFO[d.statut_client] || DEVIS_STATUT_INFO.en_attente;
+    const nom = `${d.client_prenom||''} ${d.client_nom||''}`.trim() || '—';
+    return `<div class="list-item" data-devis-id="${escapeHtml(d.app_id)}" style="cursor:pointer;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+        <strong>Devis ${escapeHtml(d.numero||'')} — ${escapeHtml(nom)}</strong>
+        <span class="badge" style="background:${info.couleur}22;color:${info.couleur};border:1px solid ${info.couleur};font-size:0.72rem;white-space:nowrap;">${info.label}</span>
+      </div>
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">
+        ${d.montant_total ? parseFloat(d.montant_total).toFixed(2) + ' €' : ''}${d.date_emission ? ' · ' + dateFrLong(d.date_emission) : ''}${d.statut === 'envoye' ? ' · 📤 envoyé' : ''}
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-devis-id]').forEach(item => {
+    item.addEventListener('click', async () => {
+      const d = tousLesDevis.find(x => x.app_id === item.dataset.devisId);
+      if(!d) return;
+      if(d.client_id && allClients.find(c => c.app_id === d.client_id)){
+        await showClientDetail(d.client_id);
+      } else if(d.rapport_app_id){
+        const r = reports.find(x => x.id === d.rapport_app_id || x.app_id === d.rapport_app_id);
+        if(r){ showView('detail'); showDetail(r); } else showToast('Dossier introuvable', true);
+      } else showToast('Aucun client ou dossier lié à ce devis', true);
+    });
+  });
+}
+
+document.getElementById('clients-mode-clients') && document.getElementById('clients-mode-clients').addEventListener('click', () => {
+  clientsModeDevis = false;
+  majClientsMode();
+  renderClientsList(document.getElementById('client-search').value);
+});
+document.getElementById('clients-mode-devis') && document.getElementById('clients-mode-devis').addEventListener('click', async () => {
+  clientsModeDevis = true;
+  majClientsMode();
+  await renderTousLesDevis();
+});
+document.getElementById('devis-filtre-statut') && document.getElementById('devis-filtre-statut').addEventListener('change', filtrerAfficherDevis);
+
 document.getElementById('client-search') && document.getElementById('client-search').addEventListener('input', e => {
-  renderClientsList(e.target.value);
+  if(clientsModeDevis) filtrerAfficherDevis();
+  else renderClientsList(e.target.value);
 });
 
 // --- Recherche client dans formulaire CR ---
