@@ -10169,6 +10169,35 @@ async function autoArchiveOldReports(){
   if(toArchive.length) renderList();
 }
 
+// Classe un devis "sans suite" (expiré) : met à jour le devis, puis nettoie le dossier lié
+// (pièce exclue du montant facturé, paiement soldé, statut terminé). Utilisé par le
+// classement automatique à 30 jours ET par le bouton manuel.
+async function classerDevisSansSuite(devisAppId, rapportAppId, motif){
+  const dateJour = new Date().toISOString().slice(0,10);
+  const { error } = await sb.from('devis').update({
+    statut_client: 'expire',
+    motif_refus: motif,
+    date_reponse_client: dateJour
+  }).eq('app_id', devisAppId);
+  if(error) throw error;
+
+  const dv = devisLight.find(x => x.app_id === devisAppId);
+  if(dv){ dv.statut_client = 'expire'; dv.motif_refus = motif; dv.date_reponse_client = dateJour; }
+
+  const r = rapportAppId ? reports.find(x => !x._isDraft && (x.id === rapportAppId || x.app_id === rapportAppId)) : null;
+  if(r){
+    exclurePiecesCommandeesDuDevis(r, motif);
+    if((parseFloat(r['reste-encaisser']) || 0) <= 0 && r['paiement-statut'] !== 'Gratuit'){
+      r['paiement-statut'] = 'Paye_total';
+    }
+    if(r.statut === 'Attente_piece'){
+      r.statut = 'Terminée';
+      if(!r.date_termine) r.date_termine = dateJour;
+    }
+    await saveReportToSupabase(r);
+  }
+}
+
 // Devis sans réponse du client depuis plus de 30 jours : on classe le dossier tout seul
 // plutôt que de le laisser traîner indéfiniment en "attente paiement"/impayé.
 async function autoClasserDevisExpires(){
@@ -10194,31 +10223,7 @@ async function autoClasserDevisExpires(){
 
   for(const d of expires){
     try{
-      const { error } = await sb.from('devis').update({
-        statut_client: 'expire',
-        motif_refus: motif,
-        date_reponse_client: dateJour
-      }).eq('app_id', d.app_id);
-      if(error) throw error;
-
-      const dv = devisLight.find(x => x.app_id === d.app_id);
-      if(dv){ dv.statut_client = 'expire'; dv.motif_refus = motif; dv.date_reponse_client = dateJour; }
-
-      const r = reports.find(x => !x._isDraft && (x.id === d.rapport_app_id || x.app_id === d.rapport_app_id));
-      if(r){
-        exclurePiecesCommandeesDuDevis(r, motif);
-        // Le solde ne dépend plus que de ce qui était déjà dû hors pièce : s'il est
-        // couvert, le dossier n'a plus de raison de rester "en attente de paiement".
-        if((parseFloat(r['reste-encaisser']) || 0) <= 0 && r['paiement-statut'] !== 'Gratuit'){
-          r['paiement-statut'] = 'Paye_total';
-        }
-        // Un dossier qui n'attendait plus que la réponse du client peut être classé terminé
-        if(r.statut === 'Attente_piece'){
-          r.statut = 'Terminée';
-          if(!r.date_termine) r.date_termine = dateJour;
-        }
-        await saveReportToSupabase(r);
-      }
+      await classerDevisSansSuite(d.app_id, d.rapport_app_id, motif);
       uneModif = true;
     }catch(e){ console.error('Erreur classement auto devis expiré :', e); }
   }
@@ -10527,6 +10532,7 @@ async function renderClientDevisList(c){
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.6rem;">
           <button class="btn btn-outline client-devis-voir-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📄 Voir le PDF</button>
           <button class="btn btn-outline client-devis-envoyer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;${d.statut==='envoye'?'color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);':''}">${d.statut==='envoye'?'✅ Envoyé':'📧 Envoyer'}</button>
+          ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-sanssuite-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:#8a97a8;border-color:#8a97a8;">🚫 Classer sans suite</button>` : ''}
           ${d.statut_client === 'accepte' ? (
             d.facture_app_id
               ? `<span class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);">✅ Déjà transformé en facture</span>`
@@ -10556,6 +10562,23 @@ async function renderClientDevisList(c){
           btn.style.borderColor = 'var(--green,#3fbf6f)';
         } else {
           btn.textContent = '📧 Envoyer';
+        }
+      });
+    });
+    container.querySelectorAll('.client-devis-sanssuite-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const d = liste.find(x => x.app_id === btn.dataset.appId);
+        if(!d) return;
+        if(!confirm(`Classer le devis ${d.numero} sans suite ? Si un dossier y est lié, la pièce sera exclue du montant facturé et le dossier classé (ce qui a déjà été encaissé est conservé).`)) return;
+        btn.disabled = true;
+        try{
+          await classerDevisSansSuite(d.app_id, d.rapport_app_id, 'Sans suite — classé manuellement');
+          showToast('Devis classé sans suite ✓');
+          await renderClientDevisList(c);
+        }catch(e){
+          console.error('Erreur classement devis sans suite :', e);
+          showToast('Échec du classement', true);
+          btn.disabled = false;
         }
       });
     });
