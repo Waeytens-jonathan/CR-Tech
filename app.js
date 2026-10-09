@@ -816,6 +816,29 @@ async function renderAgenda(){
   ]);
   updateAgendaBadge();
   renderAgendaList();
+  rattacherRdvsAuxClients();
+}
+
+// Les RDV pris depuis le site public n'ont pas de fiche client : on la crée (ou on retrouve
+// celle qui existe déjà par téléphone/email) et on lie le RDV, pour les retrouver dans Clients.
+let _rattachementRdvEnCours = false;
+async function rattacherRdvsAuxClients(){
+  if(_rattachementRdvEnCours) return;
+  const aTraiter = agendaRdvs.filter(r => !r.client_id && r.statut !== 'annule' && (r.nom || r.prenom || r.tel || r.email));
+  if(!aTraiter.length) return;
+  _rattachementRdvEnCours = true;
+  try{
+    for(const r of aTraiter){
+      const clientId = await findOrCreateClient(r.nom, r.prenom, r.tel, r.email, r.adresse, r.cp, r.ville);
+      if(!clientId) continue;
+      const { error } = await sb.from(RDV_TABLE).update({ client_id: clientId }).eq('app_id', r.app_id);
+      if(!error) r.client_id = clientId;
+    }
+    if(typeof loadClients === 'function') await loadClients();
+  }catch(e){
+    console.error('Erreur rattachement RDV → clients :', e);
+  }
+  _rattachementRdvEnCours = false;
 }
 
 function updateAgendaBadge(){
