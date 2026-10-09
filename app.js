@@ -823,22 +823,32 @@ async function renderAgenda(){
 // celle qui existe déjà par téléphone/email) et on lie le RDV, pour les retrouver dans Clients.
 let _rattachementRdvEnCours = false;
 async function rattacherRdvsAuxClients(){
-  if(_rattachementRdvEnCours) return;
-  const aTraiter = agendaRdvs.filter(r => !r.client_id && r.statut !== 'annule' && (r.nom || r.prenom || r.tel || r.email));
-  if(!aTraiter.length) return;
+  if(_rattachementRdvEnCours) return 0;
+  // Un RDV est à rattacher s'il n'a pas de client_id, OU si son client_id pointe vers une fiche qui n'existe plus
+  const idsExistants = new Set((allClients || []).map(c => c.app_id));
+  const verifOrphelins = idsExistants.size > 0;
+  const aTraiter = agendaRdvs.filter(r =>
+    r.statut !== 'annule' && (r.nom || r.prenom || r.tel || r.email) &&
+    (!r.client_id || (verifOrphelins && !idsExistants.has(r.client_id))));
+  if(!aTraiter.length) return 0;
   _rattachementRdvEnCours = true;
+  let crees = 0, echecs = 0;
   try{
     for(const r of aTraiter){
       const clientId = await findOrCreateClient(r.nom, r.prenom, r.tel, r.email, r.adresse, r.cp, r.ville);
-      if(!clientId) continue;
+      if(!clientId){ echecs++; console.error('Rattachement impossible pour le RDV', r.app_id, r.nom, r.prenom); continue; }
       const { error } = await sb.from(RDV_TABLE).update({ client_id: clientId }).eq('app_id', r.app_id);
-      if(!error) r.client_id = clientId;
+      if(error){ echecs++; console.error('Mise à jour client_id RDV échouée :', error); continue; }
+      r.client_id = clientId;
+      crees++;
     }
     if(typeof loadClients === 'function') await loadClients();
   }catch(e){
     console.error('Erreur rattachement RDV → clients :', e);
   }
   _rattachementRdvEnCours = false;
+  if(echecs) showToast(`${echecs} RDV n'ont pas pu être rattachés à une fiche client (voir console)`, true);
+  return crees;
 }
 
 function updateAgendaBadge(){
@@ -10315,6 +10325,20 @@ let editingClientId = null; // app_id en cours d'édition
 // --- Helpers ---
 function clientDisplayName(c){ return `${c.prenom||''} ${c.nom||''}`.trim() || '—'; }
 
+// --- RDV annulés par client ---
+let rdvAnnulesCache = [];
+async function chargerRdvAnnules(){
+  try{
+    const { data, error } = await sb.from(RDV_TABLE).select('app_id,date,client_id,tel,email,motif_annulation').eq('statut','annule').order('date',{ascending:false});
+    if(error) throw error;
+    rdvAnnulesCache = data || [];
+  }catch(e){ console.error('Erreur chargement RDV annulés :', e); }
+  return rdvAnnulesCache;
+}
+function rdvAnnulesDuClient(c){
+  return rdvAnnulesCache.filter(r => r.client_id === c.app_id || (c.tel && r.tel === c.tel) || (c.email && r.email === c.email));
+}
+
 // --- Motif de la pastille rouge (client "banni") ---
 function openClientMotifModal(client, appId){
   const modal = document.getElementById('client-motif-modal');
@@ -10377,12 +10401,13 @@ function renderClientsList(filter){
   }
   el.innerHTML = list.map(c => {
     const couleurs = { vert:'#4ade80', orange:'#f5a623', rouge:'#e05252' };
+    const nbAnnules = rdvAnnulesDuClient(c).length;
     const dot = couleurs[c.couleur] ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${couleurs[c.couleur]};margin-right:0.4rem;flex-shrink:0;"></span>` : '';
     return `
     <div class="list-item" data-client-id="${escapeHtml(c.app_id)}" style="cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <strong style="display:flex;align-items:center;">${dot}${escapeHtml(clientDisplayName(c))}</strong>
-        <span style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(c.ville||'')}</span>
+        <span style="font-size:0.82rem;color:var(--text-muted);">${nbAnnules ? `<span style="color:#e0584f;margin-right:0.5rem;">🚫 ${nbAnnules} annulé${nbAnnules>1?'s':''}</span>` : ''}${escapeHtml(c.ville||'')}</span>
       </div>
       <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">
         ${c.tel ? '📞 '+escapeHtml(c.tel) : ''}${c.tel && c.email ? ' · ' : ''}${c.email ? escapeHtml(c.email) : ''}
@@ -10409,6 +10434,7 @@ async function showClientDetail(appId){
       <button class="client-couleur-btn" data-couleur="rouge" style="flex:1;padding:0.5rem;border-radius:8px;border:2px solid ${c.couleur==='rouge'?'#e05252':'transparent'};background:rgba(224,82,82,0.15);color:#e05252;font-size:0.82rem;cursor:pointer;">🔴</button>
     </div>
     ${c.couleur === 'rouge' ? `<button class="btn btn-outline" id="client-voir-motif-btn" style="width:100%;margin-bottom:1rem;font-size:0.82rem;">📄 Voir le motif</button>` : ''}
+    <div id="client-rdv-annules"></div>
     <div class="detail-rows">
       ${c.tel    ? `<div class="detail-row"><span>Téléphone</span><span><a href="tel:${escapeHtml(c.tel)}" style="color:var(--text);text-decoration:none;">${escapeHtml(c.tel)}</a> <a href="tel:${escapeHtml(c.tel)}" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Appeler</a> <a href="sms:${escapeHtml(c.tel)}" class="btn btn-outline" style="font-size:0.78rem;padding:0.25rem 0.6rem;display:inline-flex;text-decoration:none;border-radius:6px;">Message</a></span></div>` : ''}
       ${c.email  ? `<div class="detail-row"><span>Email</span><span><a href="mailto:${escapeHtml(c.email)}" style="color:var(--blue);">${escapeHtml(c.email)}</a></span></div>` : ''}
@@ -10425,6 +10451,17 @@ async function showClientDetail(appId){
     </div>`;
 
   document.getElementById('client-voir-motif-btn')?.addEventListener('click', () => openClientMotifModal(c, appId));
+
+  chargerRdvAnnules().then(() => {
+    const box = document.getElementById('client-rdv-annules');
+    if(!box) return;
+    const annules = rdvAnnulesDuClient(c);
+    if(!annules.length){ box.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.8rem;">🚫 RDV annulés : 0</div>'; return; }
+    box.innerHTML = `<div style="margin-bottom:0.8rem;padding:0.6rem 0.8rem;border-radius:10px;background:rgba(224,88,79,0.1);border:1px solid rgba(224,88,79,0.4);">
+      <div style="font-weight:600;color:#e0584f;font-size:0.88rem;">🚫 RDV annulés : ${annules.length}</div>
+      ${annules.map(r => `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">${r.date ? dateFrLong(r.date) : ''}${r.motif_annulation ? ' — ' + escapeHtml(r.motif_annulation) : ''}</div>`).join('')}
+    </div>`;
+  });
 
   content.querySelectorAll('.client-couleur-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -10555,6 +10592,7 @@ async function renderClientDevisList(c){
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.6rem;">
           <button class="btn btn-outline client-devis-voir-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📄 Voir le PDF</button>
           <button class="btn btn-outline client-devis-envoyer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;${d.statut==='envoye'?'color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);':''}">${d.statut==='envoye'?'✅ Envoyé':'📧 Envoyer'}</button>
+          ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-accepte-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);">✅ Marquer accepté</button>` : ''}
           ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-sanssuite-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:#8a97a8;border-color:#8a97a8;">🚫 Classer sans suite</button>` : ''}
           ${d.statut_client === 'accepte' ? (
             d.facture_app_id
@@ -10585,6 +10623,27 @@ async function renderClientDevisList(c){
           btn.style.borderColor = 'var(--green,#3fbf6f)';
         } else {
           btn.textContent = '📧 Envoyer';
+        }
+      });
+    });
+    container.querySelectorAll('.client-devis-accepte-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const d = liste.find(x => x.app_id === btn.dataset.appId);
+        if(!d) return;
+        if(!confirm(`Marquer le devis ${d.numero} comme accepté par le client (ex : accord donné par téléphone) ?`)) return;
+        btn.disabled = true;
+        try{
+          const dateJour = new Date().toISOString().slice(0,10);
+          const { error } = await sb.from('devis').update({ statut_client: 'accepte', date_reponse_client: dateJour }).eq('app_id', d.app_id);
+          if(error) throw error;
+          const dv = devisLight.find(x => x.app_id === d.app_id);
+          if(dv){ dv.statut_client = 'accepte'; dv.date_reponse_client = dateJour; }
+          showToast('Devis marqué comme accepté ✓');
+          await renderClientDevisList(c);
+        }catch(e){
+          console.error('Erreur marquage devis accepté :', e);
+          showToast('Échec de la mise à jour', true);
+          btn.disabled = false;
         }
       });
     });
@@ -10802,9 +10861,15 @@ async function deleteClient(appId){
 // --- Navigation onglet Clients ---
 document.getElementById('tab-clients') && document.getElementById('tab-clients').addEventListener('click', async () => {
   await loadClients();
+  // Les RDV du site public n'ont pas de fiche : on les rattache avant d'afficher la liste
+  try{
+    if(!agendaRdvs.length) agendaRdvs = await loadAgendaFromSupabase();
+    await rattacherRdvsAuxClients();
+  }catch(e){ console.error('Rattachement RDV (onglet Clients) :', e); }
   clientsModeDevis = false;
   majClientsMode();
   renderClientsList('');
+  chargerRdvAnnules().then(() => { if(!clientsModeDevis) renderClientsList(document.getElementById('client-search').value); });
 });
 
 document.getElementById('client-new-btn') && document.getElementById('client-new-btn').addEventListener('click', () => openClientForm(null));
