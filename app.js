@@ -149,6 +149,10 @@ function onAuthenticated(){
   if(typeof loadFacturesLight === 'function') loadFacturesLight();
   if(typeof loadDevisLight === 'function') loadDevisLight();
   if(typeof checkDraft === 'function') checkDraft();
+  if(typeof verifierReponsesDevis === 'function'){
+    verifierReponsesDevis();
+    if(!window._pollReponsesDevis) window._pollReponsesDevis = setInterval(verifierReponsesDevis, 90000);
+  }
 }
 
 document.getElementById('login-submit-btn').addEventListener('click', async () => {
@@ -10264,6 +10268,97 @@ async function autoClasserDevisExpires(){
   if(uneModif) renderList();
 }
 
+// ==================== NOTIFICATIONS RÉPONSES DEVIS ====================
+// Quand un client accepte/refuse un devis (lien dans l'email), on prévient dans l'appli
+// tant que la réponse n'a pas été marquée comme "vue".
+let _reponsesDevisAffichees = new Set();
+async function verifierReponsesDevis(){
+  try{
+    const { data, error } = await sb.from('devis')
+      .select('app_id,numero,client_id,rapport_app_id,client_nom,client_prenom,montant_total,statut_client,motif_refus,date_reponse_client')
+      .in('statut_client', ['accepte','refuse'])
+      .eq('reponse_vue', false)
+      .order('date_reponse_client', { ascending: false });
+    if(error) throw error;
+    const nonVues = data || [];
+    if(!nonVues.length){ majBadgeReponsesDevis(0); return; }
+    majBadgeReponsesDevis(nonVues.length);
+    const nouvelles = nonVues.filter(d => !_reponsesDevisAffichees.has(d.app_id));
+    if(!nouvelles.length) return;
+    nonVues.forEach(d => _reponsesDevisAffichees.add(d.app_id));
+    afficherReponsesDevis(nonVues);
+  }catch(e){
+    console.error('Erreur vérification réponses devis :', e);
+  }
+}
+
+function majBadgeReponsesDevis(n){
+  const tab = document.getElementById('tab-clients');
+  if(!tab) return;
+  let b = document.getElementById('devis-reponses-badge');
+  if(!n){ if(b) b.remove(); return; }
+  if(!b){
+    b = document.createElement('span');
+    b.id = 'devis-reponses-badge';
+    b.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:#e0584f;color:#fff;font-size:0.7rem;font-weight:700;';
+    tab.appendChild(b);
+  }
+  b.textContent = n > 9 ? '9+' : String(n);
+}
+
+function afficherReponsesDevis(liste){
+  let modal = document.getElementById('devis-reponses-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'devis-reponses-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10050;display:flex;align-items:center;justify-content:center;padding:1.2rem;';
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 0.8rem;">🔔 Réponse${liste.length>1?'s':''} à vos devis</h3>
+    ${liste.map(d => {
+      const ok = d.statut_client === 'accepte';
+      const nom = `${d.client_prenom||''} ${d.client_nom||''}`.trim() || 'Un client';
+      return `<div class="devis-reponse-item" data-app-id="${escapeHtml(d.app_id)}" style="cursor:pointer;padding:0.7rem 0.8rem;margin-bottom:0.5rem;border-radius:10px;border:1px solid ${ok ? '#3fbf6f' : '#e05252'};background:${ok ? 'rgba(63,191,111,0.1)' : 'rgba(224,82,82,0.1)'};">
+        <div style="font-weight:600;color:${ok ? '#3fbf6f' : '#e05252'};">${ok ? '✅ Devis accepté' : '❌ Devis refusé'} — ${escapeHtml(nom)}</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">n° ${escapeHtml(d.numero||'')}${d.montant_total ? ' · ' + parseFloat(d.montant_total).toFixed(2) + ' €' : ''}</div>
+        ${!ok && d.motif_refus ? `<div style="font-size:0.82rem;margin-top:0.3rem;">Motif : ${escapeHtml(d.motif_refus)}</div>` : ''}
+      </div>`;
+    }).join('')}
+    <div style="display:flex;gap:0.6rem;margin-top:1rem;">
+      <button class="btn btn-outline" id="devis-reponses-plus-tard" style="flex:1;">Plus tard</button>
+      <button class="btn btn-primary" id="devis-reponses-vu" style="flex:1;">✓ Marquer comme vu</button>
+    </div>
+  </div>`;
+  document.getElementById('devis-reponses-plus-tard').onclick = () => { modal.style.display = 'none'; };
+  document.getElementById('devis-reponses-vu').onclick = async () => {
+    const ids = liste.map(d => d.app_id);
+    modal.style.display = 'none';
+    try{
+      await sb.from('devis').update({ reponse_vue: true }).in('app_id', ids);
+    }catch(e){ console.error('Erreur marquage réponses vues :', e); }
+    ids.forEach(id => _reponsesDevisAffichees.delete(id));
+    majBadgeReponsesDevis(0);
+    verifierReponsesDevis();
+  };
+  modal.querySelectorAll('.devis-reponse-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      const d = liste.find(x => x.app_id === item.dataset.appId);
+      if(!d) return;
+      modal.style.display = 'none';
+      if(d.client_id){
+        if(!allClients.length) await loadClients();
+        showClientDetail(d.client_id);
+      } else if(d.rapport_app_id){
+        const r = reports.find(x => x.id === d.rapport_app_id || x.app_id === d.rapport_app_id);
+        if(r){ showView('detail'); showDetail(r); }
+      }
+    });
+  });
+  if(typeof showToast === 'function') showToast('🔔 ' + liste.length + ' réponse' + (liste.length>1?'s':'') + ' à vos devis');
+}
+
 // ==================== BOUTON RDV POSE PIÈCE ====================
 document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   if(!currentDetailReport) return;
@@ -10634,7 +10729,7 @@ async function renderClientDevisList(c){
         btn.disabled = true;
         try{
           const dateJour = new Date().toISOString().slice(0,10);
-          const { error } = await sb.from('devis').update({ statut_client: 'accepte', date_reponse_client: dateJour }).eq('app_id', d.app_id);
+          const { error } = await sb.from('devis').update({ statut_client: 'accepte', date_reponse_client: dateJour, reponse_vue: true }).eq('app_id', d.app_id);
           if(error) throw error;
           const dv = devisLight.find(x => x.app_id === d.app_id);
           if(dv){ dv.statut_client = 'accepte'; dv.date_reponse_client = dateJour; }
