@@ -6499,6 +6499,27 @@ function eclaterLignesFusionnees(rows){
   return out;
 }
 
+// Pièces commandées d'un CR prêtes à afficher une par ligne : découpe les désignations fusionnées
+// ("A (Réf. 1), B (Réf. 2)…") et gère les anciens CR qui n'ont que le texte récapitulatif.
+function piecesCommandeesPourAffichage(r){
+  let base = Array.isArray(r.piecesCommandees) ? r.piecesCommandees.slice() : [];
+  if(!base.length && r['piece-desc']){
+    const parts = eclaterNomPiecesFusionne(r['piece-desc']);
+    if(parts) base = [{ nom: r['piece-desc'], ref: '' }];
+  }
+  const out = [];
+  base.forEach(p => {
+    const parts = eclaterNomPiecesFusionne(p.nom);
+    if(!parts){ out.push(p); return; }
+    parts.forEach((q, i) => out.push(Object.assign({}, p, {
+      nom: q.nom, ref: q.ref || (i === 0 ? p.ref : ''),
+      prixVente: i === 0 ? p.prixVente : undefined,
+      statutClient: q.refusee ? 'refusee' : p.statutClient
+    })));
+  });
+  return out;
+}
+
 // Reconstruit une ligne par pièce commandée quand on rouvre un dossier (au lieu de tout fusionner en une ligne).
 // Dossiers récents : le détail (prix HT, TVA, conseillé, base de marge) est dans le JSON → restitution exacte.
 // Anciens dossiers : seul le prix de vente par pièce est connu → on retrouve un prix conseillé qui redonne
@@ -8035,13 +8056,13 @@ function renderDetailContent(r, container){
       stockPiecesArr.forEach(p => {
         html += dRow('Pièce (stock)', escapeHtml(p.nom || '') + (p.ref ? ' — ' + escapeHtml(p.ref) + refCopyBtn(p.ref) : ''));
       });
-    } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
-      r.piecesCommandees.forEach(p => {
+    } else if(piecesCommandeesPourAffichage(r).length){
+      piecesCommandeesPourAffichage(r).forEach(p => {
         const refClean = cleanRef(p.ref);
         const estRefusee = p.statutClient === 'refusee';
         const valeur = estRefusee
           ? `<span style="color:#e05252;">❌ Refusée par le client${p.motifRefus ? ' — ' + escapeHtml(p.motifRefus) : ''}</span>`
-          : (refClean ? `Réf. ${escapeHtml(refClean)}${refCopyBtn(refClean)} — ` : '') + (p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : '—');
+          : [refClean ? `Réf. ${escapeHtml(refClean)}${refCopyBtn(refClean)}` : '', p.prixVente ? parseFloat(p.prixVente).toFixed(2) + ' €' : ''].filter(Boolean).join(' — ') || '—';
         html += dRow(cleanNom(p.nom) || 'Pièce', valeur);
       });
       if(r['piece-cout']) html += dRow('Total pièces + livraison (facturées)', parseFloat(r['piece-cout']).toFixed(2) + ' €');
@@ -8763,7 +8784,7 @@ async function generatePdfFor(data, mode){
     });
     y += 2;
   } else if(data['commande-piece']){
-    const pdfPiecesCommandees = Array.isArray(data.piecesCommandees) ? data.piecesCommandees : [];
+    const pdfPiecesCommandees = piecesCommandeesPourAffichage(data);
     if(pdfPiecesCommandees.length){
       section(pdfPiecesCommandees.length > 1 ? 'Pièces commandées' : 'Pièce commandée');
       pdfPiecesCommandees.forEach(p => {
