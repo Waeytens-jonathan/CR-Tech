@@ -2319,10 +2319,45 @@ let currentDepot = null;
 let editingDepotAppId = null;
 let depotPhotos = [];
 
+// Colonnes lourdes (photos en base64, signatures) : exclues de la liste, chargées à l'ouverture d'un dépôt
+const DEPOT_COLONNES_LOURDES = ['photos', 'signature_recuperation', 'signature_abandon'];
+let _depotColonnesLegeres = null;
+
+async function depotColonnesLegeres(){
+  if(_depotColonnesLegeres) return _depotColonnesLegeres;
+  try{
+    // Un seul enregistrement pour découvrir les colonnes existantes (évite d'en deviner une qui n'existe pas)
+    const { data, error } = await sb.from(DEPOT_TABLE).select('*').limit(1);
+    if(error) throw error;
+    if(data && data.length){
+      const cols = Object.keys(data[0]).filter(c => !DEPOT_COLONNES_LOURDES.includes(c));
+      if(cols.length) _depotColonnesLegeres = cols.join(',');
+    }
+  }catch(e){ console.error('Détection colonnes dépôts :', e); }
+  return _depotColonnesLegeres;
+}
+
+// Charge photos + signatures d'un dépôt précis (une seule fois), avant affichage/édition
+async function ensureDepotComplet(d){
+  if(!d || d._complet) return d;
+  try{
+    const { data, error } = await sb.from(DEPOT_TABLE).select(DEPOT_COLONNES_LOURDES.join(',')).eq('app_id', d.app_id).single();
+    if(error) throw error;
+    Object.assign(d, data);
+    d._complet = true;
+  }catch(e){
+    console.error('Erreur chargement photos/signatures dépôt :', e);
+    showToast('Impossible de charger les photos du dépôt', true);
+  }
+  return d;
+}
+
 async function loadDepots(){
   try{
-    const { data, error } = await sb.from(DEPOT_TABLE).select('*').order('created_at', { ascending: false });
+    const cols = await depotColonnesLegeres();
+    const { data, error } = await sb.from(DEPOT_TABLE).select(cols || '*').order('created_at', { ascending: false });
     if(error) throw error;
+    if(!cols) (data || []).forEach(d => { d._complet = true; });
     return data || [];
   }catch(e){
     console.error('Erreur chargement dépôts :', e);
@@ -2420,10 +2455,11 @@ function findLinkedReportForDepot(d){
   return reports.find(rep2 => !rep2._isDraft && memeClient(rep2) && memeAppareil(rep2)) || null;
 }
 
-function showDepotDetail(appId){
+async function showDepotDetail(appId){
   const d = depots.find(x => x.app_id === appId);
   if(!d) return;
   currentDepot = d;
+  await ensureDepotComplet(d);
 
   let depotPhotosArr = [];
   try{ depotPhotosArr = d.photos ? JSON.parse(d.photos) : []; }catch(e){ depotPhotosArr = []; }
@@ -4232,11 +4268,13 @@ document.getElementById('depot-photo-input').addEventListener('change', async (e
   e.target.value = '';
 });
 
-function openDepotEdit(appId){
+async function openDepotEdit(appId){
   editingDepotAppId = appId || null;
 
   if(appId){
     const d = depots.find(x => x.app_id === appId);
+    // Indispensable : sinon l'enregistrement effacerait les photos non chargées
+    await ensureDepotComplet(d);
     document.getElementById('depot-edit-title').textContent = 'Modifier le dépôt';
     document.getElementById('depot-edit-prenom').value = d.prenom || '';
     document.getElementById('depot-edit-nom').value = d.nom || '';
