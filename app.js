@@ -6468,6 +6468,46 @@ function populerSelectLivraison(){
   if([...sel.options].some(o => o.value === valeurActuelle)) sel.value = valeurActuelle;
 }
 
+// Reconstruit une ligne par pièce commandée quand on rouvre un dossier (au lieu de tout fusionner en une ligne).
+// Dossiers récents : le détail (prix HT, TVA, conseillé, base de marge) est dans le JSON → restitution exacte.
+// Anciens dossiers : seul le prix de vente par pièce est connu → on retrouve un prix conseillé qui redonne
+// ce même prix facturé, et on reporte le coût fournisseur total sur la 1re pièce pour ne rien fausser.
+function restaurerLignesPiecesCommandees(report){
+  const pieces = report.piecesCommandees;
+  const aDetail = pieces.some(p => p.prixHt !== undefined || p.prixConseille !== undefined || p.baseMarge !== undefined);
+  if(aDetail){
+    return pieces.map(p => newCommandePieceRow({
+      nom: p.nom || '', ref: p.ref || '',
+      prixHt: p.prixHt ?? '', tva: (p.tva ?? 20),
+      prixConseille: p.prixConseille ?? '',
+      baseMarge: p.baseMarge || 'ttc',
+      statutClient: p.statutClient || 'acceptee',
+      motifRefus: p.motifRefus || ''
+    }));
+  }
+  const coutTotal = parseNumFr(report['prix-fournisseur']) || 0;
+  let coutPlace = false;
+  return pieces.map(p => {
+    const refusee = p.statutClient === 'refusee';
+    const pv = parseFloat(p.prixVente) || 0;
+    let conseille = '';
+    if(!refusee && pv > 0){
+      for(const palier of BAREME_MARGE){
+        const v = pv / (1 + palier.taux);
+        if(v >= palier.min && v < palier.max && calculerPrixVente(v, 0) === Math.round(pv)){ conseille = String(Math.round(v * 100) / 100); break; }
+      }
+      if(conseille === '') conseille = String(pv);
+    }
+    const row = newCommandePieceRow({
+      nom: p.nom || '', ref: p.ref || '',
+      prixConseille: conseille, baseMarge: 'conseille',
+      statutClient: p.statutClient || 'acceptee', motifRefus: p.motifRefus || ''
+    });
+    if(!refusee && !coutPlace && coutTotal > 0){ row.prixHt = String(coutTotal); row.tva = 0; coutPlace = true; }
+    return row;
+  });
+}
+
 function newCommandePieceRow(prefill){
   return Object.assign({
     id: 'cp' + Date.now() + Math.random().toString(36).slice(2,7),
@@ -6613,7 +6653,9 @@ function recalculerPrixPiece(){
         nom: cleanNom(r.nom), ref: cleanRef(r.ref),
         prixVente: (r.statutClient !== 'refusee' && base > 0) ? calculerPrixVente(base, 0) : 0,
         statutClient: r.statutClient || 'acceptee',
-        motifRefus: r.motifRefus || ''
+        motifRefus: r.motifRefus || '',
+        // Détail de la ligne, pour la retrouver à l'identique quand on rouvre le dossier
+        prixHt: r.prixHt, tva: r.tva, prixConseille: r.prixConseille, baseMarge: r.baseMarge
       };
     })
   );
@@ -7033,7 +7075,9 @@ async function loadIntoForm(report){
   }
   document.getElementById('commande-piece-fields').style.display = report['commande-piece'] ? 'block' : 'none';
   // Rétrocompatibilité : anciens CR n'ont qu'une désignation/prix agrégés, pas de lignes détaillées
-  if(report['piece-desc'] || report['prix-fournisseur']){
+  if(Array.isArray(report.piecesCommandees) && report.piecesCommandees.length){
+    commandePieceRows = restaurerLignesPiecesCommandees(report);
+  } else if(report['piece-desc'] || report['prix-fournisseur']){
     commandePieceRows = [newCommandePieceRow({ nom: report['piece-desc'] || '', prixConseille: report['prix-fournisseur'] || '', baseMarge: 'conseille' })];
   } else {
     commandePieceRows = [];
