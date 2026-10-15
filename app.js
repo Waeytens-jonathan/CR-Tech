@@ -6468,6 +6468,37 @@ function populerSelectLivraison(){
   if([...sel.options].some(o => o.value === valeurActuelle)) sel.value = valeurActuelle;
 }
 
+// Découpe une désignation "A (Réf. 1), B (Réf. 2), C (Réf. 3)" (pièces fusionnées en une seule ligne
+// lors d'une ancienne réouverture) en lignes séparées. Ne coupe que s'il y a au moins 2 "(Réf. …)".
+function eclaterNomPiecesFusionne(texte){
+  const t = (texte || '').toString();
+  if((t.match(/\(\s*R[ée]f\.?/gi) || []).length < 2) return null;
+  const parts = [];
+  const re = /\s*([^,(][^(]*?)\s*\(\s*R[ée]f\.?\s*([^)]*)\)\s*(\[refus[ée]e par le client\])?\s*(?:,|$)/gi;
+  let m, dernier = 0;
+  while((m = re.exec(t)) !== null){
+    parts.push({ nom: m[1].trim(), ref: (m[2] || '').trim(), refusee: !!m[3] });
+    dernier = re.lastIndex;
+  }
+  const reste = t.slice(dernier).replace(/^[\s,]+/, '').trim();
+  if(reste) parts.push({ nom: reste, ref: '', refusee: /refus[ée]e par le client/i.test(reste) });
+  return parts.length >= 2 ? parts : null;
+}
+
+// Applique le découpage aux lignes restaurées : la 1re ligne garde les prix, les autres sont à compléter.
+function eclaterLignesFusionnees(rows){
+  const out = [];
+  rows.forEach(r => {
+    const parts = eclaterNomPiecesFusionne(r.nom);
+    if(!parts){ out.push(r); return; }
+    parts.forEach((p, i) => {
+      if(i === 0) out.push(Object.assign({}, r, { nom: p.nom, ref: p.ref || r.ref || '' }));
+      else out.push(newCommandePieceRow({ nom: p.nom, ref: p.ref, statutClient: p.refusee ? 'refusee' : (r.statutClient || 'acceptee'), motifRefus: p.refusee ? (r.motifRefus || '') : '' }));
+    });
+  });
+  return out;
+}
+
 // Reconstruit une ligne par pièce commandée quand on rouvre un dossier (au lieu de tout fusionner en une ligne).
 // Dossiers récents : le détail (prix HT, TVA, conseillé, base de marge) est dans le JSON → restitution exacte.
 // Anciens dossiers : seul le prix de vente par pièce est connu → on retrouve un prix conseillé qui redonne
@@ -7076,9 +7107,9 @@ async function loadIntoForm(report){
   document.getElementById('commande-piece-fields').style.display = report['commande-piece'] ? 'block' : 'none';
   // Rétrocompatibilité : anciens CR n'ont qu'une désignation/prix agrégés, pas de lignes détaillées
   if(Array.isArray(report.piecesCommandees) && report.piecesCommandees.length){
-    commandePieceRows = restaurerLignesPiecesCommandees(report);
+    commandePieceRows = eclaterLignesFusionnees(restaurerLignesPiecesCommandees(report));
   } else if(report['piece-desc'] || report['prix-fournisseur']){
-    commandePieceRows = [newCommandePieceRow({ nom: report['piece-desc'] || '', prixConseille: report['prix-fournisseur'] || '', baseMarge: 'conseille' })];
+    commandePieceRows = eclaterLignesFusionnees([newCommandePieceRow({ nom: report['piece-desc'] || '', prixConseille: report['prix-fournisseur'] || '', baseMarge: 'conseille' })]);
   } else {
     commandePieceRows = [];
   }
