@@ -7681,7 +7681,8 @@ const PIECE_SUIVI_LABELS = {
 // Exclut toutes les pièces commandées du montant facturé (devis refusé par le client,
 // ou expiré sans réponse) : conserve ce qui a déjà été encaissé, recalcule le total
 // et le reste à encaisser sans la/les pièce(s). Mutateur pur, n'enregistre pas en DB.
-function exclurePiecesCommandeesDuDevis(r, motif){
+function exclurePiecesCommandeesDuDevis(r, motif, opts){
+  const retirerDeplacement = !!(opts && opts.retirerDeplacement);
   r.piecesCommandees = (r.piecesCommandees || []).map(p => ({ ...p, statutClient: 'refusee', motifRefus: p.motifRefus || motif }));
   r['piece-desc'] = r.piecesCommandees.map(p => {
     const base = (p.nom || '') + (p.ref ? ` (Réf. ${p.ref})` : '');
@@ -7691,6 +7692,8 @@ function exclurePiecesCommandeesDuDevis(r, motif){
   r['prix-fournisseur'] = '';
   r['piece-cout'] = '';
   r['cout-pieces'] = '';
+  // Devis refusé : le déplacement n'est plus facturé non plus (retiré du dossier et donc de la facture)
+  if(retirerDeplacement) r['cout-deplacement'] = '';
   const mo = parseFloat(r['cout-mo']) || 0;
   const depl = parseFloat(r['cout-deplacement']) || 0;
   r['cout-total'] = (mo + depl).toFixed(2);
@@ -8158,7 +8161,7 @@ function renderDetailContent(r, container){
     html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Devis</span><span class="dvalue" style="font-weight:600;color:${infoDevis.couleur};">${infoDevis.label}</span></div>`;
     const piecesNonRefusees = Array.isArray(r.piecesCommandees) ? r.piecesCommandees.filter(p => p.statutClient !== 'refusee') : [];
     if((devisLie.statut_client === 'refuse' || devisLie.statut_client === 'expire') && piecesNonRefusees.length){
-      html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="exclure-pieces-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">🚫 Exclure la/les pièce(s) du CR (devis refusé/expiré)</button></div>`;
+      html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="exclure-pieces-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">🚫 Exclure pièce(s) + déplacement du CR (devis refusé/expiré)</button></div>`;
     }
   }
   html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Facture créée</span><span class="dvalue" style="font-weight:600;color:${r['facture-creee'] ? 'var(--green,#3fbf6f)' : 'var(--orange)'};">${r['facture-creee'] ? 'Oui' : 'Non'}</span></div>`;
@@ -8196,15 +8199,15 @@ function renderDetailContent(r, container){
   c.innerHTML = html;
 
   c.querySelector('#exclure-pieces-devis-refuse-btn')?.addEventListener('click', async () => {
-    if(!confirm('Marquer la/les pièce(s) commandée(s) comme refusées par le client ? Elle(s) resteront visibles dans le CR mais ne compteront plus dans le montant facturé — ce qui a déjà été encaissé est conservé.')) return;
+    if(!confirm('Devis refusé : marquer la/les pièce(s) commandée(s) comme refusées ET retirer le déplacement du montant facturé ? Les pièces resteront visibles dans le CR mais ne seront plus facturées — ce qui a déjà été encaissé est conservé.')) return;
     const devisLie = devisLight.find(d => d.rapport_app_id === r.id);
     const motif = (devisLie && devisLie.motif_refus) ? devisLie.motif_refus : 'Devis refusé par le client';
 
-    exclurePiecesCommandeesDuDevis(r, motif);
+    exclurePiecesCommandeesDuDevis(r, motif, { retirerDeplacement: true });
 
     try{
       await saveReportToSupabase(r);
-      showToast('Pièce(s) exclue(s) du montant facturé ✓');
+      showToast('Pièce(s) et déplacement exclus du montant facturé ✓');
       showDetail(r);
     }catch(e){
       console.error('Erreur exclusion pièce devis refusé :', e);
@@ -10357,7 +10360,7 @@ async function classerDevisSansSuite(devisAppId, rapportAppId, motif){
 
   const r = rapportAppId ? reports.find(x => !x._isDraft && (x.id === rapportAppId || x.app_id === rapportAppId)) : null;
   if(r){
-    exclurePiecesCommandeesDuDevis(r, motif);
+    exclurePiecesCommandeesDuDevis(r, motif, { retirerDeplacement: true });
     if((parseFloat(r['reste-encaisser']) || 0) <= 0 && r['paiement-statut'] !== 'Gratuit'){
       r['paiement-statut'] = 'Paye_total';
     }
