@@ -10346,17 +10346,19 @@ async function autoArchiveOldReports(){
 // Classe un devis "sans suite" (expiré) : met à jour le devis, puis nettoie le dossier lié
 // (pièce exclue du montant facturé, paiement soldé, statut terminé). Utilisé par le
 // classement automatique à 30 jours ET par le bouton manuel.
-async function classerDevisSansSuite(devisAppId, rapportAppId, motif){
+async function classerDevisSansSuite(devisAppId, rapportAppId, motif, statutClient){
+  statutClient = statutClient || 'expire';
   const dateJour = new Date().toISOString().slice(0,10);
   const { error } = await sb.from('devis').update({
-    statut_client: 'expire',
+    statut_client: statutClient,
     motif_refus: motif,
-    date_reponse_client: dateJour
+    date_reponse_client: dateJour,
+    reponse_vue: true
   }).eq('app_id', devisAppId);
   if(error) throw error;
 
   const dv = devisLight.find(x => x.app_id === devisAppId);
-  if(dv){ dv.statut_client = 'expire'; dv.motif_refus = motif; dv.date_reponse_client = dateJour; }
+  if(dv){ dv.statut_client = statutClient; dv.motif_refus = motif; dv.date_reponse_client = dateJour; }
 
   const r = rapportAppId ? reports.find(x => !x._isDraft && (x.id === rapportAppId || x.app_id === rapportAppId)) : null;
   if(r){
@@ -10825,6 +10827,7 @@ async function renderClientDevisList(c){
           <button class="btn btn-outline client-devis-voir-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📄 Voir le PDF</button>
           <button class="btn btn-outline client-devis-envoyer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;${d.statut==='envoye'?'color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);':''}">${d.statut==='envoye'?'✅ Envoyé':'📧 Envoyer'}</button>
           ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-accepte-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);">✅ Marquer accepté</button>` : ''}
+          ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-refuse-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--red,#e5534b);border-color:var(--red,#e5534b);">❌ Marquer refusé</button>` : ''}
           ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-sanssuite-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:#8a97a8;border-color:#8a97a8;">🚫 Classer sans suite</button>` : ''}
           ${d.statut_client === 'accepte' ? (
             d.facture_app_id
@@ -10874,6 +10877,26 @@ async function renderClientDevisList(c){
           await renderClientDevisList(c);
         }catch(e){
           console.error('Erreur marquage devis accepté :', e);
+          showToast('Échec de la mise à jour', true);
+          btn.disabled = false;
+        }
+      });
+    });
+    container.querySelectorAll('.client-devis-refuse-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const d = liste.find(x => x.app_id === btn.dataset.appId);
+        if(!d) return;
+        const saisie = prompt(`Devis ${d.numero} refusé par le client (ex : refus par téléphone).\nMotif (facultatif) :`, '');
+        if(saisie === null) return;
+        const motif = 'Refusé par le client' + (saisie.trim() ? ' — ' + saisie.trim() : ' (saisi manuellement)');
+        if(!confirm('Confirmer le refus ? Si un dossier y est lié, les pièces et le déplacement seront retirés du montant facturé et le dossier classé (ce qui a déjà été encaissé est conservé).')) return;
+        btn.disabled = true;
+        try{
+          await classerDevisSansSuite(d.app_id, d.rapport_app_id, motif, 'refuse');
+          showToast('Devis marqué comme refusé ✓');
+          await renderClientDevisList(c);
+        }catch(e){
+          console.error('Erreur marquage devis refusé :', e);
           showToast('Échec de la mise à jour', true);
           btn.disabled = false;
         }
