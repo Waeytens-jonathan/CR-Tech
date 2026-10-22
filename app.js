@@ -4376,6 +4376,32 @@ document.getElementById('depot-edit-save-btn').addEventListener('click', async (
   btn.textContent = 'Enregistrer le dépôt';
 });
 
+// Appareils d'un RDV multi-appareils dont le compte-rendu n'a pas encore été fait
+// (déduit des CR déjà présents dans le dossier, donc fiable même si l'appli a été fermée entre-temps).
+function appareilsRestantsDuRdv(r, rep){
+  if(!r || !r.appareils_supplementaires || !rep) return [];
+  let sup = [];
+  try{ sup = JSON.parse(r.appareils_supplementaires) || []; }catch(e){ return []; }
+  if(!sup.length) return [];
+  const tous = [{ appareil: r.appareil, marque: r.marque, modele: r.modele, panne: r.panne }, ...sup];
+  const dejaFaits = rep.dossier_id
+    ? reports.filter(x => !x._isDraft && x.dossier_id === rep.dossier_id)
+    : [rep];
+  const norm = v => (v || '').toString().toLowerCase().trim();
+  const restants = tous.slice();
+  const nonApparies = [];
+  dejaFaits.forEach(cr => {
+    const i = restants.findIndex(a =>
+      norm(a.appareil) === norm(cr.appareil) ||
+      norm(matchAppareilOption(a.appareil)) === norm(cr.appareil) ||
+      (norm(a.modele) && norm(a.modele) === norm(cr.modele)));
+    if(i >= 0) restants.splice(i, 1); else nonApparies.push(cr);
+  });
+  // CR dont l'appareil a été renommé : on retire quand même autant d'appareils que de CR restants
+  nonApparies.forEach(() => { if(restants.length) restants.shift(); });
+  return restants;
+}
+
 // Retrouve le compte-rendu lié à un RDV : d'abord via le marqueur caché ou le lien direct,
 // sinon par repli (client + appareil) pour les RDV créés avant l'ajout de ce lien.
 function findLinkedReport(r){
@@ -4583,6 +4609,14 @@ async function showAgendaDetail(appId){
   createCrBtn.style.display = crExiste ? 'none' : 'inline-flex';
   viewCrBtn.style.display = crExiste ? 'inline-flex' : 'none';
 
+  // Dossier multi-appareils interrompu : propose de reprendre les appareils dont le CR n'est pas encore fait
+  const resumeCrBtn = document.getElementById('agenda-detail-resume-cr');
+  if(resumeCrBtn){
+    const restants = crExiste ? appareilsRestantsDuRdv(r, linkedReport) : [];
+    resumeCrBtn.style.display = restants.length ? 'inline-flex' : 'none';
+    resumeCrBtn.textContent = `▶️ Reprendre : ${restants.length} appareil${restants.length>1?'s':''} sans compte-rendu`;
+  }
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-agenda-detail').classList.add('active');
@@ -4652,6 +4686,36 @@ document.getElementById('agenda-detail-view-cr').addEventListener('click', async
   await openReportOrDossier(rep);
 });
 
+document.getElementById('agenda-detail-resume-cr').addEventListener('click', () => {
+  if(!currentAgendaRdv) return;
+  const r = currentAgendaRdv;
+  const rep = r._linkedReportFound || findLinkedReport(r);
+  const restants = appareilsRestantsDuRdv(r, rep);
+  if(!restants.length){ showToast('Tous les appareils ont déjà un compte-rendu'); return; }
+  const dossierId = rep && rep.dossier_id ? rep.dossier_id : null;
+  const nbFaits = dossierId ? reports.filter(x => !x._isDraft && x.dossier_id === dossierId).length : 1;
+  const lancer = async (idx) => {
+    const choisi = restants[idx];
+    const reste = restants.filter((_, i2) => i2 !== idx);
+    await demarrerCrDepuisRdv(r, choisi, reste, { dossierId, nbFaits });
+  };
+  if(restants.length === 1){ lancer(0); return; }
+  const listEl = document.getElementById('choix-appareil-depart-list');
+  listEl.innerHTML = restants.map((a, i) => `
+    <button class="btn btn-outline choix-appareil-btn" data-idx="${i}" style="text-align:left;padding:0.7rem 0.9rem;">
+      <div style="font-weight:600;">${escapeHtml(a.appareil || 'Appareil ' + (i+1))}</div>
+      ${[a.marque,a.modele].filter(Boolean).length ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.15rem;">${escapeHtml([a.marque,a.modele].filter(Boolean).join(' '))}</div>` : ''}
+      ${a.panne ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.15rem;">${escapeHtml(a.panne)}</div>` : ''}
+    </button>`).join('');
+  listEl.querySelectorAll('.choix-appareil-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.getElementById('choix-appareil-depart-modal').style.display = 'none';
+      await lancer(parseInt(btn.dataset.idx, 10));
+    });
+  });
+  document.getElementById('choix-appareil-depart-modal').style.display = 'flex';
+});
+
 document.getElementById('agenda-detail-create-cr').addEventListener('click', async () => {
   if(!currentAgendaRdv) return;
   const r = currentAgendaRdv;
@@ -4699,10 +4763,12 @@ document.getElementById('choix-appareil-depart-cancel').addEventListener('click'
   document.getElementById('choix-appareil-depart-modal').style.display = 'none';
 });
 
-async function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
+async function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants, reprise){
   resetForm();
   clearDraft();
-  window._creatingFromRdvAppId = r.app_id;
+  const dossierExistant = reprise && reprise.dossierId ? reprise.dossierId : null;
+  // En reprise, le 1er CR du RDV est déjà lié : on ne le remplace pas
+  window._creatingFromRdvAppId = dossierExistant ? null : r.app_id;
   if(r.is_sav && r.sav_parent_app_id){
     window._creatingSavParentAppId = r.sav_parent_app_id;
     window._creatingSavRaison = r.sav_raison || '';
@@ -4729,19 +4795,20 @@ async function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
   }
 
   window._appareilsRestants = appareilsRestants || [];
-  if(window._appareilsRestants.length){
-    const nouveauDossierId = 'dos_' + Date.now();
+  if(window._appareilsRestants.length || dossierExistant){
+    const nouveauDossierId = dossierExistant || ('dos_' + Date.now());
     window._multiAppareilsDossierId = nouveauDossierId;
     window._currentDossierAppId = nouveauDossierId;
-    window._dossierMultiAppareilsTotal = window._appareilsRestants.length + 1;
-    window._multiAppareilsIndex = 1;
+    const dejaFaits = dossierExistant ? (reprise.nbFaits || 0) : 0;
+    window._dossierMultiAppareilsTotal = dejaFaits + window._appareilsRestants.length + 1;
+    window._multiAppareilsIndex = dejaFaits + 1;
     window._multiAppareilsClientInfo = {
       nom: r.nom||'', prenom: r.prenom||'', adresse: r.adresse||'', cp: r.cp||'', ville: r.ville||'',
       tel: r.tel||'', email: r.email||'', type_client: r.type_client||'particulier',
       entreprise_nom: r.entreprise_nom||'', entreprise_siret: r.entreprise_siret||'', date: r.date || todayISO()
     };
     // La ligne "dossiers" doit exister avant que le 1er CR ne référence son app_id (contrainte de clé étrangère)
-    try{
+    if(!dossierExistant) try{
       const { error } = await sb.from(DOSSIERS_TABLE).insert({
         app_id: nouveauDossierId,
         client_id: r.client_id || null,
@@ -4756,7 +4823,9 @@ async function demarrerCrDepuisRdv(r, appareilDepart, appareilsRestants){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-form').classList.add('active');
   goToStep(1);
-  if(window._appareilsRestants.length){
+  if(dossierExistant){
+    showToast(`Appareil ${window._multiAppareilsIndex}/${window._dossierMultiAppareilsTotal} — repris dans le dossier existant`);
+  } else if(window._appareilsRestants.length){
     showToast(`Appareil 1/${window._dossierMultiAppareilsTotal} — saisissez le diagnostic, les suivants suivront`);
   } else {
     showToast(r.is_sav ? 'Infos pré-remplies — compte-rendu SAV lié au dossier d\'origine' : 'Infos client pré-remplies depuis le RDV');
