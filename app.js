@@ -2577,6 +2577,8 @@ function openRendreAppareilModal(){
   document.getElementById('rendre-date').value = now.toISOString().slice(0,10);
   document.getElementById('rendre-heure').value = now.toTimeString().slice(0,5);
   document.getElementById('rendre-abandon-toggle').checked = false;
+  document.getElementById('rendre-sms-toggle').checked = true;
+  document.getElementById('rendre-sms-row').style.display = 'flex';
   document.getElementById('rendre-abandon-fields').style.display = 'none';
   document.getElementById('rendre-abandon-motif').value = '';
   document.getElementById('rendre-abandon-distance').checked = false;
@@ -2589,6 +2591,7 @@ function openRendreAppareilModal(){
 
 document.getElementById('rendre-abandon-toggle')?.addEventListener('change', (e) => {
   document.getElementById('rendre-abandon-fields').style.display = e.target.checked ? 'block' : 'none';
+  document.getElementById('rendre-sms-row').style.display = e.target.checked ? 'none' : 'flex';
   document.getElementById('rendre-appareil-confirm').textContent = e.target.checked ? 'Confirmer l\'abandon ✓' : 'Confirmer la remise ✓';
   // Signature demandée uniquement pour un abandon fait en personne (pas pour une remise normale, ni un abandon à distance)
   const aDistance = document.getElementById('rendre-abandon-distance').checked;
@@ -4112,6 +4115,7 @@ document.getElementById('rendre-appareil-confirm')?.addEventListener('click', as
   const btn = document.getElementById('rendre-appareil-confirm');
   const dateVal = document.getElementById('rendre-date').value;
   const heureVal = document.getElementById('rendre-heure').value;
+  const envoyerSms = document.getElementById('rendre-sms-toggle').checked;
   btn.disabled = true; btn.textContent = 'Validation…';
 
   try{
@@ -4149,7 +4153,7 @@ document.getElementById('rendre-appareil-confirm')?.addEventListener('click', as
     }
 
     // Envoyer SMS de confirmation au client (uniquement pour une remise classique)
-    if(!estAbandon){
+    if(!estAbandon && envoyerSms){
       const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
       if(tel){
         const dateFmt = dateVal ? new Date(dateVal + 'T00:00:00').toLocaleDateString('fr-FR') : '';
