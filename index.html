@@ -1805,6 +1805,12 @@
       <span>Total estimé</span><span id="devis-total-affiche">0,00 €</span>
     </div>
 
+    <div class="field" style="margin-bottom:1rem;">
+      <label style="font-size:0.85rem;">Acompte déjà réglé par le client (€) — apparaît sur le devis</label>
+      <input type="number" id="devis-acompte-regle" min="0" step="0.01" placeholder="0.00 (laisser vide si aucun)" inputmode="decimal" style="width:100%;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+      <input type="hidden" id="devis-acompte-mode">
+    </div>
+
     <button class="btn btn-primary" id="devis-generer-final-btn" style="width:100%;">Générer le devis PDF</button>
   </div>
 </div>

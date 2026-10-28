@@ -3754,6 +3754,15 @@ document.getElementById('generer-devis-btn').addEventListener('click', () => {
         quantite: l.quantite, unite: 'unité', prix_unitaire: l.prix_unitaire, remise: 0
       }))
     : [newDevisRow()];
+  // Acompte déjà versé (CR, sinon bon de dépôt lié) : pré-rempli, modifiable
+  let acMontant = (currentDetailReport['paiement-statut'] === 'Acompte') ? (parseFloat(currentDetailReport['acompte-montant']) || 0) : 0;
+  let acMode = acMontant > 0 ? (currentDetailReport['paiement-moyen'] || '') : '';
+  if(!acMontant && currentDetailReport.depot_app_id){
+    const dep = depots.find(x => x.app_id === currentDetailReport.depot_app_id);
+    if(dep && parseFloat(dep.acompte_montant) > 0){ acMontant = parseFloat(dep.acompte_montant); acMode = dep.acompte_mode || ''; }
+  }
+  document.getElementById('devis-acompte-regle').value = acMontant > 0 ? acMontant.toFixed(2) : '';
+  document.getElementById('devis-acompte-mode').value = acMode;
   renderDevisRows();
   document.getElementById('devis-modal').style.display = 'flex';
 });
@@ -3762,11 +3771,13 @@ function ouvrirDevisPourClient(c){
   devisModalClientContext = c;
   document.getElementById('devis-modal-subtitle').textContent = `Devis libre pour ${clientDisplayName(c)} — ajoutez vos lignes.`;
   devisEditRows = [newDevisRow()];
+  document.getElementById('devis-acompte-regle').value = '';
+  document.getElementById('devis-acompte-mode').value = '';
   renderDevisRows();
   document.getElementById('devis-modal').style.display = 'flex';
 }
 
-function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
+function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission, acompte){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const W = 210, margin = 20;
@@ -3865,6 +3876,19 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission){
   doc.text(montantTotal.toFixed(2)+' €', W-margin-3, y, {align:'right'});
   y += 10;
 
+  // Acompte déjà versé : le montant apparaît clairement, avec la mention « déjà réglé »
+  if(acompte && acompte.montant > 0){
+    const acompteRetenu = Math.min(acompte.montant, montantTotal);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(40,140,70);
+    doc.text(`Acompte déjà réglé${acompte.mode ? ' (' + acompte.mode + ')' : ''}`, margin, y);
+    doc.text('- ' + acompteRetenu.toFixed(2) + ' €', W-margin-3, y, {align:'right'});
+    y += 7;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(13,27,42);
+    doc.text('RESTE À RÉGLER', margin, y);
+    doc.text(Math.max(0, montantTotal - acompteRetenu).toFixed(2) + ' €', W-margin-3, y, {align:'right'});
+    y += 10;
+  }
+
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,90,90);
   const tvaLines = doc.splitTextToSize("TVA non applicable, articles 293 B du Code général des impôts (CGI) et 223-21 du Code des impositions sur les biens et services (CIBS)", W-margin*2);
   doc.text(tvaLines, margin, y);
@@ -3921,7 +3945,9 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
       ? { nom: r.nom, prenom: r.prenom, adresse: r.adresse, cp: r.cp, ville: r.ville, 'type-client': r.type_client, 'entreprise-nom': r.entreprise_nom, 'entreprise-siret': r.entreprise_siret }
       : r;
 
-    const doc = generateDevisPdf(donneesPourPdf, numero, lignes, montantTotal, dateEmission);
+    const acompteSaisi = parseFloat(document.getElementById('devis-acompte-regle').value) || 0;
+    const acompteDevis = acompteSaisi > 0 ? { montant: acompteSaisi, mode: document.getElementById('devis-acompte-mode').value || '' } : null;
+    const doc = generateDevisPdf(donneesPourPdf, numero, lignes, montantTotal, dateEmission, acompteDevis);
     const pdfBase64 = doc.output('datauristring').split(',')[1];
 
     const devisRow = {
