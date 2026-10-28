@@ -2473,6 +2473,7 @@ async function showDepotDetail(appId){
     ['Adresse', `${d.adresse || ''}, ${d.cp || ''} ${d.ville || ''}`],
     ['Appareil', d.appareil],
     ['Description', d.description],
+    ['Acompte versé', (parseFloat(d.acompte_montant) > 0) ? parseFloat(d.acompte_montant).toFixed(2) + ' €' + (d.acompte_mode ? ' (' + d.acompte_mode + ')' : '') + (d.acompte_date ? ' — le ' + new Date(d.acompte_date + 'T00:00:00').toLocaleDateString('fr-FR') : '') : ''],
   ];
   let html = '';
   rows.forEach(([label, value]) => {
@@ -4177,7 +4178,7 @@ document.getElementById('depot-detail-sms-btn').addEventListener('click', () => 
   if(!tel){ showToast('Numéro de téléphone manquant', true); return; }
   const dateLabel = dateFrLongFromISO(currentDepot.date_depot);
   const heureLabel = currentDepot.heure_depot || '';
-  const message = `Bonjour ${currentDepot.prenom||''}, je vous confirme le dépôt de votre appareil (${currentDepot.appareil||''}) le ${dateLabel} à ${heureLabel}. Je vous recontacte dès le diagnostic effectué. Jonathan – Technik-Home.`;
+  const message = `Bonjour ${currentDepot.prenom||''}, je vous confirme le dépôt de votre appareil (${currentDepot.appareil||''}) le ${dateLabel} à ${heureLabel}. ${(parseFloat(currentDepot.acompte_montant) > 0) ? 'Acompte reçu : ' + parseFloat(currentDepot.acompte_montant).toFixed(2) + ' €' + (currentDepot.acompte_mode ? ' (' + currentDepot.acompte_mode + ')' : '') + ', qui sera déduit de la facture finale. ' : ''}Je vous recontacte dès le diagnostic effectué. Jonathan – Technik-Home.`;
   ouvrirSms(tel, message);
 });
 
@@ -4213,6 +4214,15 @@ document.getElementById('depot-detail-create-cr').addEventListener('click', () =
   autoFillMainOeuvre(document.getElementById('f-appareil').value);
   document.getElementById('f-panne').value = d.description || '';
   window._creatingFromDepotAppId = d.app_id;
+  // Acompte déjà versé à la dépose : reporté dans la facturation du CR
+  if(parseFloat(d.acompte_montant) > 0){
+    const sel = document.getElementById('f-paiement-statut');
+    sel.value = 'Acompte';
+    sel.dispatchEvent(new Event('change'));
+    document.getElementById('f-acompte-montant').value = parseFloat(d.acompte_montant).toFixed(2);
+    if(d.acompte_mode) document.getElementById('f-paiement-moyen').value = d.acompte_mode;
+    updateResteAEncaisser();
+  }
 
   if(d.is_sav && d.sav_parent_app_id){
     window._creatingSavParentAppId = d.sav_parent_app_id;
@@ -4289,20 +4299,31 @@ async function openDepotEdit(appId){
     document.getElementById('depot-edit-email').value = d.email || '';
     document.getElementById('depot-edit-appareil').value = d.appareil || '';
     document.getElementById('depot-edit-description').value = d.description || '';
+    document.getElementById('depot-edit-acompte').value = parseFloat(d.acompte_montant) > 0 ? d.acompte_montant : '';
+    document.getElementById('depot-edit-acompte-mode').value = d.acompte_mode || 'Espèces';
     try{ depotPhotos = d.photos ? JSON.parse(d.photos) : []; }catch(e){ depotPhotos = []; }
   } else {
     document.getElementById('depot-edit-title').textContent = 'Nouveau dépôt';
     ['prenom','nom','adresse','cp','ville','tel','email','appareil','description'].forEach(f => {
       document.getElementById('depot-edit-' + f).value = '';
     });
+    document.getElementById('depot-edit-acompte').value = '';
+    document.getElementById('depot-edit-acompte-mode').value = 'Espèces';
     depotPhotos = [];
   }
+  majChampModeAcompteDepot();
   renderDepotPhotosGrid();
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-depot-edit').classList.add('active');
 }
+
+function majChampModeAcompteDepot(){
+  const m = parseFloat(document.getElementById('depot-edit-acompte').value) || 0;
+  document.getElementById('depot-edit-acompte-mode-field').style.display = m > 0 ? 'block' : 'none';
+}
+document.getElementById('depot-edit-acompte').addEventListener('input', majChampModeAcompteDepot);
 
 document.getElementById('depot-new-btn').addEventListener('click', () => openDepotEdit(null));
 document.getElementById('depot-detail-edit-btn').addEventListener('click', () => {
@@ -4336,6 +4357,17 @@ document.getElementById('depot-edit-save-btn').addEventListener('click', async (
     description: document.getElementById('depot-edit-description').value.trim(),
     photos: JSON.stringify(depotPhotos)
   };
+  // Acompte : colonnes envoyées seulement s'il y a un acompte (ou s'il faut l'effacer), pour ne pas dépendre de la migration SQL sinon
+  const acompteSaisi = parseFloat(document.getElementById('depot-edit-acompte').value) || 0;
+  const ancienDepot = editingDepotAppId ? depots.find(x => x.app_id === editingDepotAppId) : null;
+  const avaitAcompte = ancienDepot && parseFloat(ancienDepot.acompte_montant) > 0;
+  if(acompteSaisi > 0){
+    row.acompte_montant = acompteSaisi;
+    row.acompte_mode = document.getElementById('depot-edit-acompte-mode').value;
+    row.acompte_date = (avaitAcompte && ancienDepot.acompte_date) ? ancienDepot.acompte_date : todayISO();
+  } else if(avaitAcompte){
+    row.acompte_montant = null; row.acompte_mode = null; row.acompte_date = null;
+  }
   if(!editingDepotAppId){
     row.app_id = 'dep_' + Date.now();
     row.date_depot = todayISO();

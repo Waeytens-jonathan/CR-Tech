@@ -770,6 +770,18 @@
         <textarea id="depot-edit-description" rows="3"></textarea>
       </div>
       <div class="field">
+        <label>Acompte versé par le client (€)</label>
+        <input type="number" id="depot-edit-acompte" placeholder="0.00 (laisser vide si aucun)" step="0.01" min="0" inputmode="decimal">
+      </div>
+      <div class="field" id="depot-edit-acompte-mode-field" style="display:none;">
+        <label>Mode de paiement de l'acompte</label>
+        <select id="depot-edit-acompte-mode">
+          <option value="Espèces">Espèces</option>
+          <option value="Carte bancaire">Carte bancaire</option>
+          <option value="Virement">Virement bancaire</option>
+        </select>
+      </div>
+      <div class="field">
         <label>Photos de l'appareil (3 max)</label>
         <div class="grid" id="depot-photo-grid" style="grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:0.6rem;"></div>
         <label class="btn btn-outline" for="depot-photo-input" style="cursor:pointer; display:inline-block; margin-top:0.5rem;">
