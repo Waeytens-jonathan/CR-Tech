@@ -353,6 +353,10 @@
       </div>
 
       <div id="newrdv-appareils-sup-rows"></div>
+      <div class="checkbox-row" style="margin-top:0.6rem;">
+        <input type="checkbox" id="newrdv-longue">
+        <label for="newrdv-longue">⏱ Intervention longue <span style="font-weight:400;color:var(--text-muted);">(compte pour 2 places dans l'agenda)</span></label>
+      </div>
       <button type="button" class="btn btn-outline" id="newrdv-add-appareil-btn" style="width:100%;margin-top:1rem;margin-bottom:0.8rem;">+ Ajouter un autre appareil</button>
 
       <div class="field">
@@ -1103,6 +1107,10 @@
         <div class="field">
           <label>Durée de l'intervention (minutes)</label>
           <input type="number" id="f-duree" placeholder="ex : 90" step="1" min="0" inputmode="numeric" pattern="[0-9]*">
+        </div>
+        <div class="checkbox-row full">
+          <input type="checkbox" id="f-devis-a-faire">
+          <label for="f-devis-a-faire">📝 Devis à faire (pense-bête)</label>
         </div>
         <div class="checkbox-row full">
           <input type="checkbox" id="f-besoin-piece">

@@ -415,6 +415,7 @@ function reportToRow(r){
   if(r['piece-delai']) extra.piece_delai = r['piece-delai'];
   if(r['livraison']) extra.livraison = r['livraison'];
   if(r['acompte-montant']) extra.acompte_montant = r['acompte-montant'];
+  if(r['devis-a-faire']) extra.devis_a_faire = true;
   if(r._draftStep !== undefined) extra._draftStep = r._draftStep;
   if(r.sav_probleme) extra.sav_probleme = r.sav_probleme;
   if(r.sav_resolution) extra.sav_resolution = r.sav_resolution;
@@ -491,6 +492,7 @@ function rowToReport(row){
     'paiement-statut': row.paiement_statue,
     'reste-encaisser': row.reste_encaisser,
     'acompte-montant': extra.acompte_montant || '',
+    'devis-a-faire': !!extra.devis_a_faire,
     documents_envoyes: row.documents_envoyes != null ? !!row.documents_envoyes : !!extra.documents_envoyes,
     sav_probleme: extra.sav_probleme || '',
     sav_resolution: extra.sav_resolution || '',
@@ -757,7 +759,7 @@ let currentAgendaRdv = null;
 // Colonnes RDV sans les champs lourds (photos/signatures en base64) — utilisé pour
 // le chargement de la liste de l'agenda, beaucoup plus rapide. Les champs lourds sont
 // chargés à la demande (ensureFullRdvLoaded) uniquement à l'ouverture du détail d'un RDV.
-const LIGHT_RDV_COLUMNS = 'app_id,date,creneau,vu,nom,prenom,adresse,adresse2,cp,ville,tel,tel_interlocuteur,type_client,entreprise_nom,entreprise_siret,email,appareil,marque,modele,panne,appareils_supplementaires,note_technicien,type_rdv,distance_km,lat_rdv,lon_rdv,statut,is_sav,sav_parent_app_id,sav_raison,motif_annulation,email_confirmation_envoye,email_confirmation_erreur,date_absence,heure_absence,commentaire_absence,client_id,created_at,has_plaque_photo,has_photo_absence';
+const LIGHT_RDV_COLUMNS = 'app_id,date,creneau,vu,nom,prenom,adresse,adresse2,cp,ville,tel,tel_interlocuteur,type_client,entreprise_nom,entreprise_siret,email,appareil,marque,modele,panne,appareils_supplementaires,intervention_longue,note_technicien,type_rdv,distance_km,lat_rdv,lon_rdv,statut,is_sav,sav_parent_app_id,sav_raison,motif_annulation,email_confirmation_envoye,email_confirmation_erreur,date_absence,heure_absence,commentaire_absence,client_id,created_at,has_plaque_photo,has_photo_absence';
 
 async function ensureFullRdvLoaded(r){
   if(r._fullyLoaded) return;
@@ -913,17 +915,19 @@ function renderAgendaList(){
   const isSamedi = d.getDay() === 6;
   const quotaMatinJour = isSamedi ? (params.quotaMatinSam ?? 2) : (params.quotaMatin ?? 2);
   const quotaAmJour    = isSamedi ? (params.quotaAMSam ?? 2)    : (params.quotaAM ?? 4);
-  const restantMatin = Math.max(0, quotaMatinJour - matinRdvs.length);
-  const restantAm    = Math.max(0, quotaAmJour - amRdvs.length);
+  const usedMatin = sommePoidsRdv(matinRdvs);
+  const usedAm    = sommePoidsRdv(amRdvs);
+  const restantMatin = Math.max(0, quotaMatinJour - usedMatin);
+  const restantAm    = Math.max(0, quotaAmJour - usedAm);
   const capaciteHtml = `<div style="display:flex;gap:0.6rem;margin-bottom:0.7rem;">
     <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;">
       <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">☀️ Matin</div>
-      <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${matinRdvs.length}/${quotaMatinJour} RDV</div>
+      <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${usedMatin}/${quotaMatinJour} place${quotaMatinJour>1?'s':''}${usedMatin !== matinRdvs.length ? ' <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted);">(' + matinRdvs.length + ' RDV)</span>' : ''}</div>
       <div style="font-size:0.78rem;color:${restantMatin > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantMatin > 0 ? restantMatin + ' place' + (restantMatin>1?'s':'') + ' restante' + (restantMatin>1?'s':'') : 'Complet'}</div>
     </div>
     <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;">
       <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">🌤 Après-midi</div>
-      <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${amRdvs.length}/${quotaAmJour} RDV</div>
+      <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${usedAm}/${quotaAmJour} place${quotaAmJour>1?'s':''}${usedAm !== amRdvs.length ? ' <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted);">(' + amRdvs.length + ' RDV)</span>' : ''}</div>
       <div style="font-size:0.78rem;color:${restantAm > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantAm > 0 ? restantAm + ' place' + (restantAm>1?'s':'') + ' restante' + (restantAm>1?'s':'') : 'Complet'}</div>
     </div>
   </div>`;
@@ -945,6 +949,7 @@ function renderAgendaList(){
     if(r.appareils_supplementaires){
       try{ const sup = JSON.parse(r.appareils_supplementaires); if(Array.isArray(sup)) nbAppareilsSup = sup.length; }catch(e){}
     }
+    const longueLabel = r.intervention_longue ? `<span class="badge" style="background:rgba(245,166,35,0.18);color:#f5a623;font-size:0.68rem;">⏱ Longue (2)</span>` : '';
     const multiLabel = nbAppareilsSup > 0 ? `<span class="badge" style="background:rgba(26,115,200,0.18);color:var(--blue);font-size:0.68rem;">+${nbAppareilsSup} appareil${nbAppareilsSup>1?'s':''}</span>` : '';
     const borderColor = r.statut === 'effectue' ? '#4caf50' : 'var(--orange)';
     const bgColor = r.statut === 'effectue' ? 'rgba(76,175,80,0.06)' : 'rgba(245,166,35,0.07)';
@@ -952,7 +957,7 @@ function renderAgendaList(){
       style="cursor:pointer;border-left:4px solid ${borderColor};background:${bgColor};${r.statut==='effectue'?'opacity:0.7;':''}padding:0.6rem 0.8rem;margin-bottom:0.5rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
         <strong style="font-size:0.95rem;">${escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||'—')}</strong>
-        <div style="display:flex;gap:0.3rem;align-items:center;">${nouveauLabel}${multiLabel}${doneLabel}</div>
+        <div style="display:flex;gap:0.3rem;align-items:center;">${nouveauLabel}${longueLabel}${multiLabel}${doneLabel}</div>
       </div>
       <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">${escapeHtml(r.appareil||'')}${r.ville?' — '+escapeHtml(r.ville):''}</div>
       ${typeLabel ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">${typeLabel}</div>` : ''}
@@ -3983,6 +3988,10 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
     }
 
     document.getElementById('devis-modal').style.display = 'none';
+    if(!modeClient && r['devis-a-faire']){
+      r['devis-a-faire'] = false;
+      try{ await saveReportToSupabase(r); }catch(e){ console.error('Erreur retrait pense-bête devis :', e); }
+    }
     if(modeClient){
       await renderClientDevisList(r);
     } else {
@@ -5136,6 +5145,17 @@ document.getElementById('agenda-detail-done-btn').addEventListener('click', asyn
 });
 
 // ---------- Nouveau RDV (ajout manuel, ex: appel téléphonique) ----------
+// Poids d'un RDV dans les quotas : 1 par appareil + 1 si « intervention longue » (compte pour 2)
+function poidsRdv(r){
+  let n = 1;
+  if(r && r.appareils_supplementaires){
+    try{ const sup = JSON.parse(r.appareils_supplementaires); if(Array.isArray(sup)) n += sup.length; }catch(e){}
+  }
+  if(r && r.intervention_longue) n += 1;
+  return n;
+}
+function sommePoidsRdv(liste){ return (liste || []).reduce((t, r) => t + poidsRdv(r), 0); }
+
 let newrdvAppareilsSup = [];
 
 function newAppareilSupRow(prefill){
@@ -5567,6 +5587,7 @@ document.getElementById('agenda-new-btn').addEventListener('click', () => {
   document.querySelector('#view-agenda-new h2').textContent = 'Nouveau rendez-vous';
   document.getElementById('newrdv-save-btn').textContent = 'Enregistrer le rendez-vous';
   newrdvAppareilsSup = [];
+  document.getElementById('newrdv-longue').checked = false;
   renderNewrdvAppareilsSupRows();
 
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -5605,6 +5626,7 @@ document.getElementById('agenda-detail-edit-btn').addEventListener('click', () =
   try{
     newrdvAppareilsSup = r.appareils_supplementaires ? JSON.parse(r.appareils_supplementaires).map(a => newAppareilSupRow(a)) : [];
   }catch(e){ newrdvAppareilsSup = []; }
+  document.getElementById('newrdv-longue').checked = !!r.intervention_longue;
   renderNewrdvAppareilsSupRows();
 
   document.querySelector('#view-agenda-new h2').textContent = 'Modifier le rendez-vous';
@@ -5653,11 +5675,15 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
       apresmidi: isSam ? cfg.quotaAMSam    : cfg.quotaAM
     };
     try{
-      const { data, error } = await sb.from(RDV_TABLE).select('creneau').eq('date', date).neq('statut', 'annule');
+      const { data, error } = await sb.from(RDV_TABLE).select('creneau,appareils_supplementaires,intervention_longue').eq('date', date).neq('statut', 'annule');
       if(!error){
-        const used = (data || []).filter(r => r.creneau === creneau).length;
-        if(used >= limit[creneau]){
-          const ok = confirm(`Ce créneau affiche déjà ${used} rendez-vous (quota habituel : ${limit[creneau]}). Continuer quand même ?`);
+        const used = sommePoidsRdv((data || []).filter(r => r.creneau === creneau));
+        const poidsNouveau = poidsRdv({
+          appareils_supplementaires: newrdvAppareilsSup.filter(r => r.appareil || r.panne).length ? JSON.stringify(newrdvAppareilsSup.filter(r => r.appareil || r.panne)) : null,
+          intervention_longue: document.getElementById('newrdv-longue').checked
+        });
+        if(used + poidsNouveau > limit[creneau]){
+          const ok = confirm(`Ce créneau affiche déjà ${used} place(s) utilisée(s) sur ${limit[creneau]} et ce RDV en compte ${poidsNouveau}. Continuer quand même ?`);
           if(!ok) return;
         }
       }
@@ -5704,6 +5730,7 @@ document.getElementById('newrdv-save-btn').addEventListener('click', async () =>
       });
       return valides.length ? JSON.stringify(valides) : null;
     })(),
+    intervention_longue: document.getElementById('newrdv-longue').checked,
     note_technicien: document.getElementById('newrdv-note').value.trim(),
     type_rdv: document.getElementById('newrdv-type').value.trim() || null,
     distance_km: window._newRdvDistanceKm || null
@@ -7221,7 +7248,7 @@ const fieldIds = [
   'f-paiement-statut','f-acompte-montant','f-paiement-moyen','f-paiement-especes','f-paiement-carte',
   'f-notes'
 ];
-const checkboxIds = ['f-besoin-piece','f-commande-piece','f-garantie','f-conseils-entretien','f-evenement-exterieur'];
+const checkboxIds = ['f-besoin-piece','f-commande-piece','f-garantie','f-conseils-entretien','f-evenement-exterieur','f-devis-a-faire'];
 
 function updateEmailBtnVisibility(){
   const statut = document.getElementById('f-statut').value;
@@ -7626,7 +7653,7 @@ function buildListItem(r){
       default: statutBadge = '<span class="badge orange">🔄 En cours</span>';
     }
   }
-  const savBadge = r.is_sav ? '<span class="badge red" style="font-size:0.7rem;">🛠️ SAV</span>' : '';
+  const savBadge = (r.is_sav ? '<span class="badge red" style="font-size:0.7rem;">🛠️ SAV</span>' : '') + (r['devis-a-faire'] ? '<span class="badge" style="background:rgba(245,166,35,0.18);color:#f5a623;border:1px solid #f5a623;font-size:0.7rem;margin-left:4px;">📝 Devis à faire</span>' : '');
   const archiveDateFmt = r.statut === 'archivé' && r.date_archivage
     ? `<span style="font-size:0.75rem;color:var(--text-muted);"> · Archivé le ${new Date(r.date_archivage).toLocaleDateString('fr-FR')}</span>`
     : '';
@@ -7865,6 +7892,7 @@ function buildDossierItem(rapports){
   }
   if(hasSAV) statutBadge += '<span class="badge red" style="font-size:0.7rem;margin-left:4px;">🛠️ SAV</span>';
   if(rapports.some(r => estEnRetardPaiement(r))) statutBadge += '<span class="badge" style="background:rgba(224,88,79,0.2);color:#e0584f;border:1px solid #e0584f;font-size:0.7rem;margin-left:4px;">⚠️ Impayé</span>';
+  if(rapports.some(r => r['devis-a-faire'])) statutBadge += '<span class="badge" style="background:rgba(245,166,35,0.18);color:#f5a623;border:1px solid #f5a623;font-size:0.7rem;margin-left:4px;">📝 Devis à faire</span>';
   if(rapports.some(r => r['dossier-assurance'])) statutBadge += '<span class="badge" style="background:rgba(26,115,200,0.15);color:#1a73c8;border:1px solid #1a73c8;font-size:0.7rem;margin-left:4px;">🛡️ Assurance</span>';
 
   // RDV de pose-pièce déjà programmé
@@ -8127,6 +8155,11 @@ function renderDetailContent(r, container){
   html += '<div class="checkbox-row" style="margin-top:0.8rem;">';
   html += `<input type="checkbox" id="quick-exclu-impaye" ${r['exclu-impaye'] ? 'checked' : ''}>`;
   html += '<label for="quick-exclu-impaye">Ne pas compter comme impayé <span style="font-weight:400;color:var(--text-muted);">(ex : en attente d\'une pièce, reste à encaisser normal)</span></label>';
+  html += '</div>';
+
+  html += '<div class="checkbox-row" style="margin-top:0.4rem;">';
+  html += `<input type="checkbox" id="quick-devis-a-faire" ${r['devis-a-faire'] ? 'checked' : ''}>`;
+  html += '<label for="quick-devis-a-faire">📝 Devis à faire <span style="font-weight:400;color:var(--text-muted);">(pense-bête, se décoche une fois le devis généré)</span></label>';
   html += '</div>';
 
   html += '<div class="checkbox-row" style="margin-top:0.4rem;">';
@@ -8431,6 +8464,7 @@ function renderDetailContent(r, container){
       reports[idx]['facture-creee'] = factureEl.checked;
       reports[idx]['exclu-impaye'] = document.getElementById('quick-exclu-impaye').checked;
       reports[idx]['dossier-assurance'] = document.getElementById('quick-dossier-assurance').checked;
+      reports[idx]['devis-a-faire'] = document.getElementById('quick-devis-a-faire').checked;
       reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
       const pieceSuiviEl = document.getElementById('quick-piece-suivi');
       if(reports[idx]['commande-piece']){
@@ -10416,6 +10450,7 @@ document.getElementById('sav-choix-rdv-btn').addEventListener('click', () => {
   const typeSelect = document.getElementById('newrdv-type');
   if(typeSelect) typeSelect.value = 'sav';
   newrdvAppareilsSup = [];
+  document.getElementById('newrdv-longue').checked = false;
   renderNewrdvAppareilsSupRows();
 
   window._rdvSavParentAppId = r.app_id || r.id;
@@ -10646,6 +10681,7 @@ document.getElementById('detail-rdv-pose-btn').addEventListener('click', () => {
   document.getElementById('newrdv-creneau').value = 'apresmidi';
   document.getElementById('newrdv-type').value = 'pose_piece';
   newrdvAppareilsSup = [];
+  document.getElementById('newrdv-longue').checked = false;
   renderNewrdvAppareilsSupRows();
   document.getElementById('newrdv-prenom').value = r.prenom || '';
   document.getElementById('newrdv-nom').value = r.nom || '';
