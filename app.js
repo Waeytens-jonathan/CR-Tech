@@ -923,12 +923,12 @@ function renderAgendaList(){
     <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;">
       <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">☀️ Matin</div>
       <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${usedMatin}/${quotaMatinJour} place${quotaMatinJour>1?'s':''}${usedMatin !== matinRdvs.length ? ' <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted);">(' + matinRdvs.length + ' RDV)</span>' : ''}</div>
-      <div style="font-size:0.78rem;color:${restantMatin > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantMatin > 0 ? restantMatin + ' place' + (restantMatin>1?'s':'') + ' restante' + (restantMatin>1?'s':'') : 'Complet'}</div>
+      <div style="font-size:0.78rem;color:${restantMatin > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantMatin > 0 ? restantMatin + ' place' + (restantMatin>1?'s':'') + ' restante' + (restantMatin>1?'s':'') : (quotaMatinJour === 0 ? 'Fermé' : 'Complet')}</div>
     </div>
     <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;">
       <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">🌤 Après-midi</div>
       <div style="font-size:0.9rem;font-weight:600;margin-top:0.15rem;">${usedAm}/${quotaAmJour} place${quotaAmJour>1?'s':''}${usedAm !== amRdvs.length ? ' <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted);">(' + amRdvs.length + ' RDV)</span>' : ''}</div>
-      <div style="font-size:0.78rem;color:${restantAm > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantAm > 0 ? restantAm + ' place' + (restantAm>1?'s':'') + ' restante' + (restantAm>1?'s':'') : 'Complet'}</div>
+      <div style="font-size:0.78rem;color:${restantAm > 0 ? 'var(--green,#3fbf6f)' : 'var(--red,#e0584f)'};margin-top:0.1rem;">${restantAm > 0 ? restantAm + ' place' + (restantAm>1?'s':'') + ' restante' + (restantAm>1?'s':'') : (quotaAmJour === 0 ? 'Fermé' : 'Complet')}</div>
     </div>
   </div>`;
 
@@ -5146,6 +5146,12 @@ document.getElementById('agenda-detail-done-btn').addEventListener('click', asyn
 
 // ---------- Nouveau RDV (ajout manuel, ex: appel téléphonique) ----------
 // Poids d'un RDV dans les quotas : 1 par appareil + 1 si « intervention longue » (compte pour 2)
+// Quota saisi dans les réglages : 0 est une valeur valide (créneau fermé)
+function quotaSaisi(id, defaut){
+  const v = parseInt(document.getElementById(id).value, 10);
+  return Number.isNaN(v) ? defaut : Math.max(0, v);
+}
+
 function poidsRdv(r){
   let n = 1;
   if(r && r.appareils_supplementaires){
@@ -9730,10 +9736,10 @@ document.getElementById('p-save-btn') && document.getElementById('p-save-btn').a
     matinFin:       document.getElementById('p-matin-fin').value   || '12:00',
     amDebut:        document.getElementById('p-am-debut').value    || '12:00',
     amFin:          document.getElementById('p-am-fin').value      || '18:00',
-    quotaMatin:     parseInt(document.getElementById('p-quota-matin').value)     || 2,
-    quotaAM:        parseInt(document.getElementById('p-quota-am').value)        || 4,
-    quotaMatinSam:  parseInt(document.getElementById('p-quota-matin-sam').value) || 2,
-    quotaAMSam:     parseInt(document.getElementById('p-quota-am-sam').value)    || 2,
+    quotaMatin:     quotaSaisi('p-quota-matin', 2),
+    quotaAM:        quotaSaisi('p-quota-am', 4),
+    quotaMatinSam:  quotaSaisi('p-quota-matin-sam', 2),
+    quotaAMSam:     quotaSaisi('p-quota-am-sam', 2),
     banniereActive:     document.getElementById('p-banniere-active').checked,
     banniereMessage:    document.getElementById('p-banniere-message').value.trim(),
     banniereDateDebut:  document.getElementById('p-banniere-date-debut').value || null,
