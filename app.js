@@ -3766,6 +3766,7 @@ document.getElementById('generer-devis-btn').addEventListener('click', () => {
     const dep = depots.find(x => x.app_id === currentDetailReport.depot_app_id);
     if(dep && parseFloat(dep.acompte_montant) > 0){ acMontant = parseFloat(dep.acompte_montant); acMode = dep.acompte_mode || ''; }
   }
+  document.getElementById('devis-delai').value = currentDetailReport['piece-delai'] || '';
   document.getElementById('devis-acompte-regle').value = acMontant > 0 ? acMontant.toFixed(2) : '';
   document.getElementById('devis-acompte-mode').value = acMode;
   renderDevisRows();
@@ -3778,11 +3779,12 @@ function ouvrirDevisPourClient(c){
   devisEditRows = [newDevisRow()];
   document.getElementById('devis-acompte-regle').value = '';
   document.getElementById('devis-acompte-mode').value = '';
+  document.getElementById('devis-delai').value = '';
   renderDevisRows();
   document.getElementById('devis-modal').style.display = 'flex';
 }
 
-function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission, acompte){
+function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission, acompte, delai){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const W = 210, margin = 20;
@@ -3894,6 +3896,15 @@ function generateDevisPdf(r, numero, lignes, montantTotal, dateEmission, acompte
     y += 10;
   }
 
+  if(delai && delai.trim()){
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(13,27,42);
+    doc.text('Délai :', margin, y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+    const delaiLines = doc.splitTextToSize(delai.trim(), W - margin*2 - 16);
+    doc.text(delaiLines, margin + 16, y);
+    y += delaiLines.length * 4.6 + 6;
+  }
+
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,90,90);
   const tvaLines = doc.splitTextToSize("TVA non applicable, articles 293 B du Code général des impôts (CGI) et 223-21 du Code des impositions sur les biens et services (CIBS)", W-margin*2);
   doc.text(tvaLines, margin, y);
@@ -3952,7 +3963,7 @@ document.getElementById('devis-generer-final-btn').addEventListener('click', asy
 
     const acompteSaisi = parseFloat(document.getElementById('devis-acompte-regle').value) || 0;
     const acompteDevis = acompteSaisi > 0 ? { montant: acompteSaisi, mode: document.getElementById('devis-acompte-mode').value || '' } : null;
-    const doc = generateDevisPdf(donneesPourPdf, numero, lignes, montantTotal, dateEmission, acompteDevis);
+    const doc = generateDevisPdf(donneesPourPdf, numero, lignes, montantTotal, dateEmission, acompteDevis, document.getElementById('devis-delai').value);
     const pdfBase64 = doc.output('datauristring').split(',')[1];
 
     const devisRow = {
