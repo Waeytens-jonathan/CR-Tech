@@ -5583,6 +5583,23 @@ document.getElementById('agenda-optimize-btn').addEventListener('click', async (
   };
 });
 
+// Copie dans le presse-papier le message type avec le lien de réservation en ligne
+document.getElementById('agenda-lien-rdv-btn').addEventListener('click', () => {
+  const message = "Bonjour, vous pouvez réserver directement votre rendez-vous en ligne ici : https://www.technikhome.fr/rdv.html\nChoisissez le créneau qui vous convient et remplissez le formulaire, vous recevrez une confirmation par email. Jonathan – Technik-Home";
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = message; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try{ ok = document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+    showToast(ok ? 'Message avec le lien copié ✓' : 'Copie impossible', !ok);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(message).then(() => showToast('Message avec le lien copié ✓')).catch(fallback);
+  } else { fallback(); }
+});
+
 document.getElementById('agenda-new-btn').addEventListener('click', () => {
   editingRdvAppId = null;
   editingRdvOriginal = null;
