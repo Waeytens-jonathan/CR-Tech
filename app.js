@@ -7850,15 +7850,21 @@ function renderArchivesPage(dossiersArchives, archiveContainer, nbAffiches){
 }
 
 // Version synchrone de hasScheduledPosePieceRdv, pour l'utiliser dans le rendu de liste (pas d'await possible là-bas)
+// Un RDV pose pièce est « programmé » pour ce dossier s'il est lié explicitement au CR ([[cr:id]]),
+// ou à défaut (anciens RDV sans lien) s'il est encore à venir/non effectué, du même client et appareil,
+// et pas antérieur au CR : un ancien RDV déjà effectué ne doit pas s'accrocher à un nouveau CR.
+function rdvPosePieceCorrespond(rdv, r){
+  if(rdv.type_rdv !== 'pose_piece' || rdv.statut === 'annule') return false;
+  const crLinkMatch = (rdv.note_technicien || '').match(/\[\[cr:([^\]]+)\]\]/);
+  if(crLinkMatch) return crLinkMatch[1] === r.id;
+  if(rdv.statut === 'effectue' || rdv.statut === 'absent') return false;
+  if(r.date && rdv.date && rdv.date < r.date) return false;
+  const memeClient = (r.client_id && rdv.client_id === r.client_id) || (r.tel && rdv.tel === r.tel);
+  const memeAppareil = (rdv.appareil || '') === (r.appareil || '');
+  return memeClient && memeAppareil;
+}
 function getScheduledPosePieceRdv(r){
-  return agendaRdvs.find(rdv => {
-    if(rdv.type_rdv !== 'pose_piece' || rdv.statut === 'annule') return false;
-    const crLinkMatch = (rdv.note_technicien || '').match(/\[\[cr:([^\]]+)\]\]/);
-    if(crLinkMatch) return crLinkMatch[1] === r.id;
-    const memeClient = (r.client_id && rdv.client_id === r.client_id) || (r.tel && rdv.tel === r.tel);
-    const memeAppareil = (rdv.appareil || '') === (r.appareil || '');
-    return memeClient && memeAppareil;
-  }) || null;
+  return agendaRdvs.find(rdv => rdvPosePieceCorrespond(rdv, r)) || null;
 }
 
 const PIECE_SUIVI_LABELS = {
@@ -8556,14 +8562,7 @@ function renderDetailContent(r, container){
 // Un dossier a-t-il déjà un RDV "pose pièce" programmé (non annulé) ?
 async function hasScheduledPosePieceRdv(r){
   if(!agendaRdvs.length){ try{ agendaRdvs = await loadAgendaFromSupabase(); }catch(e){} }
-  return agendaRdvs.some(rdv => {
-    if(rdv.type_rdv !== 'pose_piece' || rdv.statut === 'annule') return false;
-    const crLinkMatch = (rdv.note_technicien || '').match(/\[\[cr:([^\]]+)\]\]/);
-    if(crLinkMatch) return crLinkMatch[1] === r.id;
-    const memeClient = (r.client_id && rdv.client_id === r.client_id) || (r.tel && rdv.tel === r.tel);
-    const memeAppareil = (rdv.appareil || '') === (r.appareil || '');
-    return memeClient && memeAppareil;
-  });
+  return agendaRdvs.some(rdv => rdvPosePieceCorrespond(rdv, r));
 }
 
 async function showDetail(r){
