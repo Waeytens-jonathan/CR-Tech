@@ -8190,6 +8190,10 @@ function renderDetailContent(r, container){
       html += `<option value="${key}" ${suiviActuel === key ? 'selected' : ''}>${escapeHtml(PIECE_SUIVI_LABELS[key].label)}</option>`;
     });
     html += '</select></div>';
+    const nbPiecesStock = piecesCommandeesPourAffichage(r).filter(p => p.statutClient !== 'refusee').length;
+    if(nbPiecesStock && suiviActuel !== 'posee' && suiviActuel !== 'annulee'){
+      html += `<button type="button" class="btn btn-outline" id="quick-piece-recue-stock-btn" style="margin-top:0.5rem;width:100%;">📥 Pièce(s) reçue(s) — ajouter ${nbPiecesStock > 1 ? 'les ' + nbPiecesStock + ' pièces' : 'la pièce'} au stock</button>`;
+    }
   }
 
   html += '<div class="checkbox-row" style="margin-top:0.8rem;">';
@@ -8481,6 +8485,43 @@ function renderDetailContent(r, container){
       r.sav_piece = sav_piece;
       await saveReportToSupabase(reports[idx]);
       showToast('Fiche SAV enregistrée ✓');
+    });
+  }
+
+  // Pièces du devis reçues du fournisseur : passage en stock « Pièces commandées » sans ressaisie
+  const recueStockBtn = document.getElementById('quick-piece-recue-stock-btn');
+  if(recueStockBtn){
+    recueStockBtn.addEventListener('click', async () => {
+      const idx = reports.findIndex(rep => rep.id === r.id);
+      if(idx === -1) return;
+      const rep = reports[idx];
+      const pieces = piecesCommandeesPourAffichage(rep).filter(p => p.statutClient !== 'refusee' && p.nom && p.nom.trim());
+      if(!pieces.length){ showToast('Aucune pièce à ajouter', true); return; }
+      if(rep['piece-suivi-statut'] === 'recu' && !confirm('Ces pièces sont déjà marquées comme reçues (et peut-être déjà au stock). Les ajouter encore une fois ?')) return;
+      recueStockBtn.disabled = true;
+      recueStockBtn.textContent = 'Ajout au stock…';
+      try{
+        const rows = pieces.map((p, i) => ({
+          app_id: 'stk_' + Date.now() + '_' + i,
+          nom: p.nom.trim(),
+          ref: (p.ref || '').trim(),
+          quantite: 1,
+          prix_vente: p.prixVente ? String(p.prixVente) : '',
+          garantie: '3 mois'
+        }));
+        const { error } = await sb.from('stock_pieces').insert(rows);
+        if(error) throw error;
+        rep['piece-suivi-statut'] = 'recu';
+        rep['piece-recue'] = true;
+        await saveReportToSupabase(rep);
+        showToast(`${rows.length} pièce${rows.length > 1 ? 's' : ''} ajoutée${rows.length > 1 ? 's' : ''} au stock ✓`);
+        renderDetailContent(rep, container);
+      }catch(e){
+        console.error('Erreur ajout pièces reçues au stock :', e);
+        showToast('Échec de l\'ajout au stock', true);
+        recueStockBtn.disabled = false;
+        recueStockBtn.textContent = '📥 Réessayer l\'ajout au stock';
+      }
     });
   }
 
