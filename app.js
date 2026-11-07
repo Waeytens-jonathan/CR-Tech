@@ -1,4 +1,3 @@
-
 // ---------- Zoom photo global (clic = agrandir, reclic = réduire) ----------
 // S'applique à toute photo affichée dans l'app : compte-rendu, plaque signalétique,
 // dépôt, pose de pièce, reçu de remise... peu importe où elle apparaît.
@@ -3044,16 +3043,29 @@ function buildFactureLignes(r){
     });
   } else if(Array.isArray(r.piecesCommandees) && r.piecesCommandees.length){
     const piecesFacturables = r.piecesCommandees.filter(p => p.statutClient !== 'refusee');
-    piecesFacturables.forEach(p => {
-      const prix = parseFloat(p.prixVente) || 0;
+    const prixBase = piecesFacturables.map(p => parseFloat(p.prixVente) || 0);
+    const sommePieces = prixBase.reduce((s, v) => s + v, 0);
+    // Frais de livraison : intégrés dans le prix des pièces (jamais en ligne séparée),
+    // répartis au prorata du prix de chaque pièce, arrondis au centime (le reste va sur la dernière).
+    const livraisonRestante = (coutPieces - sommePieces) > 0.01 ? (coutPieces - sommePieces) : 0;
+    let livraisonDistribuee = 0;
+    piecesFacturables.forEach((p, i) => {
+      let part = 0;
+      if(livraisonRestante > 0){
+        if(i === piecesFacturables.length - 1){
+          part = livraisonRestante - livraisonDistribuee;
+        } else {
+          part = Math.round((sommePieces > 0 ? livraisonRestante * prixBase[i] / sommePieces : livraisonRestante / piecesFacturables.length) * 100) / 100;
+          livraisonDistribuee += part;
+        }
+      }
+      const prix = Math.round((prixBase[i] + part) * 100) / 100;
       const nomClean = cleanNom(p.nom) || 'Pièce détachée';
       const refClean = cleanRef(p.ref);
       lignes.push({ designation: 'Pièce', description: nomClean + (refClean ? ` (Réf. ${refClean})` : ''), garantie: '3 mois', quantite: 1, prix_unitaire: prix, total: prix });
     });
-    const sommePieces = piecesFacturables.reduce((s,p) => s + (parseFloat(p.prixVente) || 0), 0);
-    const livraisonRestante = coutPieces - sommePieces;
-    if(livraisonRestante > 0.01){
-      lignes.push({ designation: 'Livraison pièce', description: '', quantite: 1, prix_unitaire: livraisonRestante, total: livraisonRestante });
+    if(!piecesFacturables.length && coutPieces > 0.01){
+      lignes.push({ designation: 'Pièce', description: (r['piece-desc'] || '').trim() || 'Pièce détachée', garantie: '3 mois', quantite: 1, prix_unitaire: coutPieces, total: coutPieces });
     }
   } else if(coutPieces > 0){
     const descCommande = (r['piece-desc'] || '').trim();
@@ -12000,5 +12012,3 @@ function checkDraft(){
     }
   }catch(e){}
 }
-
-
