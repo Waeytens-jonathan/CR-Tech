@@ -4470,6 +4470,47 @@ document.getElementById('depot-edit-save-btn').addEventListener('click', async (
   btn.textContent = 'Enregistrer le dépôt';
 });
 
+// Ajoute au « Stock pièces (commandées) » les pièces d'un devis (lignes du devis), après confirmation.
+// Renvoie true si des pièces ont été ajoutées.
+async function ajouterPiecesDevisAuStock(devisAppId){
+  try{
+    const { data, error } = await sb.from('devis').select('lignes').eq('app_id', devisAppId).single();
+    if(error) throw error;
+    let lignes = [];
+    try{ lignes = JSON.parse(data.lignes || '[]'); }catch(e){}
+    const estPiece = l => /pi[eè]ce/i.test(l.titre || '');
+    const estAutre = l => /main d|d[ée]placement|livraison|diagnostic|forfait|frais/i.test(l.titre || '');
+    let pieces = lignes.filter(estPiece);
+    if(!pieces.length) pieces = lignes.filter(l => !estAutre(l));
+    if(!pieces.length){ showToast('Aucune pièce trouvée dans ce devis', true); return false; }
+    const lignesStock = pieces.map(l => {
+      const desc = (l.description || l.titre || '').trim();
+      const m = desc.match(/^(.*?)\s*\(R[ée]f\.?\s*([^)]+)\)\s*$/i);
+      const nom = (m ? m[1] : desc).trim() || 'Pièce détachée';
+      const ref = m ? m[2].trim() : '';
+      const qte = Math.max(1, parseInt(l.quantite, 10) || 1);
+      const prix = parseFloat(l.total) ? (parseFloat(l.total) / qte) : (parseFloat(l.prix_unitaire) || 0);
+      return { nom, ref, qte, prix };
+    });
+    const recap = lignesStock.map(p => `• ${p.nom}${p.ref ? ' (Réf. ' + p.ref + ')' : ''} — ${p.prix.toFixed(2)} € × ${p.qte}`).join('\n');
+    if(!confirm(`Ajouter au stock pièces (commandées) :\n\n${recap}\n\nSi ces pièces ont déjà été ajoutées, ne confirme pas (doublon).`)) return false;
+    const rows = lignesStock.map((p, i) => ({
+      app_id: 'stk_' + Date.now() + '_' + i,
+      nom: p.nom, ref: p.ref, quantite: p.qte,
+      prix_vente: p.prix ? p.prix.toFixed(2) : '',
+      garantie: '3 mois'
+    }));
+    const { error: errIns } = await sb.from('stock_pieces').insert(rows);
+    if(errIns) throw errIns;
+    showToast(`${rows.length} pièce${rows.length > 1 ? 's' : ''} ajoutée${rows.length > 1 ? 's' : ''} au stock ✓`);
+    return true;
+  }catch(e){
+    console.error('Erreur ajout pièces du devis au stock :', e);
+    showToast('Échec de l\'ajout au stock', true);
+    return false;
+  }
+}
+
 // Appareils d'un RDV multi-appareils dont le compte-rendu n'a pas encore été fait
 // (déduit des CR déjà présents dans le dossier, donc fiable même si l'appli a été fermée entre-temps).
 function appareilsRestantsDuRdv(r, rep){
@@ -8215,6 +8256,13 @@ function renderDetailContent(r, container){
     }
   }
 
+  // Pièces uniquement présentes dans le devis (CR sans pièces saisies) : bouton pour les passer au stock
+  const devisPourStock = devisLight.find(d => d.rapport_app_id === r.id && d.statut_client !== 'refuse' && d.statut_client !== 'expire');
+  if(devisPourStock && !piecesCommandeesPourAffichage(r).filter(p => p.statutClient !== 'refusee').length
+     && r['piece-suivi-statut'] !== 'posee'){
+    html += `<button type="button" class="btn btn-outline" id="quick-piece-devis-stock-btn" data-devis="${escapeHtml(devisPourStock.app_id)}" style="margin-top:0.6rem;width:100%;">📥 Pièce(s) reçue(s) — ajouter les pièces du devis ${escapeHtml(devisPourStock.numero || '')} au stock</button>`;
+  }
+
   html += '<div class="checkbox-row" style="margin-top:0.8rem;">';
   html += `<input type="checkbox" id="quick-exclu-impaye" ${r['exclu-impaye'] ? 'checked' : ''}>`;
   html += '<label for="quick-exclu-impaye">Ne pas compter comme impayé <span style="font-weight:400;color:var(--text-muted);">(ex : en attente d\'une pièce, reste à encaisser normal)</span></label>';
@@ -8504,6 +8552,24 @@ function renderDetailContent(r, container){
       r.sav_piece = sav_piece;
       await saveReportToSupabase(reports[idx]);
       showToast('Fiche SAV enregistrée ✓');
+    });
+  }
+
+  const recueDevisBtn = document.getElementById('quick-piece-devis-stock-btn');
+  if(recueDevisBtn){
+    recueDevisBtn.addEventListener('click', async () => {
+      recueDevisBtn.disabled = true;
+      const ok = await ajouterPiecesDevisAuStock(recueDevisBtn.dataset.devis);
+      if(ok){
+        const idx = reports.findIndex(rep => rep.id === r.id);
+        if(idx !== -1){
+          reports[idx]['piece-suivi-statut'] = 'recu';
+          try{ await saveReportToSupabase(reports[idx]); }catch(e){ console.error(e); }
+          renderDetailContent(reports[idx], container);
+          return;
+        }
+      }
+      recueDevisBtn.disabled = false;
     });
   }
 
@@ -11166,48 +11232,10 @@ async function renderClientDevisList(c){
     // Pièces du devis -> stock pièces (commandées), sans ressaisie du nom, de la référence ni du prix
     container.querySelectorAll('.client-devis-stock-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const d = liste.find(x => x.app_id === btn.dataset.appId);
-        if(!d) return;
         btn.disabled = true;
         const ancienLabel = btn.textContent;
-        try{
-          const { data, error } = await sb.from('devis').select('lignes').eq('app_id', d.app_id).single();
-          if(error) throw error;
-          let lignes = [];
-          try{ lignes = JSON.parse(data.lignes || '[]'); }catch(e){}
-          const estPiece = l => /pi[eè]ce/i.test(l.titre || '');
-          const estAutre = l => /main d|d[ée]placement|livraison|diagnostic|forfait|frais/i.test(l.titre || '');
-          let pieces = lignes.filter(estPiece);
-          if(!pieces.length) pieces = lignes.filter(l => !estAutre(l));
-          if(!pieces.length){ showToast('Aucune pièce trouvée dans ce devis', true); return; }
-          const lignesStock = [];
-          pieces.forEach((l, i) => {
-            const desc = (l.description || l.titre || '').trim();
-            const m = desc.match(/^(.*?)\s*\(R[ée]f\.?\s*([^)]+)\)\s*$/i);
-            const nom = (m ? m[1] : desc).trim() || 'Pièce détachée';
-            const ref = m ? m[2].trim() : '';
-            const qte = Math.max(1, parseInt(l.quantite, 10) || 1);
-            const prix = parseFloat(l.total) ? (parseFloat(l.total) / qte) : (parseFloat(l.prix_unitaire) || 0);
-            lignesStock.push({ nom, ref, qte, prix });
-          });
-          const recap = lignesStock.map(p => `• ${p.nom}${p.ref ? ' (Réf. ' + p.ref + ')' : ''} — ${p.prix.toFixed(2)} € × ${p.qte}`).join('\n');
-          if(!confirm(`Ajouter au stock pièces (commandées) :\n\n${recap}\n\nSi ces pièces ont déjà été ajoutées, ne confirme pas (doublon).`)) return;
-          const rows = lignesStock.map((p, i) => ({
-            app_id: 'stk_' + Date.now() + '_' + i,
-            nom: p.nom, ref: p.ref, quantite: p.qte,
-            prix_vente: p.prix ? p.prix.toFixed(2) : '',
-            garantie: '3 mois'
-          }));
-          const { error: errIns } = await sb.from('stock_pieces').insert(rows);
-          if(errIns) throw errIns;
-          showToast(`${rows.length} pièce${rows.length > 1 ? 's' : ''} ajoutée${rows.length > 1 ? 's' : ''} au stock ✓`);
-        }catch(e){
-          console.error('Erreur ajout pièces du devis au stock :', e);
-          showToast('Échec de l\'ajout au stock', true);
-        }finally{
-          btn.disabled = false;
-          btn.textContent = ancienLabel;
-        }
+        try{ await ajouterPiecesDevisAuStock(btn.dataset.appId); }
+        finally{ btn.disabled = false; btn.textContent = ancienLabel; }
       });
     });
     container.querySelectorAll('.client-devis-sanssuite-btn').forEach(btn => {
