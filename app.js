@@ -8207,6 +8207,13 @@ function renderDetailContent(r, container){
       html += `<button type="button" class="btn btn-outline" id="quick-piece-recue-stock-btn" style="margin-top:0.5rem;width:100%;">📥 Pièce(s) reçue(s) — ajouter ${nbPiecesStock > 1 ? 'les ' + nbPiecesStock + ' pièces' : 'la pièce'} au stock</button>`;
     }
   }
+  else {
+    // Pièces du devis présentes même sans case « commande de pièce » cochée : bouton disponible aussi
+    const nbPiecesStock2 = piecesCommandeesPourAffichage(r).filter(p => p.statutClient !== 'refusee').length;
+    if(nbPiecesStock2 && r['piece-suivi-statut'] !== 'posee'){
+      html += `<button type="button" class="btn btn-outline" id="quick-piece-recue-stock-btn" style="margin-top:0.6rem;width:100%;">📥 Pièce(s) reçue(s) — ajouter ${nbPiecesStock2 > 1 ? 'les ' + nbPiecesStock2 + ' pièces' : 'la pièce'} au stock</button>`;
+    }
+  }
 
   html += '<div class="checkbox-row" style="margin-top:0.8rem;">';
   html += `<input type="checkbox" id="quick-exclu-impaye" ${r['exclu-impaye'] ? 'checked' : ''}>`;
@@ -11079,6 +11086,7 @@ async function renderClientDevisList(c){
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.6rem;">
           <button class="btn btn-outline client-devis-voir-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📄 Voir le PDF</button>
           <button class="btn btn-outline client-devis-envoyer-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;${d.statut==='envoye'?'color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);':''}">${d.statut==='envoye'?'✅ Envoyé':'📧 Envoyer'}</button>
+          ${(d.statut_client !== 'refuse' && d.statut_client !== 'expire') ? `<button class="btn btn-outline client-devis-stock-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">📥 Pièces → stock</button>` : ''}
           ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-accepte-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--green,#3fbf6f);border-color:var(--green,#3fbf6f);">✅ Marquer accepté</button>` : ''}
           ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-refuse-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--red,#e5534b);border-color:var(--red,#e5534b);">❌ Marquer refusé</button>` : ''}
           ${(!d.statut_client || d.statut_client === 'en_attente') ? `<button class="btn btn-outline client-devis-sanssuite-btn" data-app-id="${escapeHtml(d.app_id)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:#8a97a8;border-color:#8a97a8;">🚫 Classer sans suite</button>` : ''}
@@ -11152,6 +11160,53 @@ async function renderClientDevisList(c){
           console.error('Erreur marquage devis refusé :', e);
           showToast('Échec de la mise à jour', true);
           btn.disabled = false;
+        }
+      });
+    });
+    // Pièces du devis -> stock pièces (commandées), sans ressaisie du nom, de la référence ni du prix
+    container.querySelectorAll('.client-devis-stock-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const d = liste.find(x => x.app_id === btn.dataset.appId);
+        if(!d) return;
+        btn.disabled = true;
+        const ancienLabel = btn.textContent;
+        try{
+          const { data, error } = await sb.from('devis').select('lignes').eq('app_id', d.app_id).single();
+          if(error) throw error;
+          let lignes = [];
+          try{ lignes = JSON.parse(data.lignes || '[]'); }catch(e){}
+          const estPiece = l => /pi[eè]ce/i.test(l.titre || '');
+          const estAutre = l => /main d|d[ée]placement|livraison|diagnostic|forfait|frais/i.test(l.titre || '');
+          let pieces = lignes.filter(estPiece);
+          if(!pieces.length) pieces = lignes.filter(l => !estAutre(l));
+          if(!pieces.length){ showToast('Aucune pièce trouvée dans ce devis', true); return; }
+          const lignesStock = [];
+          pieces.forEach((l, i) => {
+            const desc = (l.description || l.titre || '').trim();
+            const m = desc.match(/^(.*?)\s*\(R[ée]f\.?\s*([^)]+)\)\s*$/i);
+            const nom = (m ? m[1] : desc).trim() || 'Pièce détachée';
+            const ref = m ? m[2].trim() : '';
+            const qte = Math.max(1, parseInt(l.quantite, 10) || 1);
+            const prix = parseFloat(l.total) ? (parseFloat(l.total) / qte) : (parseFloat(l.prix_unitaire) || 0);
+            lignesStock.push({ nom, ref, qte, prix });
+          });
+          const recap = lignesStock.map(p => `• ${p.nom}${p.ref ? ' (Réf. ' + p.ref + ')' : ''} — ${p.prix.toFixed(2)} € × ${p.qte}`).join('\n');
+          if(!confirm(`Ajouter au stock pièces (commandées) :\n\n${recap}\n\nSi ces pièces ont déjà été ajoutées, ne confirme pas (doublon).`)) return;
+          const rows = lignesStock.map((p, i) => ({
+            app_id: 'stk_' + Date.now() + '_' + i,
+            nom: p.nom, ref: p.ref, quantite: p.qte,
+            prix_vente: p.prix ? p.prix.toFixed(2) : '',
+            garantie: '3 mois'
+          }));
+          const { error: errIns } = await sb.from('stock_pieces').insert(rows);
+          if(errIns) throw errIns;
+          showToast(`${rows.length} pièce${rows.length > 1 ? 's' : ''} ajoutée${rows.length > 1 ? 's' : ''} au stock ✓`);
+        }catch(e){
+          console.error('Erreur ajout pièces du devis au stock :', e);
+          showToast('Échec de l\'ajout au stock', true);
+        }finally{
+          btn.disabled = false;
+          btn.textContent = ancienLabel;
         }
       });
     });
