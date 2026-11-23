@@ -710,6 +710,7 @@
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem;">
         <button class="btn btn-secondary" id="depot-detail-sms-btn">💬 Envoyer le bon de dépôt</button>
+        <button class="btn btn-secondary" id="depot-detail-dispo-btn">📣 Appareil disponible</button>
         <button class="btn btn-outline" id="depot-detail-edit-btn">✏️ Modifier</button>
         <button class="btn btn-outline" id="depot-detail-statut-btn"></button>
         <button class="btn btn-outline" id="depot-detail-recu-btn" style="display:none;">📄 Télécharger le reçu</button>
@@ -1752,6 +1753,23 @@
     <div style="display:flex;gap:0.6rem;">
       <button class="btn btn-outline" id="annulation-rdv-cancel-btn" style="flex:1;">Retour</button>
       <button class="btn btn-danger" id="annulation-rdv-confirm-btn" style="flex:1;">Confirmer l'annulation</button>
+    </div>
+  </div>
+</div>
+
+<div id="depot-dispo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1.2rem;">
+  <div style="background:var(--card-bg);border-radius:16px;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <h3 style="margin:0 0 0.8rem;">📣 Appareil disponible</h3>
+    <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1rem;">Le SMS indique que l'appareil est prêt et récupérable du lundi au vendredi. Choisis les heures de retrait :</p>
+    <div style="display:flex;gap:0.6rem;align-items:center;margin-bottom:1rem;">
+      <div style="flex:1;"><label style="font-size:0.8rem;color:var(--text-muted);">De</label>
+        <input type="time" id="depot-dispo-debut" value="09:00" style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+      <div style="flex:1;"><label style="font-size:0.8rem;color:var(--text-muted);">À</label>
+        <input type="time" id="depot-dispo-fin" value="18:00" style="width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+    </div>
+    <div style="display:flex;gap:0.6rem;">
+      <button class="btn btn-outline" id="depot-dispo-cancel-btn" style="flex:1;">Annuler</button>
+      <button class="btn btn-primary" id="depot-dispo-send-btn" style="flex:1;">💬 Envoyer le SMS</button>
     </div>
   </div>
 </div>

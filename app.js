@@ -1,3 +1,4 @@
+
 // ---------- Zoom photo global (clic = agrandir, reclic = réduire) ----------
 // S'applique à toute photo affichée dans l'app : compte-rendu, plaque signalétique,
 // dépôt, pose de pièce, reçu de remise... peu importe où elle apparaît.
@@ -2501,6 +2502,8 @@ async function showDepotDetail(appId){
   const statutBtn = document.getElementById('depot-detail-statut-btn');
   statutBtn.textContent = (d.statut === 'recupere' || d.statut === 'abandonne') ? '↩️ Remettre en "Déposé"' : '📤 Rendre l\'appareil';
 
+  document.getElementById('depot-detail-dispo-btn').style.display = (d.statut === 'recupere' || d.statut === 'abandonne') ? 'none' : 'inline-flex';
+
   const recuBtn = document.getElementById('depot-detail-recu-btn');
   if(d.statut === 'recupere' && d.signature_recuperation){
     recuBtn.style.display = 'inline-flex';
@@ -4237,6 +4240,41 @@ document.getElementById('depot-detail-sms-btn').addEventListener('click', () => 
   const dateLabel = dateFrLongFromISO(currentDepot.date_depot);
   const heureLabel = currentDepot.heure_depot || '';
   const message = `Bonjour ${currentDepot.prenom||''}, je vous confirme le dépôt de votre appareil (${currentDepot.appareil||''}) le ${dateLabel} à ${heureLabel}. ${(parseFloat(currentDepot.acompte_montant) > 0) ? 'Acompte reçu : ' + parseFloat(currentDepot.acompte_montant).toFixed(2) + ' €' + (currentDepot.acompte_mode ? ' (' + currentDepot.acompte_mode + ')' : '') + ', qui sera déduit de la facture finale. ' : ''}Je vous recontacte dès le diagnostic effectué. Jonathan – Technik-Home.`;
+  ouvrirSms(tel, message);
+});
+
+// SMS « appareil disponible » : retrait du lundi au vendredi, entre deux heures au choix
+function formatHeureSms(hhmm){
+  // « 09:00 » -> « 9h », « 17:30 » -> « 17h30 »
+  const [hh, mm] = (hhmm || '').split(':');
+  if(hh === undefined || hh === '') return '';
+  const h = parseInt(hh, 10);
+  return (mm && mm !== '00') ? `${h}h${mm}` : `${h}h`;
+}
+document.getElementById('depot-detail-dispo-btn').addEventListener('click', () => {
+  if(!currentDepot) return;
+  const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
+  if(!tel){ showToast('Numéro de téléphone manquant', true); return; }
+  try{
+    const d = localStorage.getItem('crtech_dispo_debut'), f = localStorage.getItem('crtech_dispo_fin');
+    if(d) document.getElementById('depot-dispo-debut').value = d;
+    if(f) document.getElementById('depot-dispo-fin').value = f;
+  }catch(e){}
+  document.getElementById('depot-dispo-modal').style.display = 'flex';
+});
+document.getElementById('depot-dispo-cancel-btn').addEventListener('click', () => {
+  document.getElementById('depot-dispo-modal').style.display = 'none';
+});
+document.getElementById('depot-dispo-send-btn').addEventListener('click', () => {
+  if(!currentDepot) return;
+  const debut = document.getElementById('depot-dispo-debut').value;
+  const fin = document.getElementById('depot-dispo-fin').value;
+  if(!debut || !fin){ showToast('Choisis les deux heures', true); return; }
+  if(debut >= fin){ showToast('L\'heure de fin doit être après l\'heure de début', true); return; }
+  try{ localStorage.setItem('crtech_dispo_debut', debut); localStorage.setItem('crtech_dispo_fin', fin); }catch(e){}
+  const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
+  const message = `Bonjour ${currentDepot.prenom||''}, votre appareil (${currentDepot.appareil||''}) est disponible. Vous pouvez venir le récupérer du lundi au vendredi, entre ${formatHeureSms(debut)} et ${formatHeureSms(fin)}, au 165 rue Emile Zola, App. 1, Bât. A, 62300 Lens. Merci de me prévenir de votre passage au 07 59 70 54 97. Jonathan – Technik-Home.`;
+  document.getElementById('depot-dispo-modal').style.display = 'none';
   ouvrirSms(tel, message);
 });
 
@@ -12095,3 +12133,5 @@ function checkDraft(){
     }
   }catch(e){}
 }
+
+
