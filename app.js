@@ -4273,7 +4273,7 @@ document.getElementById('depot-dispo-send-btn').addEventListener('click', () => 
   if(debut >= fin){ showToast('L\'heure de fin doit être après l\'heure de début', true); return; }
   try{ localStorage.setItem('crtech_dispo_debut', debut); localStorage.setItem('crtech_dispo_fin', fin); }catch(e){}
   const tel = (currentDepot.tel || '').replace(/[^\d+]/g, '');
-  const message = `Bonjour ${currentDepot.prenom||''}, votre appareil (${currentDepot.appareil||''}) est disponible. Vous pouvez venir le récupérer du lundi au vendredi, entre ${formatHeureSms(debut)} et ${formatHeureSms(fin)}, au 165 rue Emile Zola, App. 1, Bât. A, 62300 Lens. Merci de me prévenir de votre passage au 07 59 70 54 97. Jonathan – Technik-Home.`;
+  const message = `Bonjour ${currentDepot.prenom||''}, votre appareil (${currentDepot.appareil||''}) est disponible. Vous pouvez venir le récupérer du lundi au vendredi, entre ${formatHeureSms(debut)} et ${formatHeureSms(fin)}, au 165 rue Emile Zola, 62300 Lens. Merci de me prévenir de votre passage au 07 59 70 54 97. Jonathan – Technik-Home.`;
   document.getElementById('depot-dispo-modal').style.display = 'none';
   ouvrirSms(tel, message);
 });
