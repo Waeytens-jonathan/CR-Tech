@@ -9165,7 +9165,7 @@ async function generatePdfFor(data, mode){
   line('Travaux effectués', data.travaux);
   if(data['evenement-exterieur']){
     const labelsEvenement = { climatique: 'Climatique (orage, foudre, inondation...)', electrique: 'Électrique (coupure, surtension répétée du réseau...)', autre: 'Autre' };
-    line('Dommage lié à un événement extérieur', labelsEvenement[data['evenement-type']] || 'Oui');
+    line('Événement extérieur', labelsEvenement[data['evenement-type']] || 'Oui');
     if(data['evenement-details']) line('Détails de l\'événement', data['evenement-details']);
   }
   line('Statut', STATUT_LABELS[data.statut] || data.statut);
