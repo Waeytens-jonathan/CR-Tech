@@ -1122,7 +1122,8 @@ async function renderStats(){
   const urssafTauxLabel = document.getElementById('stat-urssaf-taux');
   if(urssafTauxLabel) urssafTauxLabel.textContent = urssafTauxPct;
 
-  const candidats = reports.filter(r => !r._isDraft && r.date);
+  // Stats : uniquement les dossiers réellement facturés (payés en totalité ou avec acompte) — les devis seuls ne comptent jamais
+  const candidats = reports.filter(r => !r._isDraft && r.date && ['Paye_total','Acompte'].includes(r['paiement-statut']));
   const filtered = range
     ? candidats.filter(r => r.date >= range.start && r.date <= range.end)
     : candidats;
