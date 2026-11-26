@@ -1123,7 +1123,7 @@ async function renderStats(){
   if(urssafTauxLabel) urssafTauxLabel.textContent = urssafTauxPct;
 
   // Stats : uniquement les dossiers réellement facturés (payés en totalité ou avec acompte) — les devis seuls ne comptent jamais
-  const candidats = reports.filter(r => !r._isDraft && r.date && ['Paye_total','Acompte'].includes(r['paiement-statut']));
+  const candidats = reports.filter(r => !r._isDraft && r.date && !['Non_paye','Gratuit'].includes(r['paiement-statut']));
   const filtered = range
     ? candidats.filter(r => r.date >= range.start && r.date <= range.end)
     : candidats;
@@ -1183,7 +1183,8 @@ async function renderStats(){
       const pieceArrivee = ['recu','posee'].includes(r['piece-suivi-statut']);
       // Devis pas encore accepté (en attente / envoyé) ou rien de facturé sur le dossier : pièce non commandée ou non due
       const devisNonAccepte = dv && dv.statut_client !== 'accepte';
-      if(r['piece-suivi-statut'] === 'annulee' || toutesRefusees || ((devisMort || devisNonAccepte || montantLigne <= 0) && !pieceArrivee)) prixFournisseur = 0;
+      // Aucune pièce facturée au client, ou devis refusé/expiré : jamais de coût compté (même si la pièce est marquée reçue/posée)
+      if(r['piece-suivi-statut'] === 'annulee' || toutesRefusees || devisMort || pieces <= 0 || ((devisNonAccepte || montantLigne <= 0) && !pieceArrivee)) prixFournisseur = 0;
     }
     totalFournisseur += prixFournisseur * ratioEncaisse;
     if(prixFournisseur > 0){
