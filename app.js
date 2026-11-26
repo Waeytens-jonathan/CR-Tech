@@ -416,6 +416,7 @@ function reportToRow(r){
   if(r['livraison']) extra.livraison = r['livraison'];
   if(r['acompte-montant']) extra.acompte_montant = r['acompte-montant'];
   if(r['devis-a-faire']) extra.devis_a_faire = true;
+  if(Array.isArray(r.complements) && r.complements.length) extra.complements = r.complements;
   if(r._draftStep !== undefined) extra._draftStep = r._draftStep;
   if(r.sav_probleme) extra.sav_probleme = r.sav_probleme;
   if(r.sav_resolution) extra.sav_resolution = r.sav_resolution;
@@ -493,6 +494,7 @@ function rowToReport(row){
     'reste-encaisser': row.reste_encaisser,
     'acompte-montant': extra.acompte_montant || '',
     'devis-a-faire': !!extra.devis_a_faire,
+    complements: Array.isArray(extra.complements) ? extra.complements : [],
     documents_envoyes: row.documents_envoyes != null ? !!row.documents_envoyes : !!extra.documents_envoyes,
     sav_probleme: extra.sav_probleme || '',
     sav_resolution: extra.sav_resolution || '',
@@ -1206,6 +1208,19 @@ async function renderStats(){
     // toujours à ce qui est vraiment facturé, peu importe comment la pièce a été saisie
     // (pose-pièce, stock, commande directe...).
     nbPiecesPosees += buildFactureLignes(r).filter(l => l.designation === 'Pièce').length;
+  });
+
+  // Factures complémentaires (pièce ajoutée après coup sur un dossier terminé) : comptées à leur date
+  candidats.forEach(r => {
+    (Array.isArray(r.complements) ? r.complements : []).forEach(cp => {
+      if(range && (!cp.date || cp.date < range.start || cp.date > range.end)) return;
+      totalPieces += parseFloat(cp.piece) || 0;
+      totalMo += parseFloat(cp.mo) || 0;
+      totalDepl += parseFloat(cp.depl) || 0;
+      totalFournisseur += parseFloat(cp.cout) || 0;
+      if((parseFloat(cp.piece) || 0) > 0) nbPiecesPosees++;
+      if(cp.date) caParJour[cp.date] = (caParJour[cp.date] || 0) + (parseFloat(cp.piece)||0) + (parseFloat(cp.mo)||0) + (parseFloat(cp.depl)||0);
+    });
   });
 
   const ca = totalMo + totalPieces + totalDepl;
@@ -2975,7 +2990,8 @@ async function loadFacturesLight(){
   try{
     const { data, error } = await sb.from('factures').select('app_id,numero,rapport_app_id,annee,sequence').order('sequence', { ascending: false });
     if(error) throw error;
-    facturesLight = data || [];
+    // Les factures complémentaires (app_id 'factc_…') ne doivent jamais remplacer la facture principale du dossier
+    facturesLight = (data || []).filter(f => !String(f.app_id || '').startsWith('factc_'));
   }catch(e){
     console.error('Erreur chargement factures :', e);
     facturesLight = [];
@@ -3342,6 +3358,87 @@ async function genererFacturePourDossier(r){
 
   facturesLight.push({ app_id: factureAppId, numero, rapport_app_id: r.id, annee, sequence });
   return { app_id: factureAppId, numero, montant_total: montantTotal, pdf_base64: pdfBase64 };
+}
+
+// ---------- Facture complémentaire (pièce ajoutée sur un dossier déjà terminé) ----------
+async function envoyerFactureComplement(r, cp){
+  const emailCible = await getEmailAJour(r);
+  if(!emailCible){ showToast('Email du client manquant', true); return; }
+  const { data, error } = await sb.from('factures').select('numero,montant_total,pdf_base64').eq('app_id', cp.facture_app_id).single();
+  if(error) throw error;
+  const res = await sb.functions.invoke('send-facture', {
+    body: { email: emailCible, nom: r.nom, prenom: r.prenom, numero: data.numero, montant: data.montant_total, pdf_base64: data.pdf_base64 }
+  });
+  if(res.error) throw res.error;
+  showToast('Facture envoyée au client ✓');
+}
+
+function ouvrirComplementFacture(r){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  const inp = 'width:100%;padding:0.55rem 0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95rem;box-sizing:border-box;margin-bottom:0.6rem;';
+  ov.innerHTML = `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:1.2rem;max-width:440px;width:100%;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 0.4rem;">➕ Facture complémentaire</h3>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.8rem;">La facture d'origine ne change pas. Seul ce complément est facturé (nouveau numéro).</p>
+    <label>Pièce (nom)</label><input id="cpl-nom" type="text" style="${inp}" placeholder="ex : Résistance chauffante">
+    <label>Référence (facultatif)</label><input id="cpl-ref" type="text" style="${inp}">
+    <label>Prix facturé au client pour la pièce (€, livraison incluse)</label><input id="cpl-prix" type="number" step="0.01" min="0" inputmode="decimal" style="${inp}">
+    <label>Coût réel d'achat de la pièce (€, livraison comprise)</label><input id="cpl-cout" type="number" step="0.01" min="0" inputmode="decimal" style="${inp}">
+    <label>Main-d'œuvre complémentaire (€, facultatif)</label><input id="cpl-mo" type="number" step="0.01" min="0" inputmode="decimal" style="${inp}">
+    <label>Déplacement complémentaire (€, facultatif)</label><input id="cpl-depl" type="number" step="0.01" min="0" inputmode="decimal" style="${inp}">
+    <label>Mode de paiement</label><select id="cpl-moyen" style="${inp}"><option>Espèces</option><option>Carte bancaire</option><option>Virement</option></select>
+    <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.4rem;"><button class="btn btn-outline" id="cpl-cancel">Annuler</button><button class="btn btn-primary" id="cpl-ok">Créer la facture</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#cpl-cancel').onclick = () => ov.remove();
+  ov.querySelector('#cpl-ok').onclick = async () => {
+    const nom = ov.querySelector('#cpl-nom').value.trim();
+    const ref = ov.querySelector('#cpl-ref').value.trim();
+    const prix = parseFloat(ov.querySelector('#cpl-prix').value) || 0;
+    const cout = parseFloat(ov.querySelector('#cpl-cout').value) || 0;
+    const mo = parseFloat(ov.querySelector('#cpl-mo').value) || 0;
+    const depl = parseFloat(ov.querySelector('#cpl-depl').value) || 0;
+    const moyen = ov.querySelector('#cpl-moyen').value;
+    if(prix > 0 && !nom){ showToast('Indique le nom de la pièce', true); return; }
+    const total = prix + mo + depl;
+    if(total <= 0){ showToast('Aucun montant à facturer', true); return; }
+    const btn = ov.querySelector('#cpl-ok'); btn.disabled = true; btn.textContent = 'Création…';
+    try{
+      const lignes = [];
+      if(mo > 0) lignes.push({ designation: 'Main d\'œuvre', description: [r.appareil, `${r.marque||''} ${r.modele||''}`.trim()].filter(Boolean).join(' — '), quantite: 1, prix_unitaire: mo, total: mo });
+      if(prix > 0) lignes.push({ designation: 'Pièce', description: (cleanNom(nom) || 'Pièce détachée') + (cleanRef(ref) ? ` (Réf. ${cleanRef(ref)})` : ''), garantie: '3 mois', quantite: 1, prix_unitaire: prix, total: prix });
+      if(depl > 0) lignes.push({ designation: 'Déplacement', description: '', quantite: 1, prix_unitaire: depl, total: depl });
+      const { annee, sequence, numero } = await getNextFactureNumero();
+      const dateEmission = todayISO();
+      const rc = { ...r, date: dateEmission, 'paiement-moyen': moyen, 'paiement-statut': 'Paye_total', 'paiement-especes': '', 'paiement-carte': '' };
+      const doc = generateFacturePdf(rc, numero, lignes, total, dateEmission);
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const factureAppId = 'factc_' + Date.now();
+      const { error } = await sb.from('factures').insert({
+        app_id: factureAppId, numero, annee, sequence,
+        date_emission: dateEmission, date_prestation: dateEmission, rapport_app_id: r.id,
+        client_nom: r.nom || '', client_prenom: r.prenom || '', client_adresse: r.adresse || '',
+        client_cp: r.cp || '', client_ville: r.ville || '',
+        lignes: JSON.stringify(lignes), montant_total: total, mode_paiement: moyen, pdf_base64: pdfBase64
+      });
+      if(error) throw error;
+      const cp = { facture_app_id: factureAppId, numero, date: dateEmission, nom, ref, piece: prix, cout, mo, depl, total };
+      r.complements = [...(Array.isArray(r.complements) ? r.complements : []), cp];
+      const idx = reports.findIndex(x => x.id === r.id);
+      if(idx !== -1) reports[idx].complements = r.complements;
+      await saveReportToSupabase(r);
+      ov.remove();
+      showToast(`Facture ${numero} créée ✓`);
+      showDetail(reports[idx] || r);
+      if(await getEmailAJour(r) && confirm(`Envoyer la facture ${numero} (${total.toFixed(2)} €) au client par email ?`)){
+        try{ await envoyerFactureComplement(r, cp); }catch(e){ console.error(e); showToast('Échec de l\'envoi', true); }
+      }
+    }catch(e){
+      console.error('Erreur facture complémentaire :', e);
+      showToast('Échec de la création de la facture', true);
+      btn.disabled = false; btn.textContent = 'Créer la facture';
+    }
+  };
 }
 
 // Récupère la facture existante d'un dossier, ou en génère une nouvelle si aucune n'existe encore.
@@ -7607,6 +7704,7 @@ async function saveCurrentReport(){
     // Idem pour tout champ que seul "Suivi du dossier" renseigne (pas dans le formulaire principal) —
     // un enregistrement classique du CR ne doit jamais effacer ce qui a été réglé de ce côté-là.
     if(data['facture-creee'] === undefined) data['facture-creee'] = ancien['facture-creee'] || false;
+    if(data.complements === undefined) data.complements = ancien.complements || [];
     if(data['exclu-impaye'] === undefined) data['exclu-impaye'] = ancien['exclu-impaye'] || false;
     if(data['dossier-assurance'] === undefined) data['dossier-assurance'] = ancien['dossier-assurance'] || false;
     if(data['tel-interlocuteur'] === undefined) data['tel-interlocuteur'] = ancien['tel-interlocuteur'] || '';
@@ -8530,6 +8628,14 @@ function renderDetailContent(r, container){
       html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="exclure-pieces-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">🚫 Exclure pièce(s) + déplacement du CR (devis refusé/expiré)</button></div>`;
     }
   }
+  if(['Terminée','Non_reparable','archivé'].includes(r.statut)){
+    const comps = Array.isArray(r.complements) ? r.complements : [];
+    html += '<div class="detail-section"><h3>Complément (pièce ajoutée après coup)</h3>';
+    comps.forEach((cp, i) => {
+      html += `<div class="detail-row"><span class="dlabel">${escapeHtml(cp.numero || 'Facture')} · ${escapeHtml(cp.nom || 'Complément')}</span><span class="dvalue">${(parseFloat(cp.total)||0).toFixed(2)} € <button class="btn btn-outline cr-complement-voir" data-i="${i}" style="font-size:0.75rem;padding:0.2rem 0.5rem;margin-left:0.4rem;">📄</button> <button class="btn btn-outline cr-complement-mail" data-i="${i}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">📧</button></span></div>`;
+    });
+    html += '<button class="btn btn-outline" id="cr-complement-add-btn" style="font-size:0.85rem;padding:0.45rem 0.9rem;">➕ Ajouter une pièce / facture complémentaire</button></div>';
+  }
   html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Facture créée</span><span class="dvalue" style="font-weight:600;color:${r['facture-creee'] ? 'var(--green,#3fbf6f)' : 'var(--orange)'};">${r['facture-creee'] ? 'Oui' : 'Non'}</span></div>`;
   html += '</div>';
 
@@ -8564,6 +8670,24 @@ function renderDetailContent(r, container){
 
   c.innerHTML = html;
 
+  c.querySelector('#cr-complement-add-btn')?.addEventListener('click', () => ouvrirComplementFacture(r));
+  c.querySelectorAll('.cr-complement-voir').forEach(b => b.addEventListener('click', async () => {
+    const cp = (r.complements || [])[parseInt(b.dataset.i, 10)];
+    if(!cp) return;
+    try{
+      const { data, error } = await sb.from('factures').select('pdf_base64,numero').eq('app_id', cp.facture_app_id).single();
+      if(error) throw error;
+      const a = document.createElement('a');
+      a.href = 'data:application/pdf;base64,' + data.pdf_base64; a.download = `${data.numero}.pdf`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }catch(e){ console.error(e); showToast('Facture introuvable', true); }
+  }));
+  c.querySelectorAll('.cr-complement-mail').forEach(b => b.addEventListener('click', async () => {
+    const cp = (r.complements || [])[parseInt(b.dataset.i, 10)];
+    if(!cp) return;
+    try{ await envoyerFactureComplement(r, cp); }
+    catch(e){ console.error(e); showToast('Échec de l\'envoi : ' + (e.message || 'voir console'), true); }
+  }));
   c.querySelector('#cr-devis-refuse-btn')?.addEventListener('click', async () => {
     const dv = devisLight.find(d => d.rapport_app_id === r.id);
     if(!dv) return;
