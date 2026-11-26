@@ -8632,7 +8632,7 @@ function renderDetailContent(r, container){
     const comps = Array.isArray(r.complements) ? r.complements : [];
     html += '<div class="detail-section"><h3>Complément (pièce ajoutée après coup)</h3>';
     comps.forEach((cp, i) => {
-      html += `<div class="detail-row"><span class="dlabel">${escapeHtml(cp.numero || 'Facture')} · ${escapeHtml(cp.nom || 'Complément')}</span><span class="dvalue">${(parseFloat(cp.total)||0).toFixed(2)} € <button class="btn btn-outline cr-complement-voir" data-i="${i}" style="font-size:0.75rem;padding:0.2rem 0.5rem;margin-left:0.4rem;">📄</button> <button class="btn btn-outline cr-complement-mail" data-i="${i}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">📧</button></span></div>`;
+      html += `<div class="detail-row"><span class="dlabel">${escapeHtml(cp.numero || 'Facture')} · ${escapeHtml(cp.nom || 'Complément')}</span><span class="dvalue">${(parseFloat(cp.total)||0).toFixed(2)} € <button class="btn btn-outline cr-complement-voir" data-i="${i}" style="font-size:0.75rem;padding:0.2rem 0.5rem;margin-left:0.4rem;">👁️ Voir</button> <button class="btn btn-outline cr-complement-dl" data-i="${i}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">⬇️</button> <button class="btn btn-outline cr-complement-mail" data-i="${i}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">📧</button></span></div>`;
     });
     html += '<button class="btn btn-outline" id="cr-complement-add-btn" style="font-size:0.85rem;padding:0.45rem 0.9rem;">➕ Ajouter une pièce / facture complémentaire</button></div>';
   }
@@ -8672,6 +8672,19 @@ function renderDetailContent(r, container){
 
   c.querySelector('#cr-complement-add-btn')?.addEventListener('click', () => ouvrirComplementFacture(r));
   c.querySelectorAll('.cr-complement-voir').forEach(b => b.addEventListener('click', async () => {
+    const cp = (r.complements || [])[parseInt(b.dataset.i, 10)];
+    if(!cp) return;
+    try{
+      const { data, error } = await sb.from('factures').select('pdf_base64,numero').eq('app_id', cp.facture_app_id).single();
+      if(error) throw error;
+      const bin = atob(data.pdf_base64); const arr = new Uint8Array(bin.length);
+      for(let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+      const url = URL.createObjectURL(new Blob([arr], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }catch(e){ console.error(e); showToast('Facture introuvable', true); }
+  }));
+  c.querySelectorAll('.cr-complement-dl').forEach(b => b.addEventListener('click', async () => {
     const cp = (r.complements || [])[parseInt(b.dataset.i, 10)];
     if(!cp) return;
     try{
