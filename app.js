@@ -1141,6 +1141,7 @@ async function renderStats(){
   let totalMo = 0, totalPieces = 0, totalDepl = 0, totalFournisseur = 0, totalLivraison = 0, nbNonReparable = 0, nbPiecesPosees = 0;
   const caParJour = {};
   const marqueCount = {};
+  window._diagCout = [];
   filtered.forEach(r => {
     const mo = parseFloat(r['cout-mo']) || 0;
     const pieces = parseFloat(r['cout-pieces']) || 0;
@@ -1179,9 +1180,14 @@ async function renderStats(){
       const dv = (typeof devisLight !== 'undefined' && Array.isArray(devisLight)) ? devisLight.find(d => d.rapport_app_id === r.id) : null;
       const devisMort = dv && (dv.statut_client === 'refuse' || dv.statut_client === 'expire');
       const pieceArrivee = ['recu','posee'].includes(r['piece-suivi-statut']);
-      if(r['piece-suivi-statut'] === 'annulee' || toutesRefusees || (devisMort && !pieceArrivee)) prixFournisseur = 0;
+      // Devis pas encore accepté (en attente / envoyé) ou rien de facturé sur le dossier : pièce non commandée ou non due
+      const devisNonAccepte = dv && dv.statut_client !== 'accepte';
+      if(r['piece-suivi-statut'] === 'annulee' || toutesRefusees || ((devisMort || devisNonAccepte || montantLigne <= 0) && !pieceArrivee)) prixFournisseur = 0;
     }
     totalFournisseur += prixFournisseur * ratioEncaisse;
+    if(prixFournisseur > 0){
+      (window._diagCout = window._diagCout || []).push({ r, cout: prixFournisseur * ratioEncaisse, facture: piecesEncaisse, ratio: ratioEncaisse });
+    }
     if(prixFournisseur > 0){
       const tarifsStats = (_agendaConfigCache && _agendaConfigCache.tarifsLivraison && _agendaConfigCache.tarifsLivraison.length)
         ? _agendaConfigCache.tarifsLivraison
@@ -1314,6 +1320,17 @@ async function renderStats(){
   document.getElementById('stat-pieces-facturees').textContent = formatEur(totalPieces);
   document.getElementById('stat-deplacement').textContent = formatEur(totalDepl);
   document.getElementById('stat-cout-fournisseur').textContent = formatEur(totalFournisseur + totalLivraison);
+  (function(){
+    const box = document.getElementById('stat-cout-diag');
+    if(!box) return;
+    const lignes = (window._diagCout || []).filter(d => d.cout > d.facture + 0.01)
+      .sort((x,y) => (y.cout - y.facture) - (x.cout - x.facture));
+    box.innerHTML = lignes.length
+      ? `<details style="margin-top:0.5rem;"><summary style="cursor:pointer;color:#f5a623;font-size:0.85rem;">🔍 ${lignes.length} dossier(s) où le coût fournisseur dépasse la pièce facturée</summary>`
+        + lignes.map(d => `<div style="font-size:0.8rem;padding:0.25rem 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:0.5rem;"><span>${escapeHtml(((d.r.prenom||'') + ' ' + (d.r.nom||'')).trim() || 'Client')} · ${escapeHtml(d.r.date||'')} · ${escapeHtml(d.r['paiement-statut']||'')}${d.r['piece-suivi-statut'] ? ' · ' + escapeHtml(d.r['piece-suivi-statut']) : ''}</span><span>coût ${d.cout.toFixed(2)} € / facturé ${d.facture.toFixed(2)} €</span></div>`).join('')
+        + `</details>`
+      : '';
+  })();
   document.getElementById('stat-urssaf').textContent = formatEur(urssaf);
   document.getElementById('stat-net').textContent = formatEur(net);
 
