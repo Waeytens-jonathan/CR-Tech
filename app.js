@@ -5720,6 +5720,27 @@ document.getElementById('agenda-lien-rdv-btn').addEventListener('click', () => {
   } else { fallback(); }
 });
 
+document.getElementById('depot-modalites-btn').addEventListener('click', () => {
+  const message = "Bonjour, voici les modalités de dépôt :\n"
+    + "📍 Adresse : 165 rue Emile Zola, 62300 Lens\n"
+    + "🕓 Dépôt et retrait : du lundi au vendredi, entre 16h et 18h\n"
+    + "📞 Merci de me prévenir avant de venir, pour un dépôt comme pour un retrait : 07 59 70 54 97\n"
+    + "💶 Le diagnostic est payant : 35 €\n"
+    + "Jonathan – Technik-Home";
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = message; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try{ ok = document.execCommand('copy'); }catch(err){}
+    document.body.removeChild(ta);
+    showToast(ok ? 'Modalités de dépôt copiées ✓' : 'Copie impossible', !ok);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(message).then(() => showToast('Modalités de dépôt copiées ✓')).catch(fallback);
+  } else { fallback(); }
+});
+
 document.getElementById('agenda-new-btn').addEventListener('click', () => {
   editingRdvAppId = null;
   editingRdvOriginal = null;
@@ -8502,6 +8523,9 @@ function renderDetailContent(r, container){
       : { label: '📝 Devis généré', couleur: 'var(--text-muted)' };
     html += `<div class="detail-row" style="border-bottom:none;"><span class="dlabel">Devis</span><span class="dvalue" style="font-weight:600;color:${infoDevis.couleur};">${infoDevis.label}</span></div>`;
     const piecesNonRefusees = Array.isArray(r.piecesCommandees) ? r.piecesCommandees.filter(p => p.statutClient !== 'refusee') : [];
+    if(!devisLie.statut_client || devisLie.statut_client === 'en_attente'){
+      html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="cr-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">❌ Classer le devis en refus</button></div>`;
+    }
     if((devisLie.statut_client === 'refuse' || devisLie.statut_client === 'expire') && piecesNonRefusees.length){
       html += `<div style="margin-top:0.6rem;"><button class="btn btn-outline" id="exclure-pieces-devis-refuse-btn" style="font-size:0.82rem;padding:0.4rem 0.8rem;color:#e05252;border-color:#e05252;">🚫 Exclure pièce(s) + déplacement du CR (devis refusé/expiré)</button></div>`;
     }
@@ -8539,6 +8563,24 @@ function renderDetailContent(r, container){
   }
 
   c.innerHTML = html;
+
+  c.querySelector('#cr-devis-refuse-btn')?.addEventListener('click', async () => {
+    const dv = devisLight.find(d => d.rapport_app_id === r.id);
+    if(!dv) return;
+    const saisie = prompt(`Devis ${dv.numero || ''} refusé (par le client ou l'assurance).\nMotif (facultatif) :`, '');
+    if(saisie === null) return;
+    const motif = 'Refusé' + (saisie.trim() ? ' — ' + saisie.trim() : ' (saisi manuellement)');
+    if(!confirm('Confirmer le refus ? Les pièces et le déplacement seront retirés du montant facturé et du coût réel (ce qui a déjà été encaissé est conservé).')) return;
+    try{
+      await classerDevisSansSuite(dv.app_id, dv.rapport_app_id, motif, 'refuse');
+      showToast('Devis classé en refus ✓');
+      const maj = reports.find(x => x.id === r.id) || r;
+      showDetail(maj);
+    }catch(e){
+      console.error('Erreur refus devis :', e);
+      showToast('Échec de la mise à jour', true);
+    }
+  });
 
   c.querySelector('#exclure-pieces-devis-refuse-btn')?.addEventListener('click', async () => {
     if(!confirm('Devis refusé : marquer la/les pièce(s) commandée(s) comme refusées ET retirer le déplacement du montant facturé ? Les pièces resteront visibles dans le CR mais ne seront plus facturées — ce qui a déjà été encaissé est conservé.')) return;
@@ -8701,7 +8743,7 @@ function renderDetailContent(r, container){
       reports[idx]['tel-interlocuteur'] = telInterlocuteurEl.value.trim();
       const pieceSuiviEl = document.getElementById('quick-piece-suivi');
       if(reports[idx]['commande-piece']){
-        reports[idx]['piece-suivi-statut'] = (statutEl.value === 'Terminée') ? 'posee' : (pieceSuiviEl ? pieceSuiviEl.value : reports[idx]['piece-suivi-statut']);
+        reports[idx]['piece-suivi-statut'] = (statutEl.value === 'Terminée' && !reports[idx]['dossier-assurance']) ? 'posee' : (pieceSuiviEl ? pieceSuiviEl.value : reports[idx]['piece-suivi-statut']);
       }
       reports[idx]['type-client'] = typeClientEl.value;
       if(typeClientEl.value === 'professionnel'){
@@ -10790,6 +10832,9 @@ async function autoClasserDevisExpires(){
   let uneModif = false;
 
   for(const d of expires){
+    // Dossier assurance : l'assureur peut mettre longtemps à répondre, on ne classe jamais tout seul
+    const rAss = reports.find(x => !x._isDraft && (x.id === d.rapport_app_id || x.app_id === d.rapport_app_id));
+    if(rAss && rAss['dossier-assurance']) continue;
     try{
       await classerDevisSansSuite(d.app_id, d.rapport_app_id, motif);
       uneModif = true;
