@@ -1170,7 +1170,17 @@ async function renderStats(){
     if(r.date){
       caParJour[r.date] = (caParJour[r.date] || 0) + moEncaisse + piecesEncaisse + deplEncaisse;
     }
-    const prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
+    let prixFournisseur = parseFloat(r['prix-fournisseur']) || 0;
+    // Coût réel ignoré si les pièces ne sont plus d'actualité : pièces annulées / refusées,
+    // ou devis refusé/expiré sans pièce reçue ni posée (ex. dossier assurance refusé)
+    if(prixFournisseur > 0){
+      const pcs = Array.isArray(r.piecesCommandees) ? r.piecesCommandees : [];
+      const toutesRefusees = pcs.length > 0 && pcs.every(p => p.statutClient === 'refusee');
+      const dv = (typeof devisLight !== 'undefined' && Array.isArray(devisLight)) ? devisLight.find(d => d.rapport_app_id === r.id) : null;
+      const devisMort = dv && (dv.statut_client === 'refuse' || dv.statut_client === 'expire');
+      const pieceArrivee = ['recu','posee'].includes(r['piece-suivi-statut']);
+      if(r['piece-suivi-statut'] === 'annulee' || toutesRefusees || (devisMort && !pieceArrivee)) prixFournisseur = 0;
+    }
     totalFournisseur += prixFournisseur * ratioEncaisse;
     if(prixFournisseur > 0){
       const tarifsStats = (_agendaConfigCache && _agendaConfigCache.tarifsLivraison && _agendaConfigCache.tarifsLivraison.length)
