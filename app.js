@@ -4644,6 +4644,10 @@ async function ajouterPiecesDevisAuStock(devisAppId){
     try{ lignes = JSON.parse(data.lignes || '[]'); }catch(e){}
     const estPiece = l => /pi[eè]ce/i.test(l.titre || '');
     const estAutre = l => /main d|d[ée]placement|livraison|diagnostic|forfait|frais/i.test(l.titre || '');
+    // Les frais de livraison ne sont jamais une pièce : on les intègre au prix de la pièce
+    const estLivraison = l => /livraison|port\b|exp[ée]dition/i.test((l.titre || '') + ' ' + (l.description || ''));
+    const livraisonTotale = lignes.filter(estLivraison).reduce((sum, l) => sum + (parseFloat(l.total) || ((parseFloat(l.prix_unitaire) || 0) * (parseInt(l.quantite, 10) || 1))), 0);
+    lignes = lignes.filter(l => !estLivraison(l));
     let pieces = lignes.filter(estPiece);
     if(!pieces.length) pieces = lignes.filter(l => !estAutre(l));
     if(!pieces.length){ showToast('Aucune pièce trouvée dans ce devis', true); return false; }
@@ -4656,6 +4660,7 @@ async function ajouterPiecesDevisAuStock(devisAppId){
       const prix = parseFloat(l.total) ? (parseFloat(l.total) / qte) : (parseFloat(l.prix_unitaire) || 0);
       return { nom, ref, qte, prix };
     });
+    if(livraisonTotale > 0 && lignesStock.length) lignesStock[0].prix += livraisonTotale / lignesStock[0].qte;
     const recap = lignesStock.map(p => `• ${p.nom}${p.ref ? ' (Réf. ' + p.ref + ')' : ''} — ${p.prix.toFixed(2)} € × ${p.qte}`).join('\n');
     if(!confirm(`Ajouter au stock pièces (commandées) :\n\n${recap}\n\nSi ces pièces ont déjà été ajoutées, ne confirme pas (doublon).`)) return false;
     const rows = lignesStock.map((p, i) => ({
@@ -8826,8 +8831,15 @@ function renderDetailContent(r, container){
       const idx = reports.findIndex(rep => rep.id === r.id);
       if(idx === -1) return;
       const rep = reports[idx];
-      const pieces = piecesCommandeesPourAffichage(rep).filter(p => p.statutClient !== 'refusee' && p.nom && p.nom.trim());
+      const pieces = piecesCommandeesPourAffichage(rep).filter(p => p.statutClient !== 'refusee' && p.nom && p.nom.trim() && !/^\s*(frais\s+de\s+)?(livraison|port|exp[ée]dition)/i.test(p.nom));
       if(!pieces.length){ showToast('Aucune pièce à ajouter', true); return; }
+      // Livraison = part du coût pièces facturé en plus du prix des pièces : intégrée à la 1re pièce, jamais en ligne séparée
+      const sommeVente = pieces.reduce((sum, p) => sum + (parseFloat(p.prixVente) || 0), 0);
+      const livraisonCR = Math.max(0, (parseFloat(rep['cout-pieces']) || 0) - sommeVente);
+      const prixStock = pieces.map((p, i) => {
+        const pv = parseFloat(p.prixVente) || 0;
+        return (i === 0 && pv > 0 && sommeVente > 0 && livraisonCR > 0.01 && livraisonCR < 50) ? pv + livraisonCR : pv;
+      });
       if(rep['piece-suivi-statut'] === 'recu' && !confirm('Ces pièces sont déjà marquées comme reçues (et peut-être déjà au stock). Les ajouter encore une fois ?')) return;
       recueStockBtn.disabled = true;
       recueStockBtn.textContent = 'Ajout au stock…';
@@ -8837,7 +8849,7 @@ function renderDetailContent(r, container){
           nom: p.nom.trim(),
           ref: (p.ref || '').trim(),
           quantite: 1,
-          prix_vente: p.prixVente ? String(p.prixVente) : '',
+          prix_vente: prixStock[i] ? prixStock[i].toFixed(2) : '',
           garantie: '3 mois'
         }));
         const { error } = await sb.from('stock_pieces').insert(rows);
